@@ -1,98 +1,47 @@
-# Buddy — Android AI Assistant
+# Buddy
 
-A Jetpack Compose chat UI prototype for a multimodal LLM assistant app.
+<table>
+  <tr>
+    <td align="right" valign="top">
+      <img src="./design/res/logo.png" alt="App Logo" width="256"/>
+    </td>
+    <td align="left" valign="top">
+      <h3>✨ What you can do with <strong>Buddy</strong></h3>
+      <ul>
+        <li><strong>🌐 Live Web Search</strong>: Real-time web research for verified, up-to-date answers</li>
+        <li><strong>🔗 URL Context Import</strong>: Paste any website URL to analyze as conversation background</li>
+        <li><strong>📄 Document Intelligence</strong>: Extract insights from images and text files on device</li>
+        <li><strong>📸 Camera Analysis</strong>: Instantly process photos via camera capture for text, charts, or data</li>
+        <li><strong>⚙️ Provider Selection</strong>: Choose your preferred LLM and Web Search providers</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-## Features (prototype)
-- Dark-themed chat UI with streaming simulation
-- User & assistant message bubbles
-- Code block rendering (monospace, highlighted)
-- Image attachment (gallery picker)
-- Web search toggle with pill indicator
-- Animated typing indicator
-- Blinking streaming cursor
+## ✨ Screenshots
 
----
+<div style="display: flex; justify-content: left; gap: 12px; flex-wrap: wrap;">
+  <img src="./design/res/chat-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
+  <img src="./design/res/settings-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
+  <img src="./design/res/app-info.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
+</div>
 
-## Setup in Android Studio
+## 🚀 Quick Start
 
-### 1. Create a new project
-- Template: **Empty Activity**
-- Language: **Kotlin**
-- Minimum SDK: **API 26**
-- Build config: **Kotlin DSL**
+1. Generate LLM API Key from [Ollama Cloud](https://docs.ollama.com/cloud#authentication) or any provider in [the supported list](./design/providers.md)
 
-### 2. Copy these files into your project
+2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome)
 
-Replace / create the following files:
+3. **Download the APK**
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.1)
 
-```
-app/src/main/java/com/example/buddy/
-├── MainActivity.kt
-├── data/
-│   ├── ChatMessage.kt
-│   └── Models.kt
-└── ui/
-    ├── chat/
-    │   ├── ChatScreen.kt
-    │   └── ChatViewModel.kt
-    └── theme/
-        └── Theme.kt
+4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 1V - Android 15).
 
-app/src/main/AndroidManifest.xml
-app/src/main/res/values/themes.xml
-app/build.gradle.kts          ← replace the generated one
-```
+5. **Open the app** and grant camera permissions if you want to use photo capture feature.
 
-### 3. Sync Gradle
-Click **"Sync Now"** in the yellow bar or go to **File → Sync Project with Gradle Files**.
+6. Settings
+* LLM Provider
+* Default Model & Parameters
+* Web Search Provider
 
-### 4. Run on emulator
-- Select a Pixel device (API 30+) in the AVD Manager
-- Press ▶ Run
-
----
-
-## Wiring a real LLM provider
-
-In `ChatViewModel.kt`, replace `streamMockResponse()` with a real OkHttp SSE call:
-
-```kotlin
-// 1. Build request
-val request = ChatRequest(
-    model = state.provider.model,
-    messages = state.messages.map { ApiMessage(it.role.name.lowercase(), it.content) },
-    stream = true
-)
-
-// 2. POST to provider base URL
-val httpRequest = Request.Builder()
-    .url("${state.provider.baseUrl}/chat/completions")
-    .addHeader("Authorization", "Bearer ${state.provider.apiKey}")
-    .addHeader("Content-Type", "application/json")
-    .post(Gson().toJson(request).toRequestBody("application/json".toMediaType()))
-    .build()
-
-// 3. Stream SSE lines
-OkHttpClient().newCall(httpRequest).execute().body?.source()?.let { src ->
-    while (!src.exhausted()) {
-        val line = src.readUtf8Line() ?: break
-        if (line.startsWith("data: ") && line != "data: [DONE]") {
-            val delta = parseStreamChunk(line.removePrefix("data: "))
-            // emit delta to UI state
-        }
-    }
-}
-```
-
----
-
-## Web Search Integration
-
-In `ChatViewModel.kt`, before building the LLM request:
-
-```kotlin
-if (webSearchEnabled) {
-    val results = searchApi.query(userMessage)  // Brave / SerpAPI / Searxng
-    systemPrompt = "Use these search results:\n$results"
-}
-```
+7. **Enjoy!**
