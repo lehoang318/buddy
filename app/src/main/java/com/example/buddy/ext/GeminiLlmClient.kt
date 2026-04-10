@@ -102,10 +102,13 @@ class GeminiLlmClient private constructor(
                             if (candidates != null && candidates.size() > 0) {
                                 val content = candidates[0].asJsonObject.getAsJsonObject("content")
                                 val parts = content?.getAsJsonArray("parts")
-                                if (parts != null && parts.size() > 0) {
-                                    val text = parts[0].asJsonObject.get("text")?.asString
-                                    if (!text.isNullOrEmpty()) {
-                                        emit(text)
+                                if (parts != null) {
+                                    for (partEl in parts) {
+                                        val part = partEl.asJsonObject
+                                        // skip thought/reasoning blocks (Gemini 2.5+ thinking)
+                                        if (part.get("thought")?.asBoolean == true) continue
+                                        val text = part.get("text")?.asString
+                                        if (!text.isNullOrEmpty()) emit(text)
                                     }
                                 }
                             }
@@ -216,6 +219,11 @@ class GeminiLlmClient private constructor(
                     add("generationConfig", JsonObject().apply {
                         addProperty("maxOutputTokens", 20)
                         addProperty("temperature", 0.3)
+                        // disable thinking for this short-form task to prevent THOUGHT: blocks
+                        // from inflating the response and causing downstream 400 errors
+                        add("thinkingConfig", JsonObject().apply {
+                            addProperty("thinkingBudget", 0)
+                        })
                     })
                 }
 
@@ -239,7 +247,13 @@ class GeminiLlmClient private constructor(
                         if (content != null) {
                             val parts = content.getAsJsonArray("parts")
                             if (parts != null && parts.size() > 0) {
-                                val text = parts[0].asJsonObject.get("text")?.asString?.trim()
+                                val raw = parts[0].asJsonObject.get("text")?.asString?.trim()
+                                val text = raw
+                                    // strip fenced THOUGHT blocks: ```...THOUGHT:...```
+                                    ?.replace(Regex("```[\\w]*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE), "")
+                                    // strip bare THOUGHT: lines that leaked outside fences
+                                    ?.replace(Regex("(?i)THOUGHT:.*", RegexOption.DOT_MATCHES_ALL), "")
+                                    ?.trim()
                                 if (!text.isNullOrBlank()) {
                                     return@withContext text.removeSurrounding("\"").trim()
                                 }
