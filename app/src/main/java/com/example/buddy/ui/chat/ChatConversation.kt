@@ -3,6 +3,8 @@ package com.example.buddy.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.util.Base64
 import android.widget.Toast
 import android.net.Uri
 import androidx.compose.animation.core.*
@@ -24,6 +26,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -61,17 +64,21 @@ fun MessageRow(message: ChatMessage) {
         ) {
             if (message.webSearchUsed) WebSearchPill()
 
-            message.imageUri?.let { uri ->
-                AsyncImage(
-                    model = uri,
-                    contentDescription = "Attached image",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .widthIn(max = 200.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, Outline, RoundedCornerShape(14.dp))
-                )
-                Spacer(Modifier.height(4.dp))
+            message.imageBase64?.let { base64 ->
+                val bitmap = decodeBase64ToBitmap(base64)
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Attached image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .widthIn(max = 200.dp)
+                            .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, Outline, RoundedCornerShape(14.dp))
+                    )
+                    Spacer(Modifier.height(4.dp))
+                }
             }
 
             message.attachedFileName?.let { fileName ->
@@ -340,7 +347,7 @@ fun AnimatedDot(delayMs: Int) {
 @Composable
 fun InputBar(
     text: String,
-    pendingImage: Uri?,
+    pendingImage: String?,
     pendingFile: Uri?,
     pendingFileName: String?,
     fileTooLargeError: String?,
@@ -362,25 +369,29 @@ fun InputBar(
             .navigationBarsPadding()
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        pendingImage?.let { uri ->
-            Box(modifier = Modifier.padding(bottom = 6.dp)) {
-                AsyncImage(
-                    model = uri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                )
-                IconButton(
-                    onClick = onClearImage,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .align(Alignment.TopEnd)
-                        .offset(x = 4.dp, y = (-4).dp)
-                        .background(Outline, CircleShape)
-                ) {
-                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(10.dp))
+        pendingImage?.let { base64 ->
+            val bitmap = decodeBase64ToBitmap(base64)
+            if (bitmap != null) {
+                Box(modifier = Modifier.padding(bottom = 6.dp)) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(60.dp)
+                            .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                    IconButton(
+                        onClick = onClearImage,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .align(Alignment.TopEnd)
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .background(Outline, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(10.dp))
+                    }
                 }
             }
         }
@@ -526,4 +537,14 @@ fun UrlFetchWarningPill(warning: String) {
         }
     }
     Spacer(Modifier.height(6.dp))
+}
+
+fun decodeBase64ToBitmap(base64: String): android.graphics.Bitmap? {
+    return try {
+        val base64Data = if (base64.contains(",")) base64.substringAfter(",") else base64
+        val bytes = Base64.decode(base64Data, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    } catch (e: Exception) {
+        null
+    }
 }

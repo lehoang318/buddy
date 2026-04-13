@@ -40,7 +40,7 @@ data class ChatUiState(
     val inputText: String = "",
     val isLoading: Boolean = false,
     val webSearchEnabled: Boolean = true,
-    val pendingImageUri: Uri? = null,
+    val pendingImageBase64: String? = null,
     val pendingFileUri: Uri? = null,
     val pendingFileName: String? = null,
     val availableModels: List<LlmModel> = emptyList(),
@@ -116,10 +116,10 @@ class ChatViewModel(
         _uiState.update { it.copy(inputText = text) }
     }
 
-    fun onImagePicked(uri: Uri?) {
+    fun onImagePicked(base64: String?) {
         _uiState.update {
             it.copy(
-                pendingImageUri = uri,
+                pendingImageBase64 = base64,
                 pendingFileUri = null,
                 pendingFileName = null,
                 fileTooLargeError = null
@@ -128,7 +128,7 @@ class ChatViewModel(
     }
 
     fun onClearImage() {
-        _uiState.update { it.copy(pendingImageUri = null) }
+        _uiState.update { it.copy(pendingImageBase64 = null) }
     }
 
     fun onFilePicked(uri: Uri?) {
@@ -147,7 +147,7 @@ class ChatViewModel(
             _uiState.update { it.copy(pendingFileUri = null, pendingFileName = null, fileTooLargeError = "File too large (${formatFileSize(fileSize)}, max 100KB)") }
             return
         }
-        _uiState.update { it.copy(pendingFileUri = uri, pendingFileName = fileName, pendingImageUri = null, fileTooLargeError = null) }
+        _uiState.update { it.copy(pendingFileUri = uri, pendingFileName = fileName, pendingImageBase64 = null, fileTooLargeError = null) }
     }
 
     fun onClearFile() {
@@ -161,15 +161,16 @@ class ChatViewModel(
     fun sendMessage() {
         val state = _uiState.value
         val text = state.inputText.trim()
-        if (text.isBlank() && state.pendingImageUri == null && state.pendingFileUri == null) return
+        if (text.isBlank() && state.pendingImageBase64 == null && state.pendingFileUri == null) return
 
         EventLog.add("I", "user input: ${text.length} characters")
 
         val urls = extractUrls(text)
+        val savedImageBase64 = state.pendingImageBase64
 
         _uiState.update { it.copy(
             inputText = "",
-            pendingImageUri = null,
+            pendingImageBase64 = null,
             pendingFileUri = null,
             pendingFileName = null,
             webSearchError = null,
@@ -227,7 +228,7 @@ class ChatViewModel(
                 role = Role.USER,
                 content = text,
                 fetchedUrlText = fetchedUrlText,
-                imageUri = state.pendingImageUri,
+                imageBase64 = savedImageBase64,
                 attachedFileUri = fileUri,
                 attachedFileName = fileName,
                 attachedFileText = fileText
@@ -347,16 +348,14 @@ class ChatViewModel(
             .filter { it.role != Role.SYSTEM }
             .filterNot { it.role == Role.ASSISTANT && it.content.isEmpty() && it.isStreaming }
             .map { message ->
-                val imageBase64 = message.imageUri?.let { resizeImageToJpeg(it) }
-                val content = buildMessageContent(message)
                 LlmMessage(
                     role = when (message.role) {
                         Role.USER -> LlmRole.USER
                         Role.ASSISTANT -> LlmRole.ASSISTANT
                         else -> LlmRole.USER
                     },
-                    content = content,
-                    imageBase64 = imageBase64
+                    content = buildMessageContent(message),
+                    imageBase64 = message.imageBase64
                 )
             }
 
@@ -391,53 +390,28 @@ class ChatViewModel(
             .toList()
     }
 
-    private fun resizeImageToJpeg(uri: Uri): String? {
+    fun bitmapToBase64(bitmap: Bitmap): String? {
         return try {
-            val inputStream = application.contentResolver.openInputStream(uri) ?: return null
-            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            inputStream.use { BitmapFactory.decodeStream(it, null, options) }
-            val originalWidth = options.outWidth
-            val originalHeight = options.outHeight
-            if (originalWidth <= 0 || originalHeight <= 0) return null
-            val maxDim = maxOf(originalWidth, originalHeight)
-            val inSampleSize = if (maxDim > MAX_IMAGE_DIMENSION) calculateInSampleSize(options, MAX_IMAGE_DIMENSION) else 1
-            val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-            val inputStream2 = application.contentResolver.openInputStream(uri) ?: return null
-            var bitmap = inputStream2.use { BitmapFactory.decodeStream(it, null, decodeOptions) } ?: return null
-            val scaledWidth = bitmap.width
-            val scaledHeight = bitmap.height
-            val scaledMaxDim = maxOf(scaledWidth, scaledHeight)
-            if (scaledMaxDim > MAX_IMAGE_DIMENSION) {
-                val scale = MAX_IMAGE_DIMENSION.toFloat() / scaledMaxDim
-                val newWidth = (scaledWidth * scale).toInt()
-                val newHeight = (scaledHeight * scale).toInt()
-                val resized = Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
-                bitmap.recycle()
-                bitmap = resized
+            val maxDim = maxOf(bitmap.width, bitmap.height)
+            val scaledBitmap = if (maxDim > MAX_IMAGE_DIMENSION) {
+                val scale = MAX_IMAGE_DIMENSION.toFloat() / maxDim
+                val newWidth = (bitmap.width * scale).toInt()
+                val newHeight = (bitmap.height * scale).toInt()
+                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            } else {
+                bitmap
             }
             val outputStream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, outputStream)
-            bitmap.recycle()
+            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, outputStream)
+            if (scaledBitmap !== bitmap) {
+                scaledBitmap.recycle()
+            }
             val bytes = outputStream.toByteArray()
             val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
             "data:image/jpeg;base64,$base64"
         } catch (e: Exception) {
             null
         }
-    }
-
-    private fun calculateInSampleSize(options: BitmapFactory.Options, reqSize: Int): Int {
-        val height = options.outHeight
-        val width = options.outWidth
-        var inSampleSize = 1
-        if (height > reqSize || width > reqSize) {
-            val halfHeight = height / 2
-            val halfWidth = width / 2
-            while ((halfHeight / inSampleSize) >= reqSize && (halfWidth / inSampleSize) >= reqSize) {
-                inSampleSize *= 2
-            }
-        }
-        return inSampleSize
     }
 
     private fun readTextFile(uri: Uri): Result<String> {

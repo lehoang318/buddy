@@ -3,7 +3,7 @@
 <table>
   <tr>
     <td align="right" valign="top">
-      <img src="./design/res/logo.png" alt="App Logo" width="256"/>
+      <img src="./docs/res/logo.png" alt="App Logo" width="256"/>
     </td>
     <td align="left" valign="top">
       <h3>✨ What you can do with <strong>Buddy</strong></h3>
@@ -21,14 +21,14 @@
 ## ✨ Screenshots
 
 <div style="display: flex; justify-content: left; gap: 12px; flex-wrap: wrap;">
-  <img src="./design/res/chat-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
-  <img src="./design/res/settings-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
-  <img src="./design/res/app-info.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/chat-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/settings-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/app-info.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
 </div>
 
 ## 🚀 Quick Start
 
-1. Generate LLM API Key from [Ollama Cloud](https://docs.ollama.com/cloud#authentication) or any provider in [the supported list](./design/providers.md)
+1. Generate LLM API Key from [Ollama Cloud](https://docs.ollama.com/cloud#authentication) or any provider in [the supported list](./docs/providers.md)
 
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome)
 
@@ -45,3 +45,18 @@
 * Web Search Provider
 
 7. **Enjoy!**
+
+## Documentation
+| Document | Description |
+|----------|-------------|
+| [FAQ](./FAQ.md) | Common questions and answers |
+| [Supported Providers](./docs/providers.md) | LLM & Web Search provider details |
+
+* Refer to [docs](./docs) for internal designs
+
+## License
+Distributed under Apache-2.0 license. See [LICENSE](./LICENSE) for more information.
+
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+For major changes, please open an issue first to discuss what you would like to change.

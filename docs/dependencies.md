@@ -1,0 +1,22 @@
+# Buddy AI Assistant - Dependencies
+
+This document provides a concise overview of the external libraries used in the Buddy application.
+
+| Library | Category | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| `androidx.core:core-ktx` | Core | 1.10.1 | Kotlin extensions for Android core |
+| `androidx.compose.*` | UI Framework | BOM 2026.02.01 | Declarative UI toolkit (Material 3, Graphics, Tooling) |
+| `androidx.lifecycle.*` | Lifecycle | 2.6.1 / 2.10.0 | ViewModel and lifecycle management |
+| `androidx.activity:activity-compose` | Lifecycle | 1.8.0 | Activity integration for Compose |
+| `com.aallam.openai:openai-client` | Networking | BOM 4.1.0 | Official OpenAI API client |
+| `io.ktor:ktor-client-okhttp` | Networking | - | HTTP client for network requests |
+| `com.squareup.okhttp3:okhttp` | Networking | 5.3.2 | Low-level HTTP operations |
+| `com.google.code.gson:gson` | Data | 2.13.2 | JSON serialization/deserialization |
+| `org.jsoup:jsoup` | Data | 1.22.1 | HTML parsing for shared URLs |
+| `io.coil-kt:coil-compose` | Images | 2.7.0 | Image loading and caching |
+| `io.noties.markwon:*` | Text | - | Markdown rendering and extensions |
+| `androidx.datastore:preferences` | Storage | 1.2.1 | Persistent user settings |
+| `androidx.work:work-runtime-ktx` | Background | - | Deferrable background tasks |
+| `junit` / `androidx.test.*` | Testing | 4.13.2 / 1.1.5 | Unit and UI testing framework |
+
+**Note**: Versions are managed through the Gradle version catalog (`libs.versions.toml`).

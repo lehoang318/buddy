@@ -8,7 +8,7 @@ data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
     val role: Role,
     val content: String,
-    val imageUri: Uri? = null,
+    val imageBase64: String? = null,
     val attachedFileUri: Uri? = null,
     val attachedFileName: String? = null,
     val attachedFileText: String? = null,

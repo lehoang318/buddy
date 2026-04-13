@@ -61,8 +61,6 @@ dependencies {
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
@@ -72,20 +70,12 @@ dependencies {
     implementation(libs.openai.client)
     runtimeOnly(libs.ktor.client.okhttp)
 
-    // Compose BOM — keeps all Compose versions in sync
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
-    implementation(composeBom)
-    androidTestImplementation(composeBom)
-
     // Image loading (Coil) — for multimodal image attachments
     implementation(libs.coil.compose)
 
     // Networking (OkHttp + Gson) — for real LLM API calls
     implementation(libs.okhttp)
     implementation(libs.gson)
-
-    // HTML parsing (Jsoup) — for URL content fetching
-    implementation(libs.jsoup)
 
     // HTML parsing (Jsoup) — for URL content fetching
     implementation(libs.jsoup)
@@ -111,9 +101,6 @@ dependencies {
         exclude(group = "org.jetbrains", module = "annotations-java5")
     }
     implementation("io.noties.markwon:linkify:4.6.2") {
-        exclude(group = "org.jetbrains", module = "annotations-java5")
-    }
-    implementation("io.noties.markwon:syntax-highlight:4.6.2") {
         exclude(group = "org.jetbrains", module = "annotations-java5")
     }
     implementation("io.noties.markwon:image-coil:4.6.2") {

@@ -1,5 +1,7 @@
 package com.example.buddy.ui.chat
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -73,14 +76,18 @@ fun ChatScreen(
         if (uri != null) {
             val mimeType = context.contentResolver.getType(uri)
             if (mimeType?.startsWith("image/") == true) {
-                vm.onImagePicked(uri)
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val bitmap = inputStream?.use { BitmapFactory.decodeStream(it) }
+                val base64 = bitmap?.let { vm.bitmapToBase64(it) }
+                bitmap?.recycle()
+                vm.onImagePicked(base64)
             } else {
                 vm.onFilePicked(uri)
             }
         }
     }
 
-    val cameraImageUri = remember {
+    val cameraTempUri = remember {
         val cacheDir = context.cacheDir
         val imageFile = File.createTempFile("buddy_camera_", ".jpg", cacheDir)
         FileProvider.getUriForFile(
@@ -89,11 +96,31 @@ fun ChatScreen(
             imageFile
         )
     }
+
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            vm.onImagePicked(cameraImageUri)
+    ) { success: Boolean ->
+        if (success && cameraTempUri != null) {
+            val inputStream = context.contentResolver.openInputStream(cameraTempUri)
+            val bitmap = inputStream?.use { BitmapFactory.decodeStream(it) }
+            val base64 = bitmap?.let { vm.bitmapToBase64(it) }
+            bitmap?.recycle()
+            vm.onImagePicked(base64)
+        }
+    }
+
+    val onTakePhoto = remember(cameraTempUri) {
+        {
+            takePictureLauncher.launch(cameraTempUri)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                File(cameraTempUri.path!!).delete()
+            } catch (e: Exception) {
+            }
         }
     }
 
@@ -116,7 +143,7 @@ fun ChatScreen(
         bottomBar = {
             InputBar(
                 text = state.inputText,
-                pendingImage = state.pendingImageUri,
+                pendingImage = state.pendingImageBase64,
                 pendingFile = state.pendingFileUri,
                 pendingFileName = state.pendingFileName,
                 fileTooLargeError = state.fileTooLargeError,
@@ -130,9 +157,7 @@ fun ChatScreen(
                         arrayOf("image/*", "text/*", "application/json", "application/xml", "text/plain", "text/markdown", "text/html")
                     )
                 },
-                onTakePhoto = {
-                    takePictureLauncher.launch(cameraImageUri)
-                },
+                onTakePhoto = onTakePhoto,
                 onSend = {
                     keyboard?.hide()
                     vm.sendMessage()
