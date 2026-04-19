@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.buddy.R
@@ -38,6 +39,7 @@ import androidx.compose.ui.res.painterResource
 import com.example.buddy.LocalUrlFetcher
 import com.example.buddy.LocalWebSearch
 import com.example.buddy.ext.LlmModel
+import com.example.buddy.ui.settings.ModelSelectionDialog
 import com.example.buddy.ui.theme.Dimens
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -211,8 +213,8 @@ fun BuddyChatTopBar(
     onEvents: () -> Unit = {},
     onAbout: () -> Unit = {}
 ) {
-    var expanded by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var showModelSelection by remember { mutableStateOf(false) }
     var titleWidthPx by remember { mutableIntStateOf(0) }
 
     val density = LocalDensity.current
@@ -230,8 +232,8 @@ fun BuddyChatTopBar(
     val fixedSpace = titleIconWidth + titleTextGap + clearanceAfterTitle +
                      multimodalIconWidth + clearanceBetweenIcons + webSearchIconWidth + rightPadding
     val availableWidth = screenWidth - titleWidthDp - fixedSpace
-    val minDropdownWidth = (availableWidth * 0.5f).coerceAtLeast(120.dp)
-    val maxDropdownWidth = (availableWidth * 0.8f).coerceAtLeast(120.dp)
+    val minDropdownWidth = (availableWidth * 0.5f).coerceAtLeast(80.dp)
+    val maxDropdownWidth = (availableWidth * 0.8f).coerceAtLeast(80.dp)
 
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -292,64 +294,34 @@ fun BuddyChatTopBar(
         },
         actions = {
             if (!isOffline && availableModels.isNotEmpty()) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.padding(start = 12.dp)
+                Surface(
+                    onClick = { showModelSelection = true },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .widthIn(min = minDropdownWidth, max = maxDropdownWidth)
                 ) {
-                    Surface(
-                        modifier = Modifier
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                            .widthIn(min = minDropdownWidth, max = maxDropdownWidth),
-                        onClick = { expanded = true },
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = MaterialTheme.shapes.small
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.AutoFixHigh,
-                                null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                text = selectedModel.ifBlank { "Select" },
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                            Icon(
-                                Icons.Default.KeyboardArrowDown,
-                                null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        availableModels.forEach { model ->
-                            DropdownMenuItem(
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Image,
-                                        contentDescription = null,
-                                        tint = if (model.isMultimodal) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                },
-                                text = { Text(model.name, color = MaterialTheme.colorScheme.onSurface) },
-                                onClick = {
-                                    onModelSelect(model.id)
-                                    expanded = false
-                                }
-                            )
-                        }
+                        Icon(
+                            Icons.Default.AutoFixHigh,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = availableModels.find { it.id == selectedModel }?.name
+                                ?: selectedModel.ifBlank { "Select" },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
                     }
                 }
                 if (selectedModel.isNotBlank()) {
@@ -363,17 +335,58 @@ fun BuddyChatTopBar(
                         )
                     }
                 }
-            }
-            if (webSearchAvailable && !isOffline) {
-                Spacer(Modifier.width(8.dp))
-                IconButton(onClick = onToggleWeb) {
-                    Icon(
-                        Icons.Default.Language,
-                        contentDescription = "Web Search",
-                        tint = if (webSearchEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            } else if (isOffline || availableModels.isEmpty()) {
+                Surface(
+                    onClick = { onSettings() },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.padding(start = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AutoFixHigh,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "No model",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = if (webSearchAvailable) onToggleWeb else onSettings
+            ) {
+                Icon(
+                    Icons.Default.Language,
+                    contentDescription = "Web Search",
+                    tint = when {
+                        webSearchEnabled && webSearchAvailable && !isOffline -> MaterialTheme.colorScheme.primary
+                        webSearchAvailable && !isOffline -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    }
+                )
             }
         }
     )
+
+    if (showModelSelection && availableModels.isNotEmpty()) {
+        ModelSelectionDialog(
+            availableModels = availableModels,
+            currentModelId = selectedModel,
+            onModelSelected = { modelId ->
+                onModelSelect(modelId)
+                showModelSelection = false
+            },
+            onDismiss = { showModelSelection = false }
+        )
+    }
 }

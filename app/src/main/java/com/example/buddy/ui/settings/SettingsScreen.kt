@@ -1,5 +1,6 @@
 package com.example.buddy.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -55,7 +56,7 @@ fun SettingsScreen(
     var showApiKey by remember { mutableStateOf(false) }
     var showTavilyKey by remember { mutableStateOf(false) }
     var availableModels by remember { mutableStateOf<List<LlmModel>>(emptyList()) }
-    var modelDropdownExpanded by remember { mutableStateOf(false) }
+    var showModelSelection by remember { mutableStateOf(false) }
     var providerDropdownExpanded by remember { mutableStateOf(false) }
     var webSearchProviderDropdownExpanded by remember { mutableStateOf(false) }
     var isConnecting by remember { mutableStateOf(false) }
@@ -273,25 +274,26 @@ fun SettingsScreen(
 
             Text("LLM Parameters", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
 
-            ExposedDropdownMenuBox(
-                expanded = modelDropdownExpanded,
-                onExpandedChange = { modelDropdownExpanded = it && availableModels.isNotEmpty() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            val modelDisplayName = availableModels.find { it.id == selectedModel }?.name
+                ?: selectedModel.ifBlank { "" }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
                 OutlinedTextField(
-                    value = selectedModel,
+                    value = modelDisplayName,
                     onValueChange = { },
                     readOnly = true,
                     label = { Text("Default Model") },
-                    placeholder = { Text(if (availableModels.isEmpty()) "Connect to fetch models" else "Select model") },
+                    placeholder = { Text(if (availableModels.isEmpty()) "Connect to fetch models" else "Tap to select model") },
                     trailingIcon = {
                         if (availableModels.isNotEmpty()) {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelDropdownExpanded)
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextColor,
                         unfocusedTextColor = TextColor,
@@ -303,28 +305,25 @@ fun SettingsScreen(
                         unfocusedLabelColor = OnSurfaceVariant
                     )
                 )
-                ExposedDropdownMenu(
-                    expanded = modelDropdownExpanded,
-                    onDismissRequest = { modelDropdownExpanded = false }
-                ) {
-                    availableModels.forEach { llmModel ->
-                        DropdownMenuItem(
-                            leadingIcon = {
-                                Icon(
-                                    Icons.Default.Image,
-                                    contentDescription = null,
-                                    tint = if (llmModel.isMultimodal) SendButton else OnSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            text = { Text(llmModel.name, color = MaterialTheme.colorScheme.onSurface) },
-                            onClick = {
-                                selectedModel = llmModel.id
-                                modelDropdownExpanded = false
-                            }
-                        )
-                    }
+                if (availableModels.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showModelSelection = true }
+                    )
                 }
+            }
+
+            if (showModelSelection && availableModels.isNotEmpty()) {
+                ModelSelectionDialog(
+                    availableModels = availableModels,
+                    currentModelId = selectedModel,
+                    onModelSelected = { modelId ->
+                        selectedModel = modelId
+                        showModelSelection = false
+                    },
+                    onDismiss = { showModelSelection = false }
+                )
             }
 
             SliderWithLabel(
