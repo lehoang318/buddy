@@ -67,6 +67,9 @@ object SettingsKeys {
     val TEMPERATURE = floatPreferencesKey("llm_temperature")
     val TOP_P = floatPreferencesKey("llm_top_p")
     val TOP_K = intPreferencesKey("llm_top_k")
+    val MAX_TOKENS = intPreferencesKey("llm_max_tokens")
+    val REASONING_EFFORT = stringPreferencesKey("llm_reasoning_effort")
+    val SYSTEM_MESSAGE = stringPreferencesKey("llm_system_message")
     val WEBSEARCH_PROVIDER = stringPreferencesKey("websearch_provider")
     val TAVILY_API_KEY = stringPreferencesKey("tavily_api_key")
 }
@@ -75,9 +78,12 @@ data class LlmSettings(
     val provider: String = "",
     val apiKey: String = "",
     val model: String = "",
-    val temperature: Float = 0.7f,
-    val topP: Float = 0.95f,
-    val topK: Int = 20,
+    val temperature: Float = 0f,
+    val topP: Float = 0f,
+    val topK: Int = 0,
+    val maxTokens: Int = 0,
+    val reasoningEffort: String = "",
+    val systemMessage: String = "",
     val webSearchProvider: String = "",
     val tavilyApiKey: String = ""
 ) {
@@ -93,9 +99,12 @@ class SettingsRepository(context: Context) {
             provider = prefs[SettingsKeys.PROVIDER] ?: "",
             apiKey = prefs[SettingsKeys.API_KEY] ?: "",
             model = prefs[SettingsKeys.MODEL] ?: "",
-            temperature = prefs[SettingsKeys.TEMPERATURE] ?: 0.7f,
-            topP = prefs[SettingsKeys.TOP_P] ?: 0.95f,
-            topK = prefs[SettingsKeys.TOP_K] ?: 20,
+            temperature = prefs[SettingsKeys.TEMPERATURE] ?: LlmDefaults.temperature,
+            topP = prefs[SettingsKeys.TOP_P] ?: LlmDefaults.topP,
+            topK = prefs[SettingsKeys.TOP_K] ?: LlmDefaults.topK,
+            maxTokens = prefs[SettingsKeys.MAX_TOKENS] ?: LlmDefaults.maxTokens,
+            reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
+            systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: LlmDefaults.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
             tavilyApiKey = prefs[SettingsKeys.TAVILY_API_KEY] ?: ""
         )
@@ -109,9 +118,12 @@ class SettingsRepository(context: Context) {
         provider: String,
         apiKey: String,
         model: String,
-        temperature: Float = 0.7f,
-        topP: Float = 0.95f,
-        topK: Int = 20,
+        temperature: Float = LlmDefaults.temperature,
+        topP: Float = LlmDefaults.topP,
+        topK: Int = LlmDefaults.topK,
+        maxTokens: Int = LlmDefaults.maxTokens,
+        reasoningEffort: String = "",
+        systemMessage: String = LlmDefaults.defaultSystemMessage,
         webSearchProvider: String = "",
         tavilyApiKey: String = ""
     ) {
@@ -122,6 +134,9 @@ class SettingsRepository(context: Context) {
             it[SettingsKeys.TEMPERATURE] = temperature
             it[SettingsKeys.TOP_P] = topP
             it[SettingsKeys.TOP_K] = topK
+            it[SettingsKeys.MAX_TOKENS] = maxTokens
+            it[SettingsKeys.REASONING_EFFORT] = reasoningEffort
+            it[SettingsKeys.SYSTEM_MESSAGE] = systemMessage
             it[SettingsKeys.WEBSEARCH_PROVIDER] = webSearchProvider
             it[SettingsKeys.TAVILY_API_KEY] = tavilyApiKey
         }

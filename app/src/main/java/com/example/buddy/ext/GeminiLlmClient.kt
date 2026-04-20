@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -22,6 +23,7 @@ class GeminiLlmClient private constructor(
     private val apiKey: String,
     override val currentModel: String
 ) : LlmClient {
+    override val isReasoningSupported: Boolean = false
 
     private val baseUrl = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -66,10 +68,10 @@ class GeminiLlmClient private constructor(
             }
             add("contents", JsonArray().apply { contents.forEach { add(it) } })
             add("generationConfig", JsonObject().apply {
-                addProperty("temperature", config.temperature.toDouble())
-                addProperty("topP", config.topP.toDouble())
-                addProperty("topK", config.topK)
-                addProperty("maxOutputTokens", 4096)
+                addProperty("temperature", config.temperature.takeIf { it > 0 } ?: LlmDefaults.temperature)
+                addProperty("topP", config.topP.takeIf { it > 0 } ?: LlmDefaults.topP)
+                addProperty("topK", config.topK.takeIf { it > 0 } ?: LlmDefaults.topK)
+                addProperty("maxOutputTokens", config.maxTokens.takeIf { it > 0 } ?: LlmDefaults.maxTokens)
             })
         }
 

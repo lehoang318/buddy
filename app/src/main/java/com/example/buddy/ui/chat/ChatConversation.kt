@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.*
 import coil.compose.AsyncImage
 import com.example.buddy.data.ChatMessage
+import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.Role
 import com.example.buddy.ui.theme.*
 import androidx.compose.ui.res.painterResource
@@ -353,6 +354,8 @@ fun InputBar(
     fileTooLargeError: String?,
     isOffline: Boolean,
     urlFetchInProgress: Boolean,
+    reasoningEffort: LlmDefaults.ReasoningEffort?,
+    onToggleReasoning: () -> Unit,
     onTextChange: (String) -> Unit,
     onClearImage: () -> Unit,
     onClearFile: () -> Unit,
@@ -477,29 +480,47 @@ fun InputBar(
                 }
             }
 
-            IconButton(
-                onClick = onSend,
-                enabled = canSend && !isOffline && !urlFetchInProgress,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        if (canSend && !isOffline && !urlFetchInProgress) SendButton else Outline,
-                        CircleShape
-                    )
-            ) {
-                if (urlFetchInProgress) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = TextColor
-                    )
-                } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onToggleReasoning,
+                    enabled = !isOffline,
+                    modifier = Modifier.size(36.dp)
+                ) {
                     Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Send",
-                        tint = if (canSend && !isOffline) Color.White else OnSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                        Icons.Default.Lightbulb,
+                        contentDescription = "Toggle Reasoning",
+                        tint = when {
+                            isOffline -> OnSurfaceVariant
+                            reasoningEffort == LlmDefaults.ReasoningEffort.HIGH -> SendButton
+                            else -> SecondaryIcons
+                        }
                     )
+                }
+
+                IconButton(
+                    onClick = onSend,
+                    enabled = canSend && !isOffline && !urlFetchInProgress,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            if (canSend && !isOffline && !urlFetchInProgress) SendButton else Outline,
+                            CircleShape
+                        )
+                ) {
+                    if (urlFetchInProgress) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = TextColor
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = if (canSend && !isOffline) Color.White else OnSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }

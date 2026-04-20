@@ -46,9 +46,6 @@ fun SettingsScreen(
     var selectedProvider by remember(effectiveInitial.provider) { mutableStateOf(effectiveInitial.provider) }
     var apiKey by remember(effectiveInitial.apiKey) { mutableStateOf(effectiveInitial.apiKey) }
     var selectedModel by remember(effectiveInitial.model) { mutableStateOf(effectiveInitial.model) }
-    var temperature by remember(effectiveInitial.temperature) { mutableStateOf(effectiveInitial.temperature) }
-    var topP by remember(effectiveInitial.topP) { mutableStateOf(effectiveInitial.topP) }
-    var topK by remember(effectiveInitial.topK) { mutableStateOf(effectiveInitial.topK) }
 
     var selectedWebSearchProvider by remember(effectiveInitial.webSearchProvider) { mutableStateOf(effectiveInitial.webSearchProvider) }
     var tavilyApiKey by remember(effectiveInitial.tavilyApiKey) { mutableStateOf(effectiveInitial.tavilyApiKey) }
@@ -93,9 +90,6 @@ fun SettingsScreen(
                                     provider = selectedProvider,
                                     apiKey = apiKey,
                                     model = selectedModel,
-                                    temperature = temperature,
-                                    topP = topP,
-                                    topK = topK,
                                     webSearchProvider = selectedWebSearchProvider,
                                     tavilyApiKey = tavilyApiKey
                                 )
@@ -144,9 +138,6 @@ fun SettingsScreen(
                                 provider = effectiveInitial.provider,
                                 apiKey = effectiveInitial.apiKey,
                                 model = selectedModel,
-                                temperature = temperature,
-                                topP = topP,
-                                topK = topK,
                                 webSearchProvider = selectedWebSearchProvider,
                                 tavilyApiKey = tavilyApiKey
                             )
@@ -270,10 +261,6 @@ fun SettingsScreen(
                 }
             }
 
-            HorizontalDivider(color = Outline)
-
-            Text("LLM Parameters", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
-
             val modelDisplayName = availableModels.find { it.id == selectedModel }?.name
                 ?: selectedModel.ifBlank { "" }
 
@@ -325,37 +312,6 @@ fun SettingsScreen(
                     onDismiss = { showModelSelection = false }
                 )
             }
-
-            SliderWithLabel(
-                label = "Temperature",
-                tooltip = "0.0 \u2013 0.3: factual answers, math, code, precise tasks\n0.5 \u2013 0.8: balanced chat, reasoning, general use (0.7 is a popular default)\n0.9 \u2013 1.2+: creative writing, brainstorming, storytelling",
-                value = temperature,
-                valueRange = 0f..1f,
-                steps = 9,
-                onValueChange = { temperature = it },
-                valueDisplay = String.format("%.2f", temperature)
-            )
-
-            SliderWithLabel(
-                label = "Top-p",
-                tooltip = "0.1 \u2013 0.5: more focused, deterministic output\n0.7 \u2013 0.95: good balance (0.9 is very common)\n1.0: no restriction (consider all tokens)",
-                value = topP,
-                valueRange = 0f..1f,
-                steps = 9,
-                onValueChange = { topP = it },
-                valueDisplay = String.format("%.2f", topP)
-            )
-
-            SliderWithLabel(
-                label = "Top-k",
-                tooltip = "1: greedy decoding (very deterministic)\n40 \u2013 100: common default in many open-source setups\nHigher values: more diversity",
-                value = topK.toFloat(),
-                valueRange = 1f..100f,
-                steps = 98,
-                onValueChange = { topK = it.toInt() },
-                valueDisplay = topK.toString(),
-                isInt = true
-            )
 
             HorizontalDivider(color = Outline)
 

@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -23,6 +24,7 @@ class OpenAiCompatibleLlmClient private constructor(
     private val apiKey: String,
     override val currentModel: String
 ) : LlmClient {
+    override val isReasoningSupported: Boolean = true
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -68,9 +70,19 @@ class OpenAiCompatibleLlmClient private constructor(
         val requestBody = JsonObject().apply {
             addProperty("model", model)
             add("messages", JsonArray().apply { apiMessages.forEach { add(it) } })
-            addProperty("max_tokens", 4096)
-            addProperty("temperature", config.temperature.toDouble())
-            addProperty("top_p", config.topP.toDouble())
+            addProperty("max_tokens", config.maxTokens.takeIf { it > 0 } ?: LlmDefaults.maxTokens)
+            addProperty("temperature", config.temperature.takeIf { it > 0 } ?: LlmDefaults.temperature)
+            addProperty("top_p", config.topP.takeIf { it > 0 } ?: LlmDefaults.topP)
+            if (config.reasoningEffort != null) {
+                val effortStr = when (config.reasoningEffort) {
+                    LlmDefaults.ReasoningEffort.LOW -> "low"
+                    LlmDefaults.ReasoningEffort.HIGH -> "high"
+                    else -> return@apply
+                }
+                add("reasoning", JsonObject().apply {
+                    addProperty("effort", effortStr)
+                })
+            }
             addProperty("stream", true)
         }
 

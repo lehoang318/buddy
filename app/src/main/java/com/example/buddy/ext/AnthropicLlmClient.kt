@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
@@ -22,6 +23,7 @@ class AnthropicLlmClient private constructor(
     private val apiKey: String,
     override val currentModel: String
 ) : LlmClient {
+    override val isReasoningSupported: Boolean = false
 
     private val baseUrl = "https://api.anthropic.com/v1"
 
@@ -59,9 +61,9 @@ class AnthropicLlmClient private constructor(
             if (systemMessages.isNotEmpty()) {
                 addProperty("system", systemMessages.joinToString("\n") { it.content })
             }
-            addProperty("max_tokens", 4096)
-            addProperty("temperature", config.temperature.toDouble())
-            addProperty("top_p", config.topP.toDouble())
+            addProperty("max_tokens", config.maxTokens.takeIf { it > 0 } ?: LlmDefaults.maxTokens)
+            addProperty("temperature", config.temperature.takeIf { it > 0 } ?: LlmDefaults.temperature)
+            addProperty("top_p", config.topP.takeIf { it > 0 } ?: LlmDefaults.topP)
             addProperty("stream", true)
         }
 

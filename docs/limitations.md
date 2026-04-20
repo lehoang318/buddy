@@ -109,6 +109,25 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
+## 🤖 LLM Provider Limitations
+
+### Reasoning (Extended Thinking)
+
+| Provider | Reasoning Support | API Parameter |
+|----------|-------------------|---------------|
+| **OpenAI API Compatible** | ✅ Supported | `reasoning: {effort: "low"/"high"}` |
+| **Anthropic** | ❌ Not Supported | No reasoning parameter available |
+| **Gemini** | ❌ Not Supported | No reasoning parameter available |
+
+### Notes
+
+- The reasoning toggle (💡 icon) in the chat input bar only affects OpenAI API compatible providers
+- For other providers, the toggle still works visually but does not send reasoning parameters to the API
+- This is a limitation of the respective provider APIs, not the Buddy application
+- Current reasoning effort levels: **Low** and **High**
+
+---
+
 ## 📱 Platform Limitations
 
 ### Android-Specific Constraints

@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.ApiType
+import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmProviders
 import com.example.buddy.data.EventLog
 import com.google.gson.Gson
@@ -27,9 +28,11 @@ data class LlmModel(
 )
 
 data class LlmGenerationConfig(
-    val temperature: Float = 0.7f,
-    val topP: Float = 0.95f,
-    val topK: Int = 20
+    val temperature: Float = 0f,
+    val topP: Float = 0f,
+    val topK: Int = 0,
+    val maxTokens: Int = 0,
+    val reasoningEffort: LlmDefaults.ReasoningEffort? = null
 )
 
 interface LlmClient {
@@ -38,6 +41,7 @@ interface LlmClient {
     suspend fun testConnection(): Boolean
     suspend fun generateSearchQuery(userMessage: String): String
     val currentModel: String
+    val isReasoningSupported: Boolean
 }
 
 data class LlmMessage(

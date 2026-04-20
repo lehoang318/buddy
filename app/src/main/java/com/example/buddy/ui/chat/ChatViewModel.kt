@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.buddy.data.ChatMessage as UiChatMessage
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.Role
 import com.example.buddy.ext.LlmClient
 import com.example.buddy.ext.LlmGenerationConfig
@@ -89,6 +90,31 @@ class ChatViewModel(
                 selectedModel = model.takeIf { m -> m.isNotBlank() } ?: it.selectedModel
             )
         }
+    }
+
+    fun toggleReasoningEffort() {
+        val current = _uiState.value.generationConfig.reasoningEffort
+        val next = when (current) {
+            LlmDefaults.ReasoningEffort.LOW -> LlmDefaults.ReasoningEffort.HIGH
+            LlmDefaults.ReasoningEffort.HIGH -> LlmDefaults.ReasoningEffort.LOW
+            else -> LlmDefaults.ReasoningEffort.HIGH
+        }
+        _uiState.update {
+            it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
+        }
+        
+        val isSupported = llmClient?.isReasoningSupported == true
+        val effortStr = when (next) {
+            LlmDefaults.ReasoningEffort.LOW -> "low"
+            LlmDefaults.ReasoningEffort.HIGH -> "high"
+            else -> return
+        }
+        val message = if (isSupported) {
+            "Reasoning: $effortStr"
+        } else {
+            "Reasoning: $effortStr (not supported by this provider)"
+        }
+        EventLog.add("I", message)
     }
 
     fun setOfflineMode(offline: Boolean) {

@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.ext.JsoupUrlFetcher
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        LlmDefaults.init(this)
         settingsRepository = SettingsRepository(this)
         
         // Schedule background connectivity checks
