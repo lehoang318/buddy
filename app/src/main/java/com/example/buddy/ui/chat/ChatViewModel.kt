@@ -57,28 +57,39 @@ data class ChatUiState(
 
 class ChatViewModel(
     private val application: Application,
-    private val llmClient: LlmClient?,
-    private val webSearch: WebSearch?,
-    private val urlFetcher: UrlFetcher?
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ChatUiState(isOffline = llmClient == null))
+    private var llmClient: LlmClient? = null
+    private var webSearch: WebSearch? = null
+    private var urlFetcher: UrlFetcher? = null
+
+    private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
 
-    init {
-        if (llmClient != null) {
-            _uiState.update {
-                it.copy(
-                    messages = listOf(
-                        UiChatMessage(
-                            role = Role.ASSISTANT,
-                            content = "Hey! I'm Buddy. I can answer questions, write code, analyze images, and search the web. What can I help you with?",
-                            isComplete = true
-                        )
-                    ),
-                    selectedModel = llmClient.currentModel
+    fun updateClient(client: LlmClient?, web: WebSearch?, fetcher: UrlFetcher?) {
+        llmClient = client
+        webSearch = web
+        urlFetcher = fetcher
+        val isOffline = client == null
+        _uiState.update { state ->
+            val messages = if (state.messages.isEmpty() && client != null) {
+                listOf(
+                    UiChatMessage(
+                        role = Role.ASSISTANT,
+                        content = "Hey! I'm Buddy. I can answer questions, write code, analyze images, and search the web. What can I help you with?",
+                        isComplete = true
+                    )
                 )
+            } else {
+                state.messages
             }
+            state.copy(
+                messages = messages,
+                selectedModel = client?.currentModel ?: state.selectedModel,
+                isOffline = isOffline
+            )
+        }
+        if (client != null) {
             loadAvailableModels()
         }
     }
@@ -121,10 +132,39 @@ class ChatViewModel(
         _uiState.update { it.copy(isOffline = offline) }
     }
 
+    fun clearChat() {
+        _uiState.update { state ->
+            val greeting = if (llmClient != null) {
+                listOf(
+                    UiChatMessage(
+                        role = Role.ASSISTANT,
+                        content = "Hey! I'm Buddy. I can answer questions, write code, analyze images, and search the web. What can I help you with?",
+                        isComplete = true
+                    )
+                )
+            } else {
+                emptyList()
+            }
+            state.copy(
+                messages = greeting,
+                inputText = "",
+                pendingImageBase64 = null,
+                pendingFileUri = null,
+                pendingFileName = null,
+                webSearchError = null,
+                fileTooLargeError = null,
+                urlFetchWarnings = emptyList(),
+                isLoading = false,
+                isStreaming = false,
+                urlFetchInProgress = false
+            )
+        }
+    }
+
     private fun loadAvailableModels() {
-        if (llmClient == null) return
+        val client = llmClient ?: return
         viewModelScope.launch {
-            val models = llmClient.getModels()
+            val models = client.getModels()
             _uiState.update {
                 it.copy(
                     availableModels = models,
@@ -206,7 +246,8 @@ class ChatViewModel(
         viewModelScope.launch {
             var fetchedUrlText: String? = null
             val warnings = mutableListOf<String>()
-            if (urls.isNotEmpty() && urlFetcher != null) {
+            val fetcher = urlFetcher
+            if (urls.isNotEmpty() && fetcher != null) {
                 _uiState.update { it.copy(urlFetchInProgress = true, urlFetchWarnings = emptyList()) }
                 
                 // Notify service that URL fetch is starting
@@ -216,7 +257,7 @@ class ChatViewModel(
                 val results = urls.mapNotNull { url ->
                     try {
                         EventLog.add("I", "web fetch: sent")
-                        val content = urlFetcher.fetchTextContent(url)
+                        val content = fetcher.fetchTextContent(url)
                         if (content != null) {
                             EventLog.add("I", "web fetch: success")
                             "Source: $url\n$content" to null
@@ -267,10 +308,11 @@ class ChatViewModel(
     }
 
     private suspend fun streamRealResponse(userMsg: UiChatMessage) {
-        if (llmClient == null) return
+        val client = llmClient ?: return
+        val search = webSearch
         val assistantId = java.util.UUID.randomUUID().toString()
         val state = _uiState.value
-        val shouldSearch = state.webSearchEnabled && webSearch != null && userMsg.content.isNotBlank()
+        val shouldSearch = state.webSearchEnabled && search != null && userMsg.content.isNotBlank()
 
         var searchResultsText: String? = null
 
@@ -280,11 +322,11 @@ class ChatViewModel(
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
             
             try {
-                val searchQuery = llmClient.generateSearchQuery(userMsg.content)
+                val searchQuery = client.generateSearchQuery(userMsg.content)
                 EventLog.add("I", "web query generation: ${searchQuery.length} characters")
                 EventLog.add("I", "web query: ${searchQuery.length} characters")
                 EventLog.add("I", "web fetch: sent")
-                val results = webSearch.search(searchQuery)
+                val results = search.search(searchQuery)
                 EventLog.add("I", "web fetch: success")
                 EventLog.add("I", "web search: ${results.joinToString("\n\n").length} characters")
                 if (results.isEmpty()) {
@@ -325,7 +367,7 @@ class ChatViewModel(
         val messages = buildLlmMessages(searchResultsText)
         val messagesText = messages.joinToString("\n") { "${it.role}: ${it.content}" }
         EventLog.add("I", "llm request: ${messagesText.length} characters")
-        val model = _uiState.value.selectedModel.ifBlank { llmClient.currentModel }
+        val model = _uiState.value.selectedModel.ifBlank { client.currentModel }
         val config = _uiState.value.generationConfig
 
         try {
@@ -333,7 +375,7 @@ class ChatViewModel(
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.LLM_STREAMING, "Generating response...")
             
-            llmClient.streamCompletion(messages, model, config).collect { token ->
+            client.streamCompletion(messages, model, config).collect { token ->
                 _uiState.update { s ->
                     s.copy(
                         messages = s.messages.map { msg ->
@@ -488,12 +530,9 @@ class ChatViewModel(
 
 class ChatViewModelFactory(
     private val application: Application,
-    private val llmClient: LlmClient?,
-    private val webSearch: WebSearch?,
-    private val urlFetcher: UrlFetcher?
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ChatViewModel(application, llmClient, webSearch, urlFetcher) as T
+        return ChatViewModel(application) as T
     }
 }

@@ -54,14 +54,15 @@ fun ChatScreen(
     val webSearch = LocalWebSearch.current
     val urlFetcher = LocalUrlFetcher.current
     val vm: ChatViewModel = viewModel(
-        key = llmClient?.let { it.hashCode().toString() } ?: "offline",
         factory = ChatViewModelFactory(
-            LocalContext.current.applicationContext as android.app.Application,
-            llmClient,
-            webSearch,
-            urlFetcher
+            LocalContext.current.applicationContext as android.app.Application
         )
     )
+
+    LaunchedEffect(llmClient, webSearch, urlFetcher) {
+        vm.updateClient(llmClient, webSearch, urlFetcher)
+    }
+    var showClearChatConfirm by remember { mutableStateOf(false) }
     val state by vm.uiState.collectAsState()
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
@@ -141,7 +142,8 @@ fun ChatScreen(
                 onSettings = onNavigateToSettings,
                 onParameters = onNavigateToParameters,
                 onEvents = onNavigateToEvents,
-                onAbout = onNavigateToAbout
+                onAbout = onNavigateToAbout,
+                onClearChat = { showClearChatConfirm = true }
             )
         },
         bottomBar = {
@@ -201,6 +203,29 @@ fun ChatScreen(
             }
         }
     }
+
+    if (showClearChatConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearChatConfirm = false },
+            title = { Text("Clear Chat") },
+            text = { Text("Clear conversation history?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.clearChat()
+                        showClearChatConfirm = false
+                    }
+                ) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearChatConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -216,7 +241,8 @@ fun BuddyChatTopBar(
     onSettings: () -> Unit,
     onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
-    onAbout: () -> Unit = {}
+    onAbout: () -> Unit = {},
+    onClearChat: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     var showModelSelection by remember { mutableStateOf(false) }
@@ -286,6 +312,15 @@ fun BuddyChatTopBar(
                             onParameters()
                         }
                     )
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                        text = { Text("Clear Chat", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            menuExpanded = false
+                            onClearChat()
+                        }
+                    )
+                    HorizontalDivider()
                     DropdownMenuItem(
                         leadingIcon = { Icon(Icons.Default.Event, null, tint = MaterialTheme.colorScheme.onSurface) },
                         text = { Text("Events", color = MaterialTheme.colorScheme.onSurface) },
