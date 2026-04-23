@@ -46,6 +46,7 @@ import com.example.buddy.ui.theme.Dimens
 @Composable
 fun ChatScreen(
     onNavigateToSettings: () -> Unit,
+    onNavigateToParameters: () -> Unit = {},
     onNavigateToEvents: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {}
 ) {
@@ -138,6 +139,7 @@ fun ChatScreen(
                 onModelSelect = vm::selectModel,
                 onToggleWeb = vm::toggleWebSearch,
                 onSettings = onNavigateToSettings,
+                onParameters = onNavigateToParameters,
                 onEvents = onNavigateToEvents,
                 onAbout = onNavigateToAbout
             )
@@ -212,6 +214,7 @@ fun BuddyChatTopBar(
     onModelSelect: (String) -> Unit,
     onToggleWeb: () -> Unit,
     onSettings: () -> Unit,
+    onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
     onAbout: () -> Unit = {}
 ) {
@@ -273,6 +276,14 @@ fun BuddyChatTopBar(
                         onClick = {
                             menuExpanded = false
                             onSettings()
+                        }
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Default.Tune, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("Parameters", color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            menuExpanded = false
+                            onParameters()
                         }
                     )
                     DropdownMenuItem(

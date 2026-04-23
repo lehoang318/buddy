@@ -18,6 +18,7 @@ import com.example.buddy.ext.UrlFetcher
 import com.example.buddy.ext.WebSearch
 import com.example.buddy.ui.chat.ChatScreen
 import com.example.buddy.ui.events.EventsScreen
+import com.example.buddy.ui.parameters.ParametersScreen
 import com.example.buddy.ui.settings.SettingsScreen
 import com.example.buddy.ui.about.AboutScreen
 import com.example.buddy.ui.theme.BuddyTheme
@@ -116,11 +117,32 @@ fun MainContent(
     val currentSettings by currentSettingsFlow.collectAsStateWithLifecycle()
     
     var showSettings by remember { mutableStateOf(false) }
+    var showParameters by remember { mutableStateOf(false) }
     var showEvents by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     
-    if (showEvents) {
+    if (showParameters) {
+        ParametersScreen(
+            onBack = { showParameters = false },
+            initialSettings = currentSettings,
+            onSaveParameters = { temp, topP, topK, sysMsg ->
+                scope.launch {
+                    settingsRepository.updateAll(
+                        provider = currentSettings.provider,
+                        apiKey = currentSettings.apiKey,
+                        model = currentSettings.model,
+                        temperature = temp,
+                        topP = topP,
+                        topK = topK,
+                        systemMessage = sysMsg,
+                        webSearchProvider = currentSettings.webSearchProvider,
+                        tavilyApiKey = currentSettings.tavilyApiKey
+                    )
+                }
+            }
+        )
+    } else if (showEvents) {
         EventsScreen(onBack = { showEvents = false })
     } else if (showAbout) {
         AboutScreen(onBack = { showAbout = false })
@@ -151,6 +173,7 @@ fun MainContent(
                     ProvideWebSearch(webSearch) {
                         ChatScreen(
                             onNavigateToSettings = { showSettings = true },
+                            onNavigateToParameters = { showParameters = true },
                             onNavigateToEvents = { showEvents = true },
                             onNavigateToAbout = { showAbout = true }
                         )
@@ -160,6 +183,7 @@ fun MainContent(
                 ProvideWebSearch(webSearch) {
                         ChatScreen(
                             onNavigateToSettings = { showSettings = true },
+                            onNavigateToParameters = { showParameters = true },
                             onNavigateToEvents = { showEvents = true },
                             onNavigateToAbout = { showAbout = true }
                         )
