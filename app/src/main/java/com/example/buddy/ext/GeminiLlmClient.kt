@@ -206,10 +206,9 @@ class GeminiLlmClient private constructor(
         }
     }
 
-    override suspend fun generateSearchQuery(userMessage: String): String {
+    override suspend fun generateSearchQueryRaw(userMessage: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                EventLog.debug(TAG, "Search query generation started", "Input: ${userMessage.take(200)}\nModel: $currentModel")
                 val requestBody = JsonObject().apply {
                     add("systemInstruction", JsonObject().apply {
                         add("parts", JsonArray().apply {
@@ -229,13 +228,15 @@ class GeminiLlmClient private constructor(
                         })
                     })
                     add("generationConfig", JsonObject().apply {
-                        addProperty("maxOutputTokens", LlmDefaults.SEARCH_QUERY_MAX_TOKENS)
-                        addProperty("temperature", 0.3)
+                        addProperty("maxOutputTokens", LlmDefaults.searchQueryMaxTokens)
+                        addProperty("temperature", LlmDefaults.searchQueryTemperature)
                         add("thinkingConfig", JsonObject().apply {
                             addProperty("thinkingBudget", 0)
                         })
                     })
                 }
+
+                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody))
 
                 val request = Request.Builder()
                     .url("$baseUrl/models/$currentModel:generateContent")
@@ -247,7 +248,7 @@ class GeminiLlmClient private constructor(
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
-                        return@withContext userMessage.take(50)
+                        return@withContext null
                     }
                     val bodyString = response.body?.string() ?: ""
                     val json = gson.fromJson(bodyString, JsonObject::class.java)
@@ -257,25 +258,16 @@ class GeminiLlmClient private constructor(
                         if (content != null) {
                             val parts = content.getAsJsonArray("parts")
                             if (parts != null && parts.size() > 0) {
-                                val raw = parts[0].asJsonObject.get("text")?.asString?.trim()
-                                val text = raw
-                                    ?.replace(Regex("```[\\w]*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE), "")
-                                    ?.replace(Regex("(?i)THOUGHT:.*", RegexOption.DOT_MATCHES_ALL), "")
-                                    ?.trim()
-                                if (!text.isNullOrBlank()) {
-                                    val query = text.removeSurrounding("\"").trim()
-                                    EventLog.debug(TAG, "Search query raw response", "Raw: ${raw.take(500)}\nProcessed: $query")
-                                    return@withContext query
-                                }
+                                return@withContext parts[0].asJsonObject.get("text")?.asString?.trim()
                             }
                         }
                     }
                     EventLog.debug(TAG, "Search query no candidates", "Body: ${bodyString.take(500)}")
-                    userMessage.take(50)
+                    null
                 }
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate search query", e.message)
-                userMessage.take(50)
+                null
             }
         }
     }

@@ -29,7 +29,17 @@ interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
-    suspend fun generateSearchQuery(userMessage: String): String
+    suspend fun generateSearchQueryRaw(userMessage: String): String?
+
+    suspend fun generateSearchQuery(userMessage: String): String {
+        val input = userMessage.take(300)
+        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(200)}\nModel: $currentModel")
+        val raw = generateSearchQueryRaw(input)
+        val processed = LlmDefaults.sanitizeSearchQueryResponse(raw)
+        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(500)}\nProcessed: ${processed ?: "<fallback>"}")
+        return processed ?: userMessage.take(50)
+    }
+
     val currentModel: String
     val isReasoningSupported: Boolean
 

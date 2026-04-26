@@ -254,10 +254,9 @@ class OpenAiCompatibleLlmClient private constructor(
         }
     }
 
-    override suspend fun generateSearchQuery(userMessage: String): String {
+    override suspend fun generateSearchQueryRaw(userMessage: String): String? {
         return withContext(Dispatchers.IO) {
             try {
-                EventLog.debug(TAG, "Search query generation started", "Input: ${userMessage.take(200)}\nModel: $currentModel")
                 val systemMsg = JsonObject().apply {
                     addProperty("role", "system")
                     addProperty("content", LlmDefaults.searchQueryPrompt)
@@ -273,9 +272,11 @@ class OpenAiCompatibleLlmClient private constructor(
                         add(systemMsg)
                         add(userMsg)
                     })
-                    addProperty("max_tokens", LlmDefaults.SEARCH_QUERY_MAX_TOKENS)
-                    addProperty("temperature", 0.3)
+                    addProperty("max_tokens", LlmDefaults.searchQueryMaxTokens)
+                    addProperty("temperature", LlmDefaults.searchQueryTemperature)
                 }
+
+                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody))
 
                 val request = Request.Builder()
                     .url("$normalizedBaseUrl/chat/completions")
@@ -287,30 +288,21 @@ class OpenAiCompatibleLlmClient private constructor(
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
-                        return@withContext userMessage.take(50)
+                        return@withContext null
                     }
                     val bodyString = response.body?.string() ?: ""
                     val json = gson.fromJson(bodyString, JsonObject::class.java)
                     val choices = json.getAsJsonArray("choices")
                     if (choices != null && choices.size() > 0) {
                         val message = choices[0].asJsonObject.getAsJsonObject("message")
-                        val content = message?.get("content")?.asString?.trim()
-                        if (!content.isNullOrBlank()) {
-                            val query = content.removeSurrounding("\"").trim()
-                            EventLog.debug(TAG, "Search query raw response", "Raw: ${content.take(500)}\nProcessed: $query")
-                            query
-                        } else {
-                            EventLog.debug(TAG, "Search query empty response", "Body: ${bodyString.take(500)}")
-                            userMessage.take(50)
-                        }
-                    } else {
-                        EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}")
-                        userMessage.take(50)
+                        return@withContext message?.get("content")?.asString?.trim()
                     }
+                    EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}")
+                    null
                 }
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate search query", e.message)
-                userMessage.take(50)
+                null
             }
         }
     }

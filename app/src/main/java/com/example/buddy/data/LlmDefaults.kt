@@ -32,8 +32,27 @@ object LlmDefaults {
     enum class ReasoningEffort { LOW, HIGH }
 
     const val SEARCH_QUERY_MAX_WORDS = 20
-    const val SEARCH_QUERY_MAX_TOKENS = 60
+
+    val searchQueryTemperature: Float
+        get() = res?.let { ResourcesCompat.getFloat(it, R.dimen.search_query_temperature) } ?: 0.2f
+
+    val searchQueryMaxTokens: Int
+        get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 60
 
     val searchQueryPrompt: String
-        get() = "You are a search query generator. Based on the user's message, generate a focused web search query of up to $SEARCH_QUERY_MAX_WORDS words. Extract the core question or topic. Return ONLY the query text, no quotes, no explanation."
+        get() = res?.getString(R.string.search_query_prompt)
+            ?: "You are a search query generator. Based on the user's message, generate a focused web search query. Return ONLY the query text, no quotes, no explanation."
+
+    fun sanitizeSearchQueryResponse(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        var text = raw
+        text = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL).replace(text, "")
+        text = Regex("<thinking>.*?</thinking>", RegexOption.DOT_MATCHES_ALL).replace(text, "")
+        text = Regex("```[\\w]*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE).replace(text, "")
+        text = Regex("(?i)^\\s*THOUGHT:.*", RegexOption.MULTILINE).replace(text, "")
+        text = Regex("(?i)^\\s*REASONING:.*", RegexOption.MULTILINE).replace(text, "")
+        text = text.removeSurrounding("\"").trim()
+        if (text.isBlank() || text.equals("NO_QUERY", ignoreCase = true)) return null
+        return text
+    }
 }
