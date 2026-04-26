@@ -1,25 +1,15 @@
 package com.example.buddy.ext
 
+import com.example.buddy.BuildConfig
 import com.example.buddy.data.ApiType
 import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmProviders
 import com.example.buddy.data.EventLog
-import com.google.gson.Gson
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
-import okhttp3.ConnectionPool
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import okio.BufferedSource
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
+
+private const val TAG_LLM = "LLM"
 
 data class LlmModel(
     val id: String,
@@ -42,6 +32,60 @@ interface LlmClient {
     suspend fun generateSearchQuery(userMessage: String): String
     val currentModel: String
     val isReasoningSupported: Boolean
+
+    fun streamCompletionWithLogging(
+        messages: List<LlmMessage>,
+        model: String,
+        config: LlmGenerationConfig = LlmGenerationConfig(),
+        correlationId: String? = null
+    ): Flow<String> {
+        val startTime = System.currentTimeMillis()
+        val summary = "${messages.size} messages, model=$model, temp=${config.temperature}, topP=${config.topP}, topK=${config.topK}, maxTokens=${config.maxTokens}, reasoning=${config.reasoningEffort}"
+        EventLog.info(TAG_LLM, "Request sent: $summary", correlationId = correlationId)
+        if (BuildConfig.DEBUG) {
+            val systemMsg = messages.find { it.role == LlmRole.SYSTEM }?.content
+            val debugData = buildString {
+                appendLine("Config: $summary")
+                if (systemMsg != null) appendLine("System: $systemMsg")
+                appendLine("Messages:")
+                messages.forEach {
+                    val preview = it.content.take(500) + if (it.content.length > 500) "..." else ""
+                    appendLine("${it.role}: $preview")
+                }
+            }
+            EventLog.debug(TAG_LLM, "Request details", data = debugData, correlationId = correlationId)
+        }
+        var chunkCount = 0
+        return streamCompletion(messages, model, config)
+            .onEach { chunkCount++ }
+            .onCompletion { throwable ->
+                val durationMs = System.currentTimeMillis() - startTime
+                if (throwable == null) {
+                    EventLog.info(TAG_LLM, "Response received ($chunkCount chunks)", correlationId = correlationId, durationMs = durationMs)
+                } else {
+                    EventLog.error(TAG_LLM, "Response failed", throwable.message, correlationId = correlationId, durationMs = durationMs)
+                }
+            }
+    }
+
+    fun toggleReasoning(current: LlmDefaults.ReasoningEffort?): LlmDefaults.ReasoningEffort {
+        val next = when (current) {
+            LlmDefaults.ReasoningEffort.LOW -> LlmDefaults.ReasoningEffort.HIGH
+            LlmDefaults.ReasoningEffort.HIGH -> LlmDefaults.ReasoningEffort.LOW
+            else -> LlmDefaults.ReasoningEffort.HIGH
+        }
+        val effortStr = when (next) {
+            LlmDefaults.ReasoningEffort.LOW -> "low"
+            LlmDefaults.ReasoningEffort.HIGH -> "high"
+        }
+        val message = if (isReasoningSupported) {
+            "Reasoning effort set: $effortStr"
+        } else {
+            "Reasoning effort set: $effortStr (not supported)"
+        }
+        EventLog.info(TAG_LLM, message)
+        return next
+    }
 }
 
 data class LlmMessage(

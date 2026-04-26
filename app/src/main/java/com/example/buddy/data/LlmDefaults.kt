@@ -30,4 +30,10 @@ object LlmDefaults {
         get() = res?.getString(R.string.default_system_message) ?: "You are a helpful assistant."
 
     enum class ReasoningEffort { LOW, HIGH }
+
+    const val SEARCH_QUERY_MAX_WORDS = 20
+    const val SEARCH_QUERY_MAX_TOKENS = 60
+
+    val searchQueryPrompt: String
+        get() = "You are a search query generator. Based on the user's message, generate a focused web search query of up to $SEARCH_QUERY_MAX_WORDS words. Extract the core question or topic. Return ONLY the query text, no quotes, no explanation."
 }

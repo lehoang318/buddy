@@ -19,6 +19,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSource
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "LLM"
+
 class OpenAiCompatibleLlmClient private constructor(
     private val baseUrl: String,
     private val apiKey: String,
@@ -122,14 +124,14 @@ class OpenAiCompatibleLlmClient private constructor(
                                 }
                             }
                         } catch (e: Exception) {
-                            EventLog.add("W", "Failed to parse SSE chunk")
+                            EventLog.warning(TAG, "SSE parse failed", e.message)
                         }
                     }
                 }
                 break
             } catch (e: Exception) {
                 retryCount++
-                EventLog.add("W", "Stream error (attempt $retryCount): ${e.message}")
+                EventLog.warning(TAG, "Stream error (attempt $retryCount)", e.message)
                 if (retryCount <= maxRetries) {
                     delay(1000L * retryCount)
                 } else {
@@ -169,7 +171,7 @@ class OpenAiCompatibleLlmClient private constructor(
                 }
             }
         } catch (e: Exception) {
-            EventLog.add("W", "Error parsing modality from API")
+            EventLog.warning(TAG, "Error parsing modality from API", e.message)
         }
         return false
     }
@@ -221,7 +223,7 @@ class OpenAiCompatibleLlmClient private constructor(
                     )
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "getModels failed: ${e.message}")
+                EventLog.error(TAG, "Failed to acquire model list", e.message)
                 emptyList()
             }
         }
@@ -231,7 +233,7 @@ class OpenAiCompatibleLlmClient private constructor(
         return withContext(Dispatchers.IO) {
             try {
                 val url = "$normalizedBaseUrl/models"
-                EventLog.add("I", "Testing connection: $url")
+                EventLog.info(TAG, "Connection check", data = url)
                 val request = Request.Builder()
                     .url(url)
                     .header("Authorization", "Bearer $apiKey")
@@ -242,11 +244,11 @@ class OpenAiCompatibleLlmClient private constructor(
                 client.newCall(request).execute().use { response ->
                     val code = response.code
                     val body = response.body?.string()
-                    EventLog.add("I", "Connection test: code=$code")
+                    EventLog.info(TAG, "Connection check completed (code: $code)")
                     response.isSuccessful
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "Connection test failed: ${e.message}")
+                EventLog.error(TAG, "Connection check failed", e.message)
                 false
             }
         }
@@ -255,9 +257,10 @@ class OpenAiCompatibleLlmClient private constructor(
     override suspend fun generateSearchQuery(userMessage: String): String {
         return withContext(Dispatchers.IO) {
             try {
+                EventLog.debug(TAG, "Search query generation started", "Input: ${userMessage.take(200)}\nModel: $currentModel")
                 val systemMsg = JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", "You are a search query generator. Generate a concise, focused web search query (max 5 words) based on the user's message. Return ONLY the query text, nothing else. Do not include quotes or explanations.")
+                    addProperty("content", LlmDefaults.searchQueryPrompt)
                 }
                 val userMsg = JsonObject().apply {
                     addProperty("role", "user")
@@ -270,7 +273,7 @@ class OpenAiCompatibleLlmClient private constructor(
                         add(systemMsg)
                         add(userMsg)
                     })
-                    addProperty("max_tokens", 20)
+                    addProperty("max_tokens", LlmDefaults.SEARCH_QUERY_MAX_TOKENS)
                     addProperty("temperature", 0.3)
                 }
 
@@ -283,7 +286,7 @@ class OpenAiCompatibleLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        EventLog.add("W", "generateSearchQuery failed: code=${response.code}")
+                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
                         return@withContext userMessage.take(50)
                     }
                     val bodyString = response.body?.string() ?: ""
@@ -293,16 +296,20 @@ class OpenAiCompatibleLlmClient private constructor(
                         val message = choices[0].asJsonObject.getAsJsonObject("message")
                         val content = message?.get("content")?.asString?.trim()
                         if (!content.isNullOrBlank()) {
-                            content.removeSurrounding("\"").trim()
+                            val query = content.removeSurrounding("\"").trim()
+                            EventLog.debug(TAG, "Search query raw response", "Raw: ${content.take(500)}\nProcessed: $query")
+                            query
                         } else {
+                            EventLog.debug(TAG, "Search query empty response", "Body: ${bodyString.take(500)}")
                             userMessage.take(50)
                         }
                     } else {
+                        EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}")
                         userMessage.take(50)
                     }
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "generateSearchQuery failed: ${e.message}")
+                EventLog.error(TAG, "Failed to generate search query", e.message)
                 userMessage.take(50)
             }
         }

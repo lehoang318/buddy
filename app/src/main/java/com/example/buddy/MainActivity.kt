@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
@@ -27,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+
+private const val TAG = "Settings"
 
 val LocalLlmClient = compositionLocalOf<LlmClient?> { null }
 val LocalWebSearch = compositionLocalOf<WebSearch?> { null }
@@ -152,6 +155,7 @@ fun MainContent(
             onSettingsSaved = { showSettings = false },
             initialSettings = currentSettings,
             onSaveModelSettings = { settings ->
+                EventLog.info(TAG, "Model settings saved", "provider=${settings.provider}, model=${settings.model}")
                 scope.launch {
                     settingsRepository.updateAll(
                         provider = currentSettings.provider,

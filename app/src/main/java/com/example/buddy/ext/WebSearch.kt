@@ -14,6 +14,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "WebSearch"
+
 data class SearchResult(
     val title: String,
     val url: String,
@@ -73,7 +75,7 @@ class TavilyWebSearch(
                                 429 -> "Tavily usage limit exceeded"
                                 else -> "Web search failed: HTTP ${response.code}"
                             }
-                            EventLog.add("E", "web fetch: failed")
+                            EventLog.error(TAG, "Search failed", "Query: $query\nCode: ${response.code}\nError: $errorMsg\nBody: $errorBody")
                             throw Exception("$errorMsg ($errorBody)")
                         }
                         val bodyString = response.body?.string() ?: ""
@@ -90,11 +92,11 @@ class TavilyWebSearch(
                     }
                 } catch (e: SocketTimeoutException) {
                     lastException = e
-                    EventLog.add("W", "web fetch: timeout, retry ${attempt + 1}/$maxRetries")
+                    EventLog.warning(TAG, "Timeout (attempt ${attempt + 1}/$maxRetries)", "Query: $query\nAttempt: ${attempt + 1}/$maxRetries\nException: SocketTimeoutException")
                     if (attempt < maxRetries) delay(1000L * (attempt + 1))
                 } catch (e: Exception) {
                     lastException = e
-                    EventLog.add("E", "web fetch: failed, retry ${attempt + 1}/$maxRetries")
+                    EventLog.error(TAG, "Search failed (attempt ${attempt + 1}/$maxRetries)", "Query: $query\nAttempt: ${attempt + 1}/$maxRetries\nException: ${e.message}")
                     if (attempt < maxRetries) delay(1000L * (attempt + 1))
                 }
             }
