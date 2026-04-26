@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 
 private const val TAG = "WebSearch"
 
@@ -14,17 +15,24 @@ class WebSearchHelper(
         val errorMessage: String?
     )
 
-    suspend fun search(userMessage: String, correlationId: String? = null): SearchResult {
+    suspend fun search(userMessage: String, correlationId: String? = null, conversationContext: String = ""): SearchResult {
         var searchQuery: String? = null
         val cleanInput = userMessage
             .replace(Regex("""https?://\S+"""), "")
             .trim()
             .take(300)
             .ifBlank { userMessage.take(100) }
-        EventLog.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(100)}\nCleaned: ${cleanInput.take(100)}", correlationId = correlationId)
+
+        val searchInput = if (conversationContext.isNotBlank()) {
+            "$conversationContext\n\nLatest message: $cleanInput"
+        } else {
+            cleanInput
+        }
+
+        EventLog.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(LlmDefaults.logPreviewMaxChars)}\nCleaned: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
         return try {
-            searchQuery = llmClient.generateSearchQuery(cleanInput)
-            EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(100)}", correlationId = correlationId)
+            searchQuery = llmClient.generateSearchQuery(searchInput)
+            EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
 
             val results = webSearch.search(searchQuery)
             val resultsText = results.joinToString("\n\n") { result ->
@@ -33,7 +41,7 @@ class WebSearchHelper(
             EventLog.info(
                 TAG,
                 "Search completed",
-                "Results: ${results.size}\nPreview: ${resultsText.take(100)}${if (resultsText.length > 100) "..." else ""}",
+                "Results: ${results.size}\nPreview: ${resultsText.take(LlmDefaults.logPreviewMaxChars)}${if (resultsText.length > LlmDefaults.logPreviewMaxChars) "..." else ""}",
                 correlationId = correlationId
             )
 

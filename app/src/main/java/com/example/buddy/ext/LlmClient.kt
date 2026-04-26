@@ -33,10 +33,10 @@ interface LlmClient {
 
     suspend fun generateSearchQuery(userMessage: String): String {
         val input = userMessage.take(300)
-        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(200)}\nModel: $currentModel")
+        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(LlmDefaults.logPreviewMaxChars)}\nModel: $currentModel")
         val raw = generateSearchQueryRaw(input)
         val processed = LlmDefaults.sanitizeSearchQueryResponse(raw)
-        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(500)}\nProcessed: ${processed ?: "<fallback>"}")
+        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nProcessed: ${processed ?: "<fallback>"}")
         return processed ?: userMessage.take(50)
     }
 
@@ -50,16 +50,20 @@ interface LlmClient {
         correlationId: String? = null
     ): Flow<String> {
         val startTime = System.currentTimeMillis()
-        val summary = "${messages.size} messages, model=$model, temp=${config.temperature}, topP=${config.topP}, topK=${config.topK}, maxTokens=${config.maxTokens}, reasoning=${config.reasoningEffort}"
-        EventLog.info(TAG_LLM, "Request sent: $summary", correlationId = correlationId)
+        val resolvedTemp = config.temperature.takeIf { it > 0 } ?: LlmDefaults.temperature
+        val resolvedTopP = config.topP.takeIf { it > 0 } ?: LlmDefaults.topP
+        val resolvedTopK = config.topK.takeIf { it > 0 } ?: LlmDefaults.topK
+        val resolvedMaxTokens = config.maxTokens.takeIf { it > 0 } ?: LlmDefaults.maxTokens
+        val paramDetail = "model=$model, temp=$resolvedTemp, topP=$resolvedTopP, topK=$resolvedTopK, maxTokens=$resolvedMaxTokens, reasoning=${config.reasoningEffort}"
+        EventLog.info(TAG_LLM, "Request sent: ${messages.size} messages", data = paramDetail, correlationId = correlationId)
         if (BuildConfig.DEBUG) {
             val systemMsg = messages.find { it.role == LlmRole.SYSTEM }?.content
             val debugData = buildString {
-                appendLine("Config: $summary")
+                appendLine("Config: $paramDetail")
                 if (systemMsg != null) appendLine("System: $systemMsg")
                 appendLine("Messages:")
                 messages.forEach {
-                    val preview = it.content.take(500) + if (it.content.length > 500) "..." else ""
+                    val preview = it.content.take(LlmDefaults.logPreviewMaxChars) + if (it.content.length > LlmDefaults.logPreviewMaxChars) "..." else ""
                     appendLine("${it.role}: $preview")
                 }
             }

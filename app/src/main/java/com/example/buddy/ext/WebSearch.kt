@@ -1,6 +1,7 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +53,7 @@ class TavilyWebSearch(
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
                 addProperty("api_key", apiKey)
-                addProperty("max_results", 3)
+                addProperty("max_results", LlmDefaults.searchMaxResults)
                 addProperty("search_depth", "basic")
             }
 

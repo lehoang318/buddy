@@ -37,7 +37,13 @@ object LlmDefaults {
         get() = res?.let { ResourcesCompat.getFloat(it, R.dimen.search_query_temperature) } ?: 0.2f
 
     val searchQueryMaxTokens: Int
-        get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 60
+        get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 150
+
+    val searchMaxResults: Int
+        get() = res?.getInteger(R.integer.search_max_results) ?: 5
+
+    val logPreviewMaxChars: Int
+        get() = res?.getInteger(R.integer.log_preview_max_chars) ?: 1024
 
     val searchQueryPrompt: String
         get() = res?.getString(R.string.search_query_prompt)

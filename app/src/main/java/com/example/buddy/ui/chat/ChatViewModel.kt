@@ -290,8 +290,20 @@ class ChatViewModel(
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
             
+            val conversationContext = buildString {
+                val previousMessages = _uiState.value.messages.dropLast(1).takeLast(4)
+                for (msg in previousMessages) {
+                    val label = when (msg.role) {
+                        Role.USER -> "User"
+                        Role.ASSISTANT -> "Assistant"
+                        else -> continue
+                    }
+                    appendLine("$label: ${msg.content.take(LlmDefaults.logPreviewMaxChars)}")
+                }
+            }.trim()
+
             val helper = com.example.buddy.ext.WebSearchHelper(client, search)
-            val result = helper.search(userMsg.content, correlationId)
+            val result = helper.search(userMsg.content, correlationId, conversationContext)
             
             result.resultsText?.let { searchResultsText = it }
             result.errorMessage?.let { error ->
@@ -362,7 +374,7 @@ class ChatViewModel(
     }
 
     private fun buildLlmMessages(searchResults: String? = null): List<LlmMessage> {
-        val baseMessages = _uiState.value.messages
+        val messages = _uiState.value.messages
             .filter { it.role != Role.SYSTEM }
             .filterNot { it.role == Role.ASSISTANT && it.content.isEmpty() && it.isStreaming }
             .map { message ->
@@ -377,16 +389,24 @@ class ChatViewModel(
                 )
             }
 
-        return if (searchResults != null) {
-            listOf(
-                LlmMessage(
-                    role = LlmRole.SYSTEM,
-                    content = "Use the following web search results to provide accurate, up-to-date information. Cite sources when relevant.\n\n$searchResults"
-                )
-            ) + baseMessages
+        val messagesWithSearch = if (searchResults != null) {
+            messages.toMutableList().also { list ->
+                val lastUserIndex = list.indexOfLast { it.role == LlmRole.USER }
+                if (lastUserIndex >= 0) {
+                    val msg = list[lastUserIndex]
+                    list[lastUserIndex] = msg.copy(content = "${msg.content}\n\nUse the information below as references:\n$searchResults")
+                }
+            }
         } else {
-            baseMessages
+            messages
         }
+
+        return listOf(
+            LlmMessage(
+                role = LlmRole.SYSTEM,
+                content = LlmDefaults.defaultSystemMessage
+            )
+        ) + messagesWithSearch
     }
 
     private fun buildMessageContent(message: UiChatMessage): String {
