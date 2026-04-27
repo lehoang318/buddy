@@ -183,6 +183,6 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-**Last Updated**: v0.2
+**Last Updated**: v0.3
 
 **Note**: These limitations are subject to change in future updates.

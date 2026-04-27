@@ -32,7 +32,7 @@ private const val MAX_FILE_SIZE_BYTES = 100 * 1024
 private const val TAG = "Chat"
 
 val SUPPORTED_TEXT_EXTENSIONS = listOf(
-    ".txt", ".md", ".log", ".rst", ".adoc", ".asciidoc", ".rtf", ".json", ".xml", ".html"
+    ".txt", ".md", ".log", ".rst", ".adoc", ".asciidoc", ".rtf", ".json", ".xml", ".html", ".py", ".js"
 )
 
 data class ChatUiState(

@@ -33,7 +33,7 @@
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome)
 
 3. **Download the APK**
-  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.2)
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.3)
 
 4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 1V - Android 15).
 

@@ -55,13 +55,17 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 
 ![Model selection screenshot placeholder]
 
-#### Step 5: Configure AI Parameters
+#### Step 5: Configure AI Parameters (Optional)
+AI parameters are configured in a separate **Parameters** screen (accessible from the main menu via the Buddy logo icon). From Settings, you can return to chat, open the menu, and select "Parameters" to adjust:
+
 1. Adjust the sliders for:
    - **Temperature**: Controls creativity (0.0 = factual, 1.0 = creative)
    - **Top-p**: Controls response diversity (0.1 = focused, 1.0 = diverse)
    - **Top-k**: Controls word variety (1 = very focused, 100 = more variety)
 
-2. Use the info icon (?) for tooltips explaining each parameter
+2. Use the info icon (i) for tooltips explaining each parameter
+
+3. Parameters are saved automatically when you tap back
 
 ![AI parameters screenshot placeholder]
 
@@ -73,8 +77,8 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 ![Web search configuration screenshot placeholder]
 
 #### Step 7: Save Settings
-1. Tap the back button to save your settings
-2. Buddy will connect to your chosen provider and model
+1. Tap the back button to return to chat — model selection and web search settings are saved automatically
+2. Buddy will use your chosen provider and model
 3. You're now ready to start chatting!
 
 ![Save settings screenshot placeholder]

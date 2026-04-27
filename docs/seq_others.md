@@ -33,11 +33,14 @@ sequenceDiagram
     SettingsScreen->>SettingsScreen: Update API key field
 
     User->>SettingsScreen: Tap sync button
+    SettingsScreen->>SettingsScreen: handleConnect()
     SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return list of models
 
-    SettingsScreen->>LlmClientFactory: createWithProviderId(provider, apiKey, model)
+    Note over SettingsScreen: Auto-select first model: selectedModel = models.first().id
+
+    SettingsScreen->>LlmClientFactory: createWithProviderId(provider, apiKey, selectedModel)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
     LLMClient-->>SettingsScreen: Connection successful
@@ -47,41 +50,36 @@ sequenceDiagram
     SettingsRepository-->>SettingsScreen: Settings saved
 
     User->>SettingsScreen: Tap back button
-    SettingsScreen->>MainActivity: onSettingsSaved()
+    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
+    SettingsScreen->>MainActivity: onBack()
     MainActivity-->>User: Return to chat screen
 ```
 
-### 2. Settings - Change Model and Parameters
+### 2. Settings - Change Model
 
 ```mermaid
 sequenceDiagram
     participant User
     participant SettingsScreen
     participant SettingsRepository
-    participant LlmClient
+    participant MainActivity
 
     User->>SettingsScreen: Open settings
     SettingsScreen->>SettingsScreen: Display current settings
 
-    User->>SettingsScreen: Select new model from dropdown
+    User->>SettingsScreen: Tap sync button to refresh models
+    SettingsScreen->>SettingsScreen: Fetch available models
+    SettingsScreen-->>User: Show model list
+
+    User->>SettingsScreen: Tap "Default Model" field
+    SettingsScreen->>SettingsScreen: Show ModelSelectionDialog
+    User->>SettingsScreen: Select new model from dialog
     SettingsScreen->>SettingsScreen: Update selected model
 
-    User->>SettingsScreen: Adjust temperature slider
-    SettingsScreen->>SettingsScreen: Update temperature value
-
-    User->>SettingsScreen: Adjust top-p slider
-    SettingsScreen->>SettingsScreen: Update top-p value
-
-    User->>SettingsScreen: Adjust top-k slider
-    SettingsScreen->>SettingsScreen: Update top-k value
-
     User->>SettingsScreen: Tap back button
-    SettingsScreen->>SettingsRepository: updateAll(settings)
-    SettingsRepository->>SettingsRepository: Save settings locally
-    SettingsRepository-->>SettingsScreen: Settings saved
-
-    SettingsScreen->>MainActivity: onSettingsSaved()
-    MainActivity->>MainActivity: Update LLM client with new settings
+    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
+    SettingsScreen->>MainActivity: onBack()
+    MainActivity->>MainActivity: Update LLM client with new model
     MainActivity-->>User: Return to chat screen
 ```
 
@@ -232,7 +230,6 @@ sequenceDiagram
     participant User
     participant MainActivity
     participant AboutScreen
-    participant EventLog
 
     User->>MainActivity: Open app
     MainActivity->>MainActivity: Display Chat Screen
@@ -242,9 +239,6 @@ sequenceDiagram
     MainActivity->>MainActivity: User selects About
 
     User->>AboutScreen: About screen opens
-    AboutScreen->>EventLog: add("I", "Opened About screen")
-    EventLog->>EventLog: Create AppEvent
-    EventLog-->>AboutScreen: Event logged
 
     AboutScreen->>AboutScreen: Display app version
     AboutScreen->>AboutScreen: Display build date
@@ -260,19 +254,13 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant AboutScreen
-    participant EventLog
     participant EmailClient
     participant Browser
 
     User->>AboutScreen: Open about screen
-    AboutScreen->>EventLog: add("I", "Opened About screen")
-    EventLog-->>AboutScreen: Event logged
-
     AboutScreen->>AboutScreen: Display contact information
 
     User->>AboutScreen: Tap on Email row
-    AboutScreen->>EventLog: add("I", "Opened email client")
-    EventLog-->>AboutScreen: Event logged
     AboutScreen->>EmailClient: Open email intent
     EmailClient->>EmailClient: Launch email app
     EmailClient-->>User: Show new email composition
@@ -281,15 +269,11 @@ sequenceDiagram
     EmailClient-->>User: Email sent successfully
 
     User->>AboutScreen: Tap on GitHub row
-    AboutScreen->>EventLog: add("I", "Opened GitHub")
-    EventLog-->>AboutScreen: Event logged
     AboutScreen->>Browser: Open GitHub URL
     Browser->>Browser: Launch browser
     Browser-->>User: Display GitHub repository
 
     User->>AboutScreen: Tap on LinkedIn row
-    AboutScreen->>EventLog: add("I", "Opened LinkedIn")
-    EventLog-->>AboutScreen: Event logged
     AboutScreen->>Browser: Open LinkedIn URL
     Browser->>Browser: Launch browser
     Browser-->>User: Display LinkedIn profile
@@ -305,25 +289,18 @@ sequenceDiagram
     participant SettingsScreen
     participant EventsScreen
     participant AboutScreen
-    participant EventLog
 
     User->>MainActivity: Open app
-    MainActivity->>EventLog: add("I", "App opened")
-    EventLog-->>MainActivity: Event logged
     MainActivity->>ChatScreen: Display chat interface
 
     User->>MainActivity: Tap Buddy logo
     MainActivity->>MainActivity: Show menu dropdown
 
     User->>MainActivity: Select Settings
-    MainActivity->>EventLog: add("I", "Opened Settings")
-    EventLog-->>MainActivity: Event logged
     MainActivity->>SettingsScreen: Navigate to settings
     SettingsScreen-->>User: Show settings screen
 
     User->>SettingsScreen: Tap back button
-    SettingsScreen->>EventLog: add("I", "Closed Settings")
-    EventLog-->>SettingsScreen: Event logged
     SettingsScreen->>MainActivity: Return to chat
     MainActivity->>ChatScreen: Resume chat screen
 
@@ -331,16 +308,11 @@ sequenceDiagram
     MainActivity->>MainActivity: Show menu dropdown
 
     User->>MainActivity: Select Events
-    MainActivity->>EventLog: add("I", "Opened Events")
-    EventLog-->>MainActivity: Event logged
     MainActivity->>EventsScreen: Navigate to events
-    EventsScreen->>EventLog: collect events
-    EventLog-->>EventsScreen: Return events
+    EventsScreen->>EventsScreen: Collect events from EventLog
     EventsScreen-->>User: Show events screen
 
     User->>EventsScreen: Tap back button
-    EventsScreen->>EventLog: add("I", "Closed Events")
-    EventLog-->>EventsScreen: Event logged
     EventsScreen->>MainActivity: Return to chat
     MainActivity->>ChatScreen: Resume chat screen
 
@@ -348,14 +320,10 @@ sequenceDiagram
     MainActivity->>MainActivity: Show menu dropdown
 
     User->>MainActivity: Select About
-    MainActivity->>EventLog: add("I", "Opened About")
-    EventLog-->>MainActivity: Event logged
     MainActivity->>AboutScreen: Navigate to about
     AboutScreen-->>User: Show about screen
 
     User->>AboutScreen: Tap back button
-    AboutScreen->>EventLog: add("I", "Closed About")
-    EventLog-->>AboutScreen: Event logged
     AboutScreen->>MainActivity: Return to chat
     MainActivity->>ChatScreen: Resume chat screen
 ```
@@ -368,31 +336,26 @@ sequenceDiagram
     participant SettingsScreen
     participant SettingsRepository
     participant LlmClientFactory
-    participant EventLog
 
     User->>SettingsScreen: Open settings
-    SettingsScreen->>EventLog: add("I", "Opened Settings")
-    EventLog-->>SettingsScreen: Event logged
-
-    SettingsScreen->>SettingsScreen: Display current model
+    SettingsScreen->>SettingsScreen: Display current settings
 
     User->>SettingsScreen: Tap sync button to refresh models
-    SettingsScreen->>EventLog: add("I", "Refreshed models")
-    EventLog-->>SettingsScreen: Event logged
+    SettingsScreen->>SettingsScreen: handleConnect()
     SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return updated model list
 
-    SettingsScreen->>SettingsScreen: Update model dropdown
-    SettingsScreen->>SettingsScreen: Show new available models
+    Note over SettingsScreen: Auto-select first model
+
+    SettingsScreen->>SettingsScreen: Show new available models in dialog
 
     User->>SettingsScreen: Select newly available model
-    SettingsScreen->>SettingsScreen: Update selected model
+    SettingsScreen->>SettingsScreen: Update selected model via ModelSelectionDialog
 
     User->>SettingsScreen: Tap back to save
+    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
     SettingsScreen->>SettingsRepository: updateAll(settings)
-    SettingsRepository->>EventLog: add("I", "Settings saved")
-    EventLog-->>SettingsRepository: Event logged
     SettingsRepository-->>SettingsScreen: Settings saved
 
     SettingsScreen-->>User: Return to chat screen
