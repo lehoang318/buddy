@@ -1,13 +1,45 @@
 package com.example.buddy.ext
 
+import com.example.buddy.data.EventLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 
+private const val TAG = "UrlFetcher"
+
+data class UrlFetchResult(
+    val fetchedText: String?,
+    val warnings: List<String>
+)
+
 interface UrlFetcher {
     suspend fun fetchTextContent(url: String): String?
     suspend fun testConnection(): Boolean
+
+    suspend fun fetchAll(urls: List<String>, correlationId: String? = null): UrlFetchResult {
+        val warnings = mutableListOf<String>()
+        val results = urls.mapNotNull { url ->
+            try {
+                EventLog.info(TAG, "Fetching URL", "URL: $url", correlationId = correlationId)
+                val content = fetchTextContent(url)
+                if (content != null) {
+                    EventLog.info(TAG, "Fetch succeeded", "URL: $url\nLength: ${content.length}", correlationId = correlationId)
+                    "Source: $url\n$content"
+                } else {
+                    EventLog.error(TAG, "Fetch failed", "URL: $url", correlationId = correlationId)
+                    warnings.add("Failed to fetch: $url")
+                    null
+                }
+            } catch (e: Exception) {
+                EventLog.error(TAG, "Fetch failed", "URL: $url\n${e.message}", correlationId = correlationId)
+                warnings.add("Failed to fetch: $url")
+                null
+            }
+        }
+        val fetchedText = if (results.isNotEmpty()) results.joinToString("\n\n---\n\n") else null
+        return UrlFetchResult(fetchedText, warnings)
+    }
 }
 
 class JsoupUrlFetcher : UrlFetcher {

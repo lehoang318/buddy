@@ -19,6 +19,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSource
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "LLM"
+
 class GeminiLlmClient private constructor(
     private val apiKey: String,
     override val currentModel: String
@@ -115,14 +117,14 @@ class GeminiLlmClient private constructor(
                                 }
                             }
                         } catch (e: Exception) {
-                            EventLog.add("W", "Failed to parse Gemini SSE chunk")
+                            EventLog.warning(TAG, "SSE parse failed", e.message)
                         }
                     }
                 }
                 break
             } catch (e: Exception) {
                 retryCount++
-                EventLog.add("W", "Gemini stream error (attempt $retryCount): ${e.message}")
+                EventLog.warning(TAG, "Stream error (attempt $retryCount)", e.message)
                 if (retryCount <= maxRetries) {
                     delay(1000L * retryCount)
                 } else {
@@ -159,7 +161,7 @@ class GeminiLlmClient private constructor(
                     } ?: emptyList()
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "getModels failed: ${e.message}")
+                EventLog.error(TAG, "Failed to acquire model list", e.message)
                 emptyList()
             }
         }
@@ -193,41 +195,48 @@ class GeminiLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     val code = response.code
-                    val body = response.body?.string() ?: ""
-                    EventLog.add("I", "Gemini connection test: code=$code, body=$body")
+                    val body = response.body?.string()
+                    EventLog.info(TAG, "Connection check completed (code: $code)", body)
                     response.isSuccessful
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "Gemini connection test failed: ${e.message}")
+                EventLog.error(TAG, "Connection check failed", e.message)
                 false
             }
         }
     }
 
-    override suspend fun generateSearchQuery(userMessage: String): String {
+    override suspend fun generateSearchQueryRaw(userMessage: String): String? {
         return withContext(Dispatchers.IO) {
             try {
                 val requestBody = JsonObject().apply {
+                    add("systemInstruction", JsonObject().apply {
+                        add("parts", JsonArray().apply {
+                            add(JsonObject().apply {
+                                addProperty("text", LlmDefaults.searchQueryPrompt)
+                            })
+                        })
+                    })
                     add("contents", JsonArray().apply {
                         add(JsonObject().apply {
                             addProperty("role", "user")
                             add("parts", JsonArray().apply {
                                 add(JsonObject().apply {
-                                    addProperty("text", "Generate a concise web search query (max 5 words) for: $userMessage. Return ONLY the query.")
+                                    addProperty("text", userMessage)
                                 })
                             })
                         })
                     })
                     add("generationConfig", JsonObject().apply {
-                        addProperty("maxOutputTokens", 20)
-                        addProperty("temperature", 0.3)
-                        // disable thinking for this short-form task to prevent THOUGHT: blocks
-                        // from inflating the response and causing downstream 400 errors
+                        addProperty("maxOutputTokens", LlmDefaults.searchQueryMaxTokens)
+                        addProperty("temperature", LlmDefaults.searchQueryTemperature)
                         add("thinkingConfig", JsonObject().apply {
                             addProperty("thinkingBudget", 0)
                         })
                     })
                 }
+
+                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody))
 
                 val request = Request.Builder()
                     .url("$baseUrl/models/$currentModel:generateContent")
@@ -238,8 +247,8 @@ class GeminiLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        EventLog.add("W", "Gemini generateSearchQuery failed: code=${response.code}")
-                        return@withContext userMessage.take(50)
+                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
+                        return@withContext null
                     }
                     val bodyString = response.body?.string() ?: ""
                     val json = gson.fromJson(bodyString, JsonObject::class.java)
@@ -249,24 +258,16 @@ class GeminiLlmClient private constructor(
                         if (content != null) {
                             val parts = content.getAsJsonArray("parts")
                             if (parts != null && parts.size() > 0) {
-                                val raw = parts[0].asJsonObject.get("text")?.asString?.trim()
-                                val text = raw
-                                    // strip fenced THOUGHT blocks: ```...THOUGHT:...```
-                                    ?.replace(Regex("```[\\w]*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE), "")
-                                    // strip bare THOUGHT: lines that leaked outside fences
-                                    ?.replace(Regex("(?i)THOUGHT:.*", RegexOption.DOT_MATCHES_ALL), "")
-                                    ?.trim()
-                                if (!text.isNullOrBlank()) {
-                                    return@withContext text.removeSurrounding("\"").trim()
-                                }
+                                return@withContext parts[0].asJsonObject.get("text")?.asString?.trim()
                             }
                         }
                     }
-                    userMessage.take(50)
+                    EventLog.debug(TAG, "Search query no candidates", "Body: ${bodyString.take(500)}")
+                    null
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "Gemini generateSearchQuery failed: ${e.message}")
-                userMessage.take(50)
+                EventLog.error(TAG, "Failed to generate search query", e.message)
+                null
             }
         }
     }

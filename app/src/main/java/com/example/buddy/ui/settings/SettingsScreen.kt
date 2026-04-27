@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmProviders
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
@@ -27,6 +28,8 @@ import com.example.buddy.ext.LlmModel
 import com.example.buddy.ext.LlmClientFactory
 import com.example.buddy.ui.theme.*
 import kotlinx.coroutines.launch
+
+private const val TAG = "Settings"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +96,7 @@ fun SettingsScreen(
                                     webSearchProvider = selectedWebSearchProvider,
                                     tavilyApiKey = tavilyApiKey
                                 )
+                                EventLog.info(TAG, "Settings connected", "provider=$selectedProvider, model=$selectedModel, webSearch=$selectedWebSearchProvider")
                             } else {
                                 connectError = "Connection failed. Please check your API Key."
                             }

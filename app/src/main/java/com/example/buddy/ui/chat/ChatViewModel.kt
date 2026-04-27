@@ -2,10 +2,8 @@ package com.example.buddy.ui.chat
 
 import android.app.Application
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,6 +29,7 @@ import java.io.ByteArrayOutputStream
 private const val MAX_IMAGE_DIMENSION = 1440
 private const val JPEG_QUALITY = 85
 private const val MAX_FILE_SIZE_BYTES = 100 * 1024
+private const val TAG = "Chat"
 
 val SUPPORTED_TEXT_EXTENSIONS = listOf(
     ".txt", ".md", ".log", ".rst", ".adoc", ".asciidoc", ".rtf", ".json", ".xml", ".html"
@@ -85,7 +84,7 @@ class ChatViewModel(
             }
             state.copy(
                 messages = messages,
-                selectedModel = client?.currentModel ?: state.selectedModel,
+                selectedModel = state.selectedModel.takeIf { it.isNotBlank() } ?: client?.currentModel ?: "",
                 isOffline = isOffline
             )
         }
@@ -105,27 +104,10 @@ class ChatViewModel(
 
     fun toggleReasoningEffort() {
         val current = _uiState.value.generationConfig.reasoningEffort
-        val next = when (current) {
-            LlmDefaults.ReasoningEffort.LOW -> LlmDefaults.ReasoningEffort.HIGH
-            LlmDefaults.ReasoningEffort.HIGH -> LlmDefaults.ReasoningEffort.LOW
-            else -> LlmDefaults.ReasoningEffort.HIGH
-        }
+        val next = llmClient?.toggleReasoning(current) ?: LlmDefaults.ReasoningEffort.HIGH
         _uiState.update {
             it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
         }
-        
-        val isSupported = llmClient?.isReasoningSupported == true
-        val effortStr = when (next) {
-            LlmDefaults.ReasoningEffort.LOW -> "low"
-            LlmDefaults.ReasoningEffort.HIGH -> "high"
-            else -> return
-        }
-        val message = if (isSupported) {
-            "Reasoning: $effortStr"
-        } else {
-            "Reasoning: $effortStr (not supported by this provider)"
-        }
-        EventLog.add("I", message)
     }
 
     fun setOfflineMode(offline: Boolean) {
@@ -229,10 +211,20 @@ class ChatViewModel(
         val text = state.inputText.trim()
         if (text.isBlank() && state.pendingImageBase64 == null && state.pendingFileUri == null) return
 
-        EventLog.add("I", "user input: ${text.length} characters")
-
+        val correlationId = java.util.UUID.randomUUID().toString()
         val urls = extractUrls(text)
+        val urlData = if (urls.isNotEmpty()) urls.joinToString("\n") else null
+        EventLog.info(TAG, "User input: ${text.length} chars" + if (urls.isNotEmpty()) ", ${urls.size} URL(s)" else "", data = urlData, correlationId = correlationId)
         val savedImageBase64 = state.pendingImageBase64
+        val savedFileUri = state.pendingFileUri
+        val savedFileName = state.pendingFileName
+
+        if (savedImageBase64 != null) {
+            EventLog.info(TAG, "Image attached", "Size: ${savedImageBase64.length} chars", correlationId = correlationId)
+        }
+        if (savedFileUri != null) {
+            EventLog.info(TAG, "File attached", "Name: $savedFileName", correlationId = correlationId)
+        }
 
         _uiState.update { it.copy(
             inputText = "",
@@ -245,45 +237,23 @@ class ChatViewModel(
 
         viewModelScope.launch {
             var fetchedUrlText: String? = null
-            val warnings = mutableListOf<String>()
             val fetcher = urlFetcher
             if (urls.isNotEmpty() && fetcher != null) {
                 _uiState.update { it.copy(urlFetchInProgress = true, urlFetchWarnings = emptyList()) }
                 
-                // Notify service that URL fetch is starting
                 ServiceHelper.onOperationStart(application)
                 BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.URL_FETCHING, "Fetching URL content...")
                 
-                val results = urls.mapNotNull { url ->
-                    try {
-                        EventLog.add("I", "web fetch: sent")
-                        val content = fetcher.fetchTextContent(url)
-                        if (content != null) {
-                            EventLog.add("I", "web fetch: success")
-                            "Source: $url\n$content" to null
-                        } else {
-                            EventLog.add("E", "web fetch: failed")
-                            warnings.add("Failed to fetch: $url")
-                            null
-                        }
-                    } catch (e: Exception) {
-                        EventLog.add("E", "web fetch: failed")
-                        warnings.add("Failed to fetch: $url")
-                        null
-                    }
-                }
-                fetchedUrlText = if (results.isNotEmpty()) results.map { it.first }.joinToString("\n\n---\n\n") else null
-                _uiState.update { it.copy(urlFetchInProgress = false, urlFetchWarnings = warnings) }
+                val result = fetcher.fetchAll(urls, correlationId)
+                fetchedUrlText = result.fetchedText
+                _uiState.update { it.copy(urlFetchInProgress = false, urlFetchWarnings = result.warnings) }
                 
-                // Notify service that URL fetch is complete
                 ServiceHelper.onOperationEnd(application)
             }
 
             var fileText: String? = null
-            val fileUri = state.pendingFileUri
-            val fileName = state.pendingFileName
-            if (fileUri != null) {
-                val result = readTextFile(fileUri)
+            if (savedFileUri != null) {
+                val result = readTextFile(savedFileUri)
                 if (result.isFailure) {
                     _uiState.update { it.copy(fileTooLargeError = result.exceptionOrNull()?.message ?: "Could not read file") }
                     return@launch
@@ -296,18 +266,18 @@ class ChatViewModel(
                 content = text,
                 fetchedUrlText = fetchedUrlText,
                 imageBase64 = savedImageBase64,
-                attachedFileUri = fileUri,
-                attachedFileName = fileName,
+                attachedFileUri = savedFileUri,
+                attachedFileName = savedFileName,
                 attachedFileText = fileText
             )
 
             _uiState.update { it.copy(messages = it.messages + userMsg, isLoading = true) }
 
-            streamRealResponse(userMsg)
+            streamRealResponse(userMsg, correlationId)
         }
     }
 
-    private suspend fun streamRealResponse(userMsg: UiChatMessage) {
+    private suspend fun streamRealResponse(userMsg: UiChatMessage, correlationId: String) {
         val client = llmClient ?: return
         val search = webSearch
         val assistantId = java.util.UUID.randomUUID().toString()
@@ -317,37 +287,24 @@ class ChatViewModel(
         var searchResultsText: String? = null
 
         if (shouldSearch) {
-            // Notify service that web search is starting
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
             
-            try {
-                val searchQuery = client.generateSearchQuery(userMsg.content)
-                EventLog.add("I", "web query generation: ${searchQuery.length} characters")
-                EventLog.add("I", "web query: ${searchQuery.length} characters")
-                EventLog.add("I", "web fetch: sent")
-                val results = search.search(searchQuery)
-                EventLog.add("I", "web fetch: success")
-                EventLog.add("I", "web search: ${results.joinToString("\n\n").length} characters")
-                if (results.isEmpty()) {
-                    _uiState.update { it.copy(webSearchError = "Web search returned no results") }
-                } else {
-                    searchResultsText = results.joinToString("\n\n") { result ->
-                        "Source: ${result.title}\nURL: ${result.url}\n${result.content}"
-                    }
-                }
-            } catch (e: Exception) {
-                EventLog.add("E", "web fetch: failed")
+            val helper = com.example.buddy.ext.WebSearchHelper(client, search)
+            val result = helper.search(userMsg.content, correlationId)
+            
+            result.resultsText?.let { searchResultsText = it }
+            result.errorMessage?.let { error ->
                 val errorMsg = when {
-                    e.message?.contains("401") == true || e.message?.contains("403") == true -> "Invalid Tavily API key"
-                    e.message?.contains("429") == true -> "Tavily usage limit exceeded"
-                    else -> "Web search failed: ${e.message}"
+                    error.contains("401") || error.contains("403") -> "Invalid Tavily API key"
+                    error.contains("429") -> "Tavily usage limit exceeded"
+                    error == "Web search returned no results" -> error
+                    else -> "Web search failed: $error"
                 }
                 _uiState.update { it.copy(webSearchError = errorMsg) }
-            } finally {
-                // Notify service that web search is complete
-                ServiceHelper.onOperationEnd(application)
             }
+            
+            ServiceHelper.onOperationEnd(application)
         }
 
         _uiState.update {
@@ -365,17 +322,14 @@ class ChatViewModel(
         }
 
         val messages = buildLlmMessages(searchResultsText)
-        val messagesText = messages.joinToString("\n") { "${it.role}: ${it.content}" }
-        EventLog.add("I", "llm request: ${messagesText.length} characters")
         val model = _uiState.value.selectedModel.ifBlank { client.currentModel }
         val config = _uiState.value.generationConfig
 
         try {
-            // Notify service that LLM streaming is starting
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.LLM_STREAMING, "Generating response...")
             
-            client.streamCompletion(messages, model, config).collect { token ->
+            client.streamCompletionWithLogging(messages, model, config, correlationId).collect { token ->
                 _uiState.update { s ->
                     s.copy(
                         messages = s.messages.map { msg ->
@@ -384,8 +338,6 @@ class ChatViewModel(
                     )
                 }
             }
-            EventLog.add("I", "llm response: success")
-            // Mark streaming done and isComplete=true so markdown rendering kicks in
             _uiState.update { s ->
                 s.copy(
                     messages = s.messages.map { msg ->
@@ -395,7 +347,6 @@ class ChatViewModel(
                 )
             }
         } catch (e: Exception) {
-            EventLog.add("E", "llm response: failed: ${e.message}")
             _uiState.update { s ->
                 s.copy(
                     messages = s.messages.map { msg ->
@@ -405,14 +356,13 @@ class ChatViewModel(
                 )
             }
         } finally {
-            // Notify service that LLM streaming is complete
             ServiceHelper.onOperationEnd(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.IDLE, "")
         }
     }
 
     private fun buildLlmMessages(searchResults: String? = null): List<LlmMessage> {
-        val baseMessages = _uiState.value.messages
+        val messages = _uiState.value.messages
             .filter { it.role != Role.SYSTEM }
             .filterNot { it.role == Role.ASSISTANT && it.content.isEmpty() && it.isStreaming }
             .map { message ->
@@ -427,16 +377,24 @@ class ChatViewModel(
                 )
             }
 
-        return if (searchResults != null) {
-            listOf(
-                LlmMessage(
-                    role = LlmRole.SYSTEM,
-                    content = "Use the following web search results to provide accurate, up-to-date information. Cite sources when relevant.\n\n$searchResults"
-                )
-            ) + baseMessages
+        val messagesWithSearch = if (searchResults != null) {
+            messages.toMutableList().also { list ->
+                val lastUserIndex = list.indexOfLast { it.role == LlmRole.USER }
+                if (lastUserIndex >= 0) {
+                    val msg = list[lastUserIndex]
+                    list[lastUserIndex] = msg.copy(content = "${msg.content}\n\nUse the information below as references:\n$searchResults")
+                }
+            }
         } else {
-            baseMessages
+            messages
         }
+
+        return listOf(
+            LlmMessage(
+                role = LlmRole.SYSTEM,
+                content = LlmDefaults.defaultSystemMessage
+            )
+        ) + messagesWithSearch
     }
 
     private fun buildMessageContent(message: UiChatMessage): String {

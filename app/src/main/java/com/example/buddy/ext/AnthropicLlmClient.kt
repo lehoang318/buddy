@@ -19,6 +19,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSource
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "LLM"
+
 class AnthropicLlmClient private constructor(
     private val apiKey: String,
     override val currentModel: String
@@ -114,14 +116,14 @@ class AnthropicLlmClient private constructor(
                                 }
                             }
                         } catch (e: Exception) {
-                            EventLog.add("W", "Failed to parse Anthropic SSE chunk")
+                            EventLog.warning(TAG, "SSE parse failed", e.message)
                         }
                     }
                 }
                 break
             } catch (e: Exception) {
                 retryCount++
-                EventLog.add("W", "Anthropic stream error (attempt $retryCount): ${e.message}")
+                EventLog.warning(TAG, "Stream error (attempt $retryCount)", e.message)
                 if (retryCount <= maxRetries) {
                     delay(1000L * retryCount)
                 } else {
@@ -152,7 +154,7 @@ class AnthropicLlmClient private constructor(
                     )
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "getModels failed: ${e.message}")
+                EventLog.error(TAG, "Failed to acquire model list", e.message)
                 emptyList()
             }
         }
@@ -177,30 +179,33 @@ class AnthropicLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     val code = response.code
-                    EventLog.add("I", "Anthropic connection test: code=$code")
+                    EventLog.info(TAG, "Connection check completed (code: $code)")
                     response.isSuccessful || code == 400
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "Anthropic connection test failed: ${e.message}")
+                EventLog.error(TAG, "Connection check failed", e.message)
                 false
             }
         }
     }
 
-    override suspend fun generateSearchQuery(userMessage: String): String {
+    override suspend fun generateSearchQueryRaw(userMessage: String): String? {
         return withContext(Dispatchers.IO) {
             try {
                 val requestBody = JsonObject().apply {
                     addProperty("model", currentModel)
-                    addProperty("max_tokens", 20)
-                    addProperty("temperature", 0.3)
+                    addProperty("max_tokens", LlmDefaults.searchQueryMaxTokens)
+                    addProperty("temperature", LlmDefaults.searchQueryTemperature)
+                    addProperty("system", LlmDefaults.searchQueryPrompt)
                     add("messages", JsonArray().apply {
                         add(JsonObject().apply {
                             addProperty("role", "user")
-                            addProperty("content", "Generate a concise web search query (max 5 words) for: $userMessage. Return ONLY the query.")
+                            addProperty("content", userMessage)
                         })
                     })
                 }
+
+                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody))
 
                 val request = Request.Builder()
                     .url("$baseUrl/messages")
@@ -212,23 +217,21 @@ class AnthropicLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        EventLog.add("W", "Anthropic generateSearchQuery failed: code=${response.code}")
-                        return@withContext userMessage.take(50)
+                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
+                        return@withContext null
                     }
                     val bodyString = response.body?.string() ?: ""
                     val json = gson.fromJson(bodyString, JsonObject::class.java)
                     val content = json.getAsJsonArray("content")
                     if (content != null && content.size() > 0) {
-                        val text = content[0].asJsonObject.get("text")?.asString?.trim()
-                        if (!text.isNullOrBlank()) {
-                            return@withContext text.removeSurrounding("\"").trim()
-                        }
+                        return@withContext content[0].asJsonObject.get("text")?.asString?.trim()
                     }
-                    userMessage.take(50)
+                    EventLog.debug(TAG, "Search query no content", "Body: ${bodyString.take(500)}")
+                    null
                 }
             } catch (e: Exception) {
-                EventLog.add("E", "Anthropic generateSearchQuery failed: ${e.message}")
-                userMessage.take(50)
+                EventLog.error(TAG, "Failed to generate search query", e.message)
+                null
             }
         }
     }
