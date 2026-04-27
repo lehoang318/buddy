@@ -15,23 +15,17 @@ class WebSearchHelper(
         val errorMessage: String?
     )
 
-    suspend fun search(userMessage: String, correlationId: String? = null, conversationContext: String = ""): SearchResult {
+    suspend fun search(userMessage: String, correlationId: String? = null): SearchResult {
         var searchQuery: String? = null
         val cleanInput = userMessage
             .replace(Regex("""https?://\S+"""), "")
             .trim()
-            .take(300)
+            .take(1024)
             .ifBlank { userMessage.take(100) }
-
-        val searchInput = if (conversationContext.isNotBlank()) {
-            "$conversationContext\n\nLatest message: $cleanInput"
-        } else {
-            cleanInput
-        }
 
         EventLog.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(LlmDefaults.logPreviewMaxChars)}\nCleaned: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
         return try {
-            searchQuery = llmClient.generateSearchQuery(searchInput)
+            searchQuery = llmClient.generateSearchQuery(cleanInput)
             EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
 
             val results = webSearch.search(searchQuery)

@@ -290,20 +290,8 @@ class ChatViewModel(
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
             
-            val conversationContext = buildString {
-                val previousMessages = _uiState.value.messages.dropLast(1).takeLast(4)
-                for (msg in previousMessages) {
-                    val label = when (msg.role) {
-                        Role.USER -> "User"
-                        Role.ASSISTANT -> "Assistant"
-                        else -> continue
-                    }
-                    appendLine("$label: ${msg.content.take(LlmDefaults.logPreviewMaxChars)}")
-                }
-            }.trim()
-
             val helper = com.example.buddy.ext.WebSearchHelper(client, search)
-            val result = helper.search(userMsg.content, correlationId, conversationContext)
+            val result = helper.search(userMsg.content, correlationId)
             
             result.resultsText?.let { searchResultsText = it }
             result.errorMessage?.let { error ->

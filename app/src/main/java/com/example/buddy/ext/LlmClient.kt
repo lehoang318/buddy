@@ -32,7 +32,7 @@ interface LlmClient {
     suspend fun generateSearchQueryRaw(userMessage: String): String?
 
     suspend fun generateSearchQuery(userMessage: String): String {
-        val input = userMessage.take(300)
+        val input = userMessage.take(1024)
         EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(LlmDefaults.logPreviewMaxChars)}\nModel: $currentModel")
         val raw = generateSearchQueryRaw(input)
         val processed = LlmDefaults.sanitizeSearchQueryResponse(raw)
