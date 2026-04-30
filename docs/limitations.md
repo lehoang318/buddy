@@ -4,7 +4,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 🖼️ Image Processing
+## Image Processing
 
 ### Current Implementation
 
@@ -29,7 +29,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 📄 File Type Support
+## File Type Support
 
 ### Supported Text Files (Maximum 100KB)
 
@@ -59,7 +59,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 📎 Attachment Constraints
+## Attachment Constraints
 
 ### Current Limitations
 
@@ -91,11 +91,11 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 🔄 Web Search Limitations
+## Web Search Limitations
 
 ### Current Constraints
 
-- **API Dependency**: Requires external web search provider (Tavily recommended)
+- **API Dependency**: Requires external web search provider (Exa, LinkUp, or Tavily)
 - **Separate API Key**: Web search requires its own API key, separate from LLM provider
 - **Internet Required**: Web search functionality requires active internet connection
 - **Rate Limits**: Subject to web search provider's rate limits and usage quotas
@@ -105,30 +105,35 @@ This document outlines the current technical limitations and constraints of the 
 
 | Provider | Best For | Notes |
 |----------|----------|-------|
+| **Exa** | Semantic search, research | Powerful content filtering |
+| **LinkUp** | Agentic search, privacy | Precise content retrieval |
 | **Tavily** | AI agents, RAG pipelines | Optimized for AI applications |
 
 ---
 
-## 🤖 LLM Provider Limitations
+## LLM Provider Limitations
 
 ### Reasoning (Extended Thinking)
 
 | Provider | Reasoning Support | API Parameter |
 |----------|-------------------|---------------|
 | **OpenAI API Compatible** | ✅ Supported | `reasoning: {effort: "low"/"high"}` |
-| **Anthropic** | ❌ Not Supported | No reasoning parameter available |
-| **Gemini** | ❌ Not Supported | No reasoning parameter available |
 
 ### Notes
 
-- The reasoning toggle (💡 icon) in the chat input bar only affects OpenAI API compatible providers
-- For other providers, the toggle still works visually but does not send reasoning parameters to the API
-- This is a limitation of the respective provider APIs, not the Buddy application
+- The reasoning toggle (💡 icon) in the chat input bar sends reasoning parameters to all OpenAI-compatible providers
+- Providers that do not support reasoning will ignore the parameter
 - Current reasoning effort levels: **Low** and **High**
+
+### Provider Architecture
+
+- All built-in and custom providers use the **OpenAI-compatible API** format
+- No provider-specific client implementations are required
+- Any endpoint supporting `/chat/completions` and `/models` works uniformly
 
 ---
 
-## 📱 Platform Limitations
+## Platform Limitations
 
 ### Android-Specific Constraints
 
@@ -148,7 +153,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 🛡️ Security Considerations
+## Security Considerations
 
 ### Data Privacy
 
@@ -166,7 +171,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-## 📋 Future Considerations
+## Future Considerations
 
 ### Potential Enhancements
 
@@ -179,7 +184,6 @@ This document outlines the current technical limitations and constraints of the 
 - [ ] EXIF orientation handling
 - [ ] Animated image support
 - [ ] Larger file size limits
-- [ ] Additional web search providers
 
 ---
 

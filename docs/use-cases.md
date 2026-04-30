@@ -1,15 +1,16 @@
 # Buddy AI Assistant - Use Cases Guide
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [1. Settings Configuration](#1-settings-configuration)
-- [2. Changing AI Models](#2-changing-ai-models)
-  - [2.1 Switch to Another Model from Same Provider](#21-switch-to-another-model-from-same-provider)
-  - [2.2 Switch to Model from Different Provider](#22-switch-to-model-from-different-provider)
-- [3. Web Search Configuration](#3-web-search-configuration)
-  - [3.1 Change Web Search Provider](#31-change-web-search-provider)
-  - [3.2 Enable/Disable Web Search](#32-enabledisable-web-search)
-- [4. First Time Startup](#4-first-time-startup)
+- [2. Adding a Custom LLM Provider](#2-adding-a-custom-llm-provider)
+- [3. Changing AI Models](#3-changing-ai-models)
+  - [3.1 Switch to Another Model from Same Provider](#31-switch-to-another-model-from-same-provider)
+  - [3.2 Switch to Model from Different Provider](#32-switch-to-model-from-different-provider)
+- [4. Web Search Configuration](#4-web-search-configuration)
+  - [4.1 Change Web Search Provider](#41-change-web-search-provider)
+  - [4.2 Enable/Disable Web Search](#42-enabledisable-web-search)
+- [5. First Time Startup](#5-first-time-startup)
 
 ---
 
@@ -32,11 +33,13 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 
 #### Step 2: Choose Your AI Provider
 1. In the "LLM Provider" section, tap the dropdown field
-2. Select your preferred AI provider from the list:
-   - OpenAI (ChatGPT models)
-   - Anthropic (Claude models)
-   - Local providers (if you have your own server)
-   - Other compatible providers
+2. Select your preferred AI provider from the built-in list:
+   - Fireworks AI
+   - Ollama Cloud
+   - OpenRouter
+   - SiliconFlow
+   - Together AI
+3. Or tap "Add Provider..." to add a custom OpenAI-compatible provider
 
 ![Provider selection screenshot placeholder]
 
@@ -70,7 +73,10 @@ AI parameters are configured in a separate **Parameters** screen (accessible fro
 ![AI parameters screenshot placeholder]
 
 #### Step 6: Configure Web Search (Optional)
-1. In the "Web Search Provider" section, select your provider (Tavily recommended)
+1. In the "Web Search Provider" section, select your provider:
+   - **Exa** — Semantic search, content filtering
+   - **LinkUp** — Agentic search, precise content retrieval
+   - **Tavily** — AI-optimized, fast results
 2. Enter your web search API key (if required)
 3. Web search enables current information queries
 
@@ -85,17 +91,62 @@ AI parameters are configured in a separate **Parameters** screen (accessible fro
 
 </details>
 
-## 2. Changing AI Models
+## 2. Adding a Custom LLM Provider
+
+<details>
+  <summary>2. Adding a Custom LLM Provider</summary>
+
+### Overview
+Add any OpenAI-compatible LLM provider that is not in the built-in list.
+
+### When to Use This
+- You have a self-hosted model (e.g., via Ollama, vLLM, LM Studio)
+- Your provider is not in the built-in list
+- You want to use a private or corporate endpoint
+
+### Steps
+
+#### Step 1: Open Settings
+1. Tap the Buddy logo in the top bar
+2. Select "Settings" from the menu
+
+#### Step 2: Add Custom Provider
+1. In the "LLM Provider" section, tap the dropdown
+2. Scroll to the bottom and tap "Add Provider..."
+
+#### Step 3: Enter Provider Details
+1. **Name**: Enter a display name (e.g., "My Ollama Server")
+2. **Base URL**: Enter the API endpoint (must be OpenAI-compatible, e.g., `https://my-server.com/v1`)
+3. **API Key** (optional): Enter if your endpoint requires authentication
+
+#### Step 4: Save and Connect
+1. Tap "Add" — the provider appears in the dropdown
+2. Select your new provider
+3. Enter the API key if you didn't already
+4. Tap the sync button (🔄) to fetch models and test the connection
+
+#### Step 5: Select Model
+1. Once connected, choose a model from the "Default Model" dropdown
+2. Tap back to save
+
+### Requirements
+- The endpoint must support OpenAI-compatible `/chat/completions` and `/models` endpoints
+- The endpoint must accept `Authorization: Bearer <api_key>` headers
+- Streaming responses via Server-Sent Events (SSE) are supported
+
+</details>
+
+## 3. Changing AI Models
 
 * Tips
 - **Multimodal Models**: Image icons next to models' names indicate multimodal capability. Grey color means that multimodal is unsupported!
 - **Model Capabilities**: Some models are better at specific tasks (writing, coding, analysis)
 - **Response Quality**: Try different models to find your preferred response style
 
-### 2.1 Switch to Another Model from Same Provider
+### 3.1 Switch to Another Model from Same Provider
 
 <details>
-  <summary>2.1 Switch to Another Model from Same Provider</summary>
+  <summary>3.1 Switch to Another Model from Same Provider</summary>
 
 ### Overview
 Change to a different AI model while keeping the same AI provider.
@@ -148,10 +199,10 @@ Change to a different AI model while keeping the same AI provider.
 
 </details>
 
-### 2.2 Switch to Model from Different Provider
+### 3.2 Switch to Model from Different Provider
 
 <details>
-  <summary>2.2 Switch to Model from Different Provider</summary>
+  <summary>3.2 Switch to Model from Different Provider</summary>
 
 ### Overview
 Change to a completely different AI provider and model.
@@ -192,25 +243,22 @@ Change to a completely different AI provider and model.
 
 ### Provider Comparison Tips
 
-#### OpenAI
-- **Strengths**: Excellent general conversation, good writing assistance
-- **Models**: GPT-4, GPT-3.5, various specialized models
-- **Best for**: General chat, writing, analysis
+#### OpenRouter
+- **Strengths**: 400+ models from 60+ providers, great for experimentation
+- **Best for**: Model experimentation, accessing niche models
 
-#### Anthropic (Claude)
-- **Strengths**: Very helpful, harmless, and honest responses
-- **Models**: Claude 3 series, different sizes available
-- **Best for**: Professional use, ethical considerations
+#### Ollama Cloud
+- **Strengths**: Privacy-focused, no data retention
+- **Best for**: Privacy-conscious users, local model deployment
 
-#### Local Providers
-- **Strengths**: Complete privacy, no internet required
-- **Requirements**: Your own server or computer running AI models
-- **Best for**: Maximum privacy, offline use
+#### Fireworks AI / Together AI / SiliconFlow
+- **Strengths**: Fast inference, open-source models, research-focused
+- **Best for**: Coding, development, cost-effective inference
 
-#### Other Providers
-- **Strengths**: Various specialized capabilities
-- **Considerations**: Different pricing, different model strengths
-- **Best for**: Specific use cases or budget considerations
+#### Custom Providers
+- **Strengths**: Any OpenAI-compatible endpoint
+- **Requirements**: Name, base URL, and optional API key
+- **Best for**: Self-hosted models, private endpoints, specialized services
 
 ### Troubleshooting Provider Switches
 
@@ -218,6 +266,7 @@ Change to a completely different AI provider and model.
 - Double-check your API key for the new provider
 - Verify you have internet connection
 - Some providers may have rate limits or maintenance periods
+- For custom providers, ensure the base URL ends with `/v1` and supports `/chat/completions`
 
 #### Model Not Available
 - Not all models are available in all regions
@@ -231,12 +280,12 @@ Change to a completely different AI provider and model.
 
 </details>
 
-## 3. Web Search Configuration
+## 4. Web Search Configuration
 
-### 3.1 Change Web Search Provider
+### 4.1 Change Web Search Provider
 
 <details>
-  <summary>3.1 Change Web Search Provider</summary>
+  <summary>4.1 Change Web Search Provider</summary>
 
 ### Overview
 Switch between different web search services to find current information.
@@ -259,12 +308,13 @@ Switch between different web search services to find current information.
 #### Step 3: Select New Provider
 1. Tap the dropdown in the "Web Search Provider" field
 2. Choose from available providers:
-   - **Tavily** (recommended for most users)
-   - Other compatible web search providers
+   - **Exa** — Semantic search, content filtering
+   - **LinkUp** — Agentic search, precise content retrieval
+   - **Tavily** — AI-optimized, fast results
 
 #### Step 4: Enter New API Key (if needed)
 1. If the new provider requires an API key, enter it in the "API Key" field
-2. API keys for web search often start with `tvly-` for Tavily
+2. API keys vary by provider (e.g., `tvly-` for Tavily)
 3. Tap the sync button to test the connection
 
 #### Step 5: Test Web Search
@@ -275,15 +325,20 @@ Switch between different web search services to find current information.
 
 ### Provider Comparison
 
-#### Tavily
-- **Strengths**: Fast, reliable, good coverage
-- **Best for**: General web search needs
+#### Exa
+- **Strengths**: Powerful semantic search, content filtering
+- **Best for**: Research, finding specific content
 - **Cost**: Competitive pricing
 
-#### Other Providers
-- **Strengths**: May offer specialized search capabilities
-- **Considerations**: Different pricing models, different result quality
-- **Best for**: Specific use cases or regional needs
+#### LinkUp
+- **Strengths**: Agentic search, precise content retrieval
+- **Best for**: Privacy-focused users, targeted searches
+- **Cost**: Competitive pricing
+
+#### Tavily
+- **Strengths**: Fast, reliable, good coverage, optimized for AI
+- **Best for**: General web search needs
+- **Cost**: Competitive pricing
 
 ### Web Search Best Practices
 
@@ -301,10 +356,10 @@ Switch between different web search services to find current information.
 
 </details>
 
-### 3.2 Enable/Disable Web Search
+### 4.2 Enable/Disable Web Search
 
 <details>
-  <summary>3.2 Enable/Disable Web Search</summary>
+  <summary>4.2 Enable/Disable Web Search</summary>
 
 ### Overview
 Toggle web search on or off to control whether Buddy searches the internet for answers.
@@ -387,10 +442,10 @@ Toggle web search on or off to control whether Buddy searches the internet for a
 
 </details>
 
-## 4. First Time Startup
+## 5. First Time Startup
 
 <details>
-  <summary>4. First Time Startup</summary>
+  <summary>5. First Time Startup</summary>
 
 ### Overview
 What to expect and how to proceed when opening Buddy for the first time.

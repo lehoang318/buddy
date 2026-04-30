@@ -3,7 +3,7 @@ package com.example.buddy.ext
 import com.example.buddy.BuildConfig
 import com.example.buddy.data.ApiType
 import com.example.buddy.data.LlmDefaults
-import com.example.buddy.data.LlmProviders
+import com.example.buddy.data.LlmProvider
 import com.example.buddy.data.EventLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
@@ -115,47 +115,18 @@ enum class LlmRole {
 }
 
 object LlmClientFactory {
+    fun createWithProvider(provider: LlmProvider, apiKey: String, model: String): Result<LlmClient> {
+        val key = apiKey.ifBlank { provider.apiKey }
+        return OpenAiCompatibleLlmClient.create(provider.baseUrl, key, model)
+    }
+
     fun createWithBaseUrl(baseUrl: String, apiKey: String, model: String): Result<LlmClient> {
         return OpenAiCompatibleLlmClient.create(baseUrl, apiKey, model)
     }
 
-    fun createWithProviderId(providerId: String, apiKey: String, model: String): Result<LlmClient> {
-        return try {
-            val provider = LlmProviders.ALL.find { it.id == providerId }
-                ?: throw IllegalArgumentException("Unknown provider: $providerId")
-            
-            val client = when (provider.apiType) {
-                ApiType.OPENAI_COMPATIBLE -> OpenAiCompatibleLlmClient.create(provider.baseUrl, apiKey, model).getOrThrow()
-                ApiType.ANTHROPIC -> AnthropicLlmClient.create(apiKey, model).getOrThrow()
-                ApiType.GEMINI -> GeminiLlmClient.create(apiKey, model).getOrThrow()
-            }
-            Result.success(client)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    suspend fun getModels(providerId: String, apiKey: String): List<LlmModel> {
-        return try {
-            val provider = LlmProviders.ALL.find { it.id == providerId }
-                ?: return emptyList()
-            
-            when (provider.apiType) {
-                ApiType.OPENAI_COMPATIBLE -> {
-                    val client = OpenAiCompatibleLlmClient.create(provider.baseUrl, apiKey, "temp").getOrNull()
-                    client?.getModels() ?: emptyList()
-                }
-                ApiType.ANTHROPIC -> {
-                    val client = AnthropicLlmClient.create(apiKey, "temp").getOrNull()
-                    client?.getModels() ?: emptyList()
-                }
-                ApiType.GEMINI -> {
-                    val client = GeminiLlmClient.create(apiKey, "temp").getOrNull()
-                    client?.getModels() ?: emptyList()
-                }
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+    suspend fun getModels(provider: LlmProvider, apiKey: String): List<LlmModel> {
+        val key = apiKey.ifBlank { provider.apiKey }
+        val client = OpenAiCompatibleLlmClient.create(provider.baseUrl, key, "temp").getOrNull()
+        return client?.getModels() ?: emptyList()
     }
 }

@@ -8,56 +8,15 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 enum class ApiType {
-    OPENAI_COMPATIBLE,
-    ANTHROPIC,
-    GEMINI
-}
-
-object LlmProviders {
-data class ProviderInfo(
-        val id: String,
-        val name: String,
-        val baseUrl: String,
-        val apiType: ApiType = ApiType.OPENAI_COMPATIBLE
-    )
-
-    val ALL = listOf(
-        ProviderInfo("openrouter", "OpenRouter", "https://openrouter.ai/api/v1", ApiType.OPENAI_COMPATIBLE),
-        ProviderInfo("ollama", "Ollama Cloud", "https://ollama.com/v1/", ApiType.OPENAI_COMPATIBLE),
-        ProviderInfo("anthropic", "Anthropic", "https://api.anthropic.com", ApiType.ANTHROPIC),
-        ProviderInfo("gemini", "Gemini", "https://generativelanguage.googleapis.com/v1beta", ApiType.GEMINI),
-        ProviderInfo("openai", "OpenAI", "https://api.openai.com/v1", ApiType.OPENAI_COMPATIBLE),
-        ProviderInfo("xai", "xAI", "https://api.x.ai/v1", ApiType.OPENAI_COMPATIBLE)
-    )
-
-    fun getBaseUrl(providerId: String): String {
-        return ALL.find { it.id == providerId }?.baseUrl ?: ""
-    }
-
-    fun getApiType(providerId: String): ApiType {
-        return ALL.find { it.id == providerId }?.apiType ?: ApiType.OPENAI_COMPATIBLE
-    }
-
-    fun fromBaseUrl(baseUrl: String): String {
-        return ALL.find { it.baseUrl == baseUrl }?.id ?: ""
-    }
-}
-
-object WebSearchProviders {
-    data class ProviderInfo(
-        val id: String,
-        val name: String
-    )
-
-    val ALL = listOf(
-        ProviderInfo("tavily", "Tavily")
-    )
+    OPENAI_COMPATIBLE
 }
 
 object SettingsKeys {
@@ -71,7 +30,11 @@ object SettingsKeys {
     val REASONING_EFFORT = stringPreferencesKey("llm_reasoning_effort")
     val SYSTEM_MESSAGE = stringPreferencesKey("llm_system_message")
     val WEBSEARCH_PROVIDER = stringPreferencesKey("websearch_provider")
-    val TAVILY_API_KEY = stringPreferencesKey("tavily_api_key")
+    val WEBSEARCH_API_KEY = stringPreferencesKey("websearch_api_key")
+    val CUSTOM_LLM_PROVIDERS = stringPreferencesKey("custom_llm_providers")
+    val CUSTOM_WEBSEARCH_PROVIDERS = stringPreferencesKey("custom_websearch_providers")
+    val LLM_API_KEYS = stringPreferencesKey("llm_api_keys")
+    val WEBSEARCH_API_KEYS = stringPreferencesKey("websearch_api_keys")
 }
 
 data class LlmSettings(
@@ -85,13 +48,12 @@ data class LlmSettings(
     val reasoningEffort: String = "",
     val systemMessage: String = "",
     val webSearchProvider: String = "",
-    val tavilyApiKey: String = ""
-) {
-    val baseUrl: String
-        get() = LlmProviders.getBaseUrl(provider)
-}
+    val webSearchApiKey: String = "",
+    val customLlmProvidersJson: String = "",
+    val customWebSearchProvidersJson: String = ""
+)
 
-class SettingsRepository(context: Context) {
+class SettingsRepository(private val context: Context) {
     private val dataStore = context.dataStore
 
     val settings: Flow<LlmSettings> = dataStore.data.map { prefs ->
@@ -106,7 +68,9 @@ class SettingsRepository(context: Context) {
             reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
             systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: LlmDefaults.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
-            tavilyApiKey = prefs[SettingsKeys.TAVILY_API_KEY] ?: ""
+            webSearchApiKey = prefs[SettingsKeys.WEBSEARCH_API_KEY] ?: "",
+            customLlmProvidersJson = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: "",
+            customWebSearchProvidersJson = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
         )
     }
 
@@ -125,7 +89,7 @@ class SettingsRepository(context: Context) {
         reasoningEffort: String = "",
         systemMessage: String = LlmDefaults.defaultSystemMessage,
         webSearchProvider: String = "",
-        tavilyApiKey: String = ""
+        webSearchApiKey: String = ""
     ) {
         dataStore.edit {
             it[SettingsKeys.PROVIDER] = provider
@@ -138,7 +102,90 @@ class SettingsRepository(context: Context) {
             it[SettingsKeys.REASONING_EFFORT] = reasoningEffort
             it[SettingsKeys.SYSTEM_MESSAGE] = systemMessage
             it[SettingsKeys.WEBSEARCH_PROVIDER] = webSearchProvider
-            it[SettingsKeys.TAVILY_API_KEY] = tavilyApiKey
+            it[SettingsKeys.WEBSEARCH_API_KEY] = webSearchApiKey
+        }
+    }
+
+    suspend fun addCustomLlmProvider(provider: LlmProvider) {
+        dataStore.edit {
+            val current = it[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
+            val list = BuiltInProviders.deserializeProviderData(current).toMutableList()
+            list.removeAll { p -> p.id == provider.id }
+            list.add(provider.toProviderData())
+            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = BuiltInProviders.serializeProviderData(list)
+        }
+    }
+
+    suspend fun removeCustomLlmProvider(providerId: String) {
+        dataStore.edit {
+            val current = it[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
+            val list = BuiltInProviders.deserializeProviderData(current).toMutableList()
+            list.removeAll { p -> p.id == providerId }
+            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = BuiltInProviders.serializeProviderData(list)
+        }
+    }
+
+    val customLlmProviders: Flow<List<LlmProvider>> = dataStore.data.map { prefs ->
+        val json = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
+        BuiltInProviders.deserializeProviderData(json).map { it.toLlmProvider() }
+    }
+
+    val customWebSearchProviders: Flow<List<WebSearchProvider>> = dataStore.data.map { prefs ->
+        val json = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
+        BuiltInProviders.deserializeProviderData(json).map { it.toWebSearchProvider() }
+    }
+
+    val allLlmProviders: Flow<List<LlmProvider>> = dataStore.data.map { prefs ->
+        val builtIn = BuiltInProviders.loadLlmProviders(context)
+        val custom = BuiltInProviders.deserializeProviderData(
+            prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
+        ).map { it.toLlmProvider() }
+        builtIn + custom
+    }
+
+    val allWebSearchProviders: Flow<List<WebSearchProvider>> = dataStore.data.map { prefs ->
+        val builtIn = BuiltInProviders.loadWebSearchProviders(context)
+        val custom = BuiltInProviders.deserializeProviderData(
+            prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
+        ).map { it.toWebSearchProvider() }
+        builtIn + custom
+    }
+
+    val llmApiKeysByProvider: Flow<Map<String, String>> = dataStore.data.map { prefs ->
+        val json = prefs[SettingsKeys.LLM_API_KEYS] ?: ""
+        if (json.isBlank()) emptyMap()
+        else try { Gson().fromJson<Map<String, String>>(json, object : TypeToken<Map<String, String>>() {}.type) ?: emptyMap() }
+        catch (_: Exception) { emptyMap() }
+    }
+
+    val webSearchApiKeysByProvider: Flow<Map<String, String>> = dataStore.data.map { prefs ->
+        val json = prefs[SettingsKeys.WEBSEARCH_API_KEYS] ?: ""
+        if (json.isBlank()) emptyMap()
+        else try { Gson().fromJson<Map<String, String>>(json, object : TypeToken<Map<String, String>>() {}.type) ?: emptyMap() }
+        catch (_: Exception) { emptyMap() }
+    }
+
+    suspend fun saveLlmApiKey(providerId: String, apiKey: String) {
+        val gson = Gson()
+        dataStore.edit {
+            val json = it[SettingsKeys.LLM_API_KEYS] ?: ""
+            val map = if (json.isBlank()) mutableMapOf<String, String>()
+            else try { gson.fromJson<MutableMap<String, String>>(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
+            catch (_: Exception) { mutableMapOf() }
+            map[providerId] = apiKey
+            it[SettingsKeys.LLM_API_KEYS] = gson.toJson(map)
+        }
+    }
+
+    suspend fun saveWebSearchApiKey(providerId: String, apiKey: String) {
+        val gson = Gson()
+        dataStore.edit {
+            val json = it[SettingsKeys.WEBSEARCH_API_KEYS] ?: ""
+            val map = if (json.isBlank()) mutableMapOf<String, String>()
+            else try { gson.fromJson<MutableMap<String, String>>(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
+            catch (_: Exception) { mutableMapOf() }
+            map[providerId] = apiKey
+            it[SettingsKeys.WEBSEARCH_API_KEYS] = gson.toJson(map)
         }
     }
 }

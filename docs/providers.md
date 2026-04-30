@@ -4,34 +4,43 @@ This document provides detailed information about all supported AI and web searc
 
 ---
 
-## 🧠 LLM (Large Language Model) Providers
+## LLM (Large Language Model) Providers
 
-Buddy supports multiple LLM providers, giving you flexibility to choose the best model for your needs.
+Buddy supports OpenAI-compatible LLM providers, giving you flexibility to choose the best model for your needs.
 
-| Provider | Base URL | API Type | Description | Status |
-|----------|----------|----------|--------------------|--------|
-| **Ollama Cloud** | `https://ollama.com/v1` | OpenAI-compatible | Privacy-focused, no data retention | ✅ Tested |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | OpenAI-compatible | 400+ models from 60+ providers, experimentation | ✅ Tested |
-| **Gemini** | `https://generativelanguage.googleapis.com/v1beta` | Gemini API | Google's multimodal models, strong reasoning | ✅ Tested |
-| **Anthropic** | `https://api.anthropic.com/v1` | Anthropic Messages API | Excellent reasoning, coding, safety-focused | ⚠️ Planned |
-| **OpenAI** | `https://api.openai.com/v1` | OpenAI-native | Industry standard, GPT-4 models, reliable | ⚠️ Planned |
-| **xAI (Grok)** | `https://api.x.ai/v1` | OpenAI-compatible | Real-time info, unique perspective | ⚠️ Planned |
+| Provider | Base URL | Description | Status |
+|----------|----------|-------------|--------|
+| **Fireworks AI** | `https://api.fireworks.ai/inference/v1` | Fast inference, open-source models | ✅ Tested |
+| **Ollama Cloud** | `https://ollama.com/v1` | Privacy-focused, no data retention | ✅ Tested |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | 400+ models from 60+ providers | ✅ Tested |
+| **SiliconFlow** | `https://api.siliconflow.cn/v1` | High-performance model inference | ✅ Tested |
+| **Together AI** | `https://api.together.xyz/v1` | Research-focused, fast inference | ✅ Tested |
+
+Buddy also supports **custom OpenAI-compatible providers** via the Settings screen. You can add any provider that exposes an OpenAI-compatible chat completions API by providing its name, base URL, and API key.
+
+### Architecture
+
+All LLM providers in Buddy use the **OpenAI-compatible API** format. This means:
+- Any provider with an OpenAI-compatible `/chat/completions` endpoint works out of the box
+- No provider-specific client code is required
+- Models are fetched dynamically from the provider's `/models` endpoint
+- Features like streaming, reasoning effort, and multimodal detection work uniformly across all providers
 
 ---
 
-## 🔍 Web Search Providers
+## Web Search Providers
 
 Web search capabilities allow Buddy to access current, up-to-date information from the internet.
 
 | Provider | Base URL | Description | Status |
 |----------|----------|-------------|--------|
-| **Tavily** | `https://api.tavily.com` | AI agents, RAG pipelines - AI-optimized, fast results, content filtering | ✅ Tested |
-| **Brave Search** | `https://api.search.brave.com` | Privacy-focused search - Privacy-first, cost-effective, comprehensive index | ⚠️ Planned |
-| **Exa** | `https://api.exa.ai` | Semantic search, research - Powerful semantic search, content filtering | ⚠️ Planned |
+| **Exa** | `https://api.exa.ai` | Semantic search, content filtering | ✅ Tested |
+| **LinkUp** | `https://api.linkup.so` | Agentic search, precise content retrieval | ✅ Tested |
+| **Tavily** | `https://api.tavily.com` | AI-optimized, fast results | ✅ Tested |
 
 ---
 
-## 📋 Configuration Guide
+## Configuration Guide
 
 ### Setting Up LLM Providers
 
@@ -43,26 +52,39 @@ Web search capabilities allow Buddy to access current, up-to-date information fr
 
 ### Setting Up Web Search
 
-1. **Choose Provider**: Select from Tavily, Exa, or Brave Search
+1. **Choose Provider**: Select from Exa, LinkUp, or Tavily
 2. **Get API Key**: Sign up with your chosen provider
 3. **Configure**: Enter API key in Buddy web search settings
 4. **Enable**: Toggle web search in the chat interface
+
+### Adding Custom LLM Providers
+
+1. Open Settings and tap "Add Provider..." below the LLM provider dropdown
+2. Enter a **name** for your provider (e.g., "My Local LLM")
+3. Enter the **base URL** (must be OpenAI-compatible, e.g., `https://api.example.com/v1`)
+4. Optionally enter an **API Key**
+5. Tap "Add" — the provider will appear in the dropdown and persist across sessions
+
+### API Key Storage
+
+- **Per-provider keys**: API keys are stored per-provider, so switching providers automatically loads the correct key
+- **Built-in provider keys**: If a built-in provider has a pre-configured API key in `providers.xml`, it is used as fallback
+- **Custom provider keys**: Saved automatically when you connect a custom provider
+- **Web search keys**: Stored separately per web search provider
 
 ### Provider Selection Tips
 
 | Use Case | Recommended Provider(s) |
 |----------|------------------------|
-| **Privacy-focused** | Ollama Cloud, Brave Search |
+| **Privacy-focused** | Ollama Cloud, LinkUp |
 | **Model experimentation** | OpenRouter |
-| **Current events** | xAI, Tavily |
-| **Coding/development** | Anthropic, OpenAI |
-| **Cost-effective** | OpenRouter, Brave Search |
-| **Production use** | OpenAI, Anthropic |
-| **Research** | Exa, Gemini |
+| **Coding/development** | Together AI, Fireworks AI |
+| **Cost-effective** | OpenRouter, LinkUp |
+| **Research** | Exa, SiliconFlow |
 
 ---
 
-## 🔐 Security & Privacy
+## Security & Privacy
 
 ### API Key Security
 - All API keys are stored locally on your device

@@ -40,7 +40,7 @@ sequenceDiagram
 
     Note over SettingsScreen: Auto-select first model: selectedModel = models.first().id
 
-    SettingsScreen->>LlmClientFactory: createWithProviderId(provider, apiKey, selectedModel)
+    SettingsScreen->>LlmClientFactory: createWithProvider(provider, apiKey, selectedModel)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
     LLMClient-->>SettingsScreen: Connection successful
@@ -55,7 +55,45 @@ sequenceDiagram
     MainActivity-->>User: Return to chat screen
 ```
 
-### 2. Settings - Change Model
+### 2. Settings - Add Custom Provider
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant SettingsScreen
+    participant SettingsRepository
+    participant LlmClientFactory
+
+    User->>SettingsScreen: Open settings
+    SettingsScreen->>SettingsScreen: Display current settings
+
+    User->>SettingsScreen: Tap LLM provider dropdown
+    SettingsScreen->>SettingsScreen: Show provider list
+    User->>SettingsScreen: Tap "Add Provider..."
+    SettingsScreen->>SettingsScreen: Show AddProviderDialog
+
+    User->>SettingsScreen: Enter name, base URL, API key
+    SettingsScreen->>SettingsScreen: Tap "Add"
+    SettingsScreen->>SettingsRepository: addCustomLlmProvider(provider)
+    SettingsRepository->>SettingsRepository: Save to DataStore
+    SettingsRepository-->>SettingsScreen: Provider saved
+
+    SettingsScreen->>SettingsScreen: Select new provider from dropdown
+    SettingsScreen->>SettingsScreen: handleConnect()
+    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    LlmClientFactory->>LlmClientFactory: Call provider API
+    LlmClientFactory-->>SettingsScreen: Return list of models
+
+    Note over SettingsScreen: Auto-select first model
+
+    SettingsScreen->>SettingsRepository: updateAll(settings)
+    SettingsRepository->>SettingsRepository: Save settings locally
+    SettingsRepository-->>SettingsScreen: Settings saved
+
+    SettingsScreen-->>User: Return to chat screen
+```
+
+### 3. Settings - Change Model
 
 ```mermaid
 sequenceDiagram
@@ -83,14 +121,14 @@ sequenceDiagram
     MainActivity-->>User: Return to chat screen
 ```
 
-### 3. Settings - Change Web Search Provider
+### 4. Settings - Change Web Search Provider
 
 ```mermaid
 sequenceDiagram
     participant User
     participant SettingsScreen
     participant SettingsRepository
-    participant TavilyWebSearch
+    participant WebSearch
 
     User->>SettingsScreen: Open settings
     SettingsScreen->>SettingsScreen: Display current settings
@@ -98,7 +136,7 @@ sequenceDiagram
     User->>SettingsScreen: Select web search provider from dropdown
     SettingsScreen->>SettingsScreen: Update selected provider
 
-    User->>SettingsScreen: Enter Tavily API key
+    User->>SettingsScreen: Enter web search API key
     SettingsScreen->>SettingsScreen: Update API key field
 
     User->>SettingsScreen: Tap back button
@@ -107,12 +145,12 @@ sequenceDiagram
     SettingsRepository-->>SettingsScreen: Settings saved
 
     SettingsScreen->>MainActivity: onSettingsSaved()
-    MainActivity->>MainActivity: Create TavilyWebSearch instance
+    MainActivity->>MainActivity: Create WebSearch instance
     MainActivity->>MainActivity: Update web search capability
     MainActivity-->>User: Return to chat screen
 ```
 
-### 4. Settings - Connection Error Handling
+### 5. Settings - Connection Error Handling
 
 ```mermaid
 sequenceDiagram
@@ -139,7 +177,7 @@ sequenceDiagram
     LlmClientFactory-->>SettingsScreen: Return list of models
 
     User->>SettingsScreen: Select model and tap sync
-    SettingsScreen->>LlmClientFactory: createWithProviderId(provider, apiKey, model)
+    SettingsScreen->>LlmClientFactory: createWithProvider(provider, apiKey, model)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
     LLMClient-->>SettingsScreen: Connection successful
@@ -148,7 +186,7 @@ sequenceDiagram
     SettingsScreen-->>User: Return to chat screen
 ```
 
-### 5. Events Screen - View Event Log
+### 6. Events Screen - View Event Log
 
 ```mermaid
 sequenceDiagram
@@ -182,7 +220,7 @@ sequenceDiagram
     MainActivity-->>User: Return to chat screen
 ```
 
-### 6. Events Screen - Event Types Displayed
+### 7. Events Screen - Event Types Displayed
 
 ```mermaid
 sequenceDiagram
@@ -223,7 +261,7 @@ sequenceDiagram
     EventsScreen-->>User: Show [E] errors, [W] warnings, [I] info
 ```
 
-### 7. About Screen - Display App Information
+### 8. About Screen - Display App Information
 
 ```mermaid
 sequenceDiagram
@@ -248,7 +286,7 @@ sequenceDiagram
     AboutScreen-->>User: Show app details and contact info
 ```
 
-### 8. About Screen - Contact Developer
+### 9. About Screen - Contact Developer
 
 ```mermaid
 sequenceDiagram
@@ -279,7 +317,7 @@ sequenceDiagram
     Browser-->>User: Display LinkedIn profile
 ```
 
-### 9. Settings - Menu Navigation Flow
+### 10. Settings - Menu Navigation Flow
 
 ```mermaid
 sequenceDiagram
@@ -328,7 +366,7 @@ sequenceDiagram
     MainActivity->>ChatScreen: Resume chat screen
 ```
 
-### 10. Settings - Model Refresh
+### 11. Settings - Model Refresh
 
 ```mermaid
 sequenceDiagram

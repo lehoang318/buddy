@@ -66,6 +66,7 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState
 
     fun updateClient(client: LlmClient?, web: WebSearch?, fetcher: UrlFetcher?) {
+        val clientChanged = llmClient !== client
         llmClient = client
         webSearch = web
         urlFetcher = fetcher
@@ -82,9 +83,15 @@ class ChatViewModel(
             } else {
                 state.messages
             }
+            val model = when {
+                clientChanged && client != null -> client.currentModel
+                state.selectedModel.isNotBlank() -> state.selectedModel
+                client != null -> client.currentModel
+                else -> ""
+            }
             state.copy(
                 messages = messages,
-                selectedModel = state.selectedModel.takeIf { it.isNotBlank() } ?: client?.currentModel ?: "",
+                selectedModel = model,
                 isOffline = isOffline
             )
         }
@@ -149,8 +156,14 @@ class ChatViewModel(
             val models = client.getModels()
             _uiState.update {
                 it.copy(
-                    availableModels = models,
-                    selectedModel = it.selectedModel.takeIf { s -> models.any { m -> m.id == s } } ?: models.firstOrNull()?.id ?: ""
+                    availableModels = models.ifEmpty { it.availableModels },
+                    selectedModel = if (models.isEmpty()) {
+                        it.selectedModel
+                    } else {
+                        it.selectedModel.takeIf { s -> models.any { m -> m.id == s } }
+                            ?: llmClient?.currentModel?.takeIf { m -> models.any { mod -> mod.id == m } }
+                            ?: models.firstOrNull()?.id ?: it.selectedModel
+                    }
                 )
             }
         }
@@ -296,8 +309,8 @@ class ChatViewModel(
             result.resultsText?.let { searchResultsText = it }
             result.errorMessage?.let { error ->
                 val errorMsg = when {
-                    error.contains("401") || error.contains("403") -> "Invalid Tavily API key"
-                    error.contains("429") -> "Tavily usage limit exceeded"
+                    error.contains("401") || error.contains("403") -> "Invalid web search API key"
+                    error.contains("429") -> "Web search usage limit exceeded"
                     error == "Web search returned no results" -> error
                     else -> "Web search failed: $error"
                 }

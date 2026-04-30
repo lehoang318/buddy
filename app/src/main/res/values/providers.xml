@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="llm_provider_ids">
+        <item>fireworks</item>
+        <item>together</item>
+        <item>ollama</item>
+        <item>openrouter</item>
+        <item>siliconflow</item>
+    </string-array>
+    <string-array name="llm_provider_names">
+        <item>Fireworks AI</item>
+        <item>Together AI</item>
+        <item>Ollama Cloud</item>
+        <item>OpenRouter</item>
+        <item>SiliconFlow</item>
+    </string-array>
+    <string-array name="llm_provider_urls">
+        <item>https://api.fireworks.ai/inference/v1</item>
+        <item>https://api.together.xyz/v1</item>
+        <item>https://ollama.com/v1/</item>
+        <item>https://openrouter.ai/api/v1</item>
+        <item>https://api.siliconflow.com/v1</item>
+    </string-array>
+
+    <string-array name="websearch_provider_ids">
+        <item>exa</item>
+        <item>linkup</item>
+        <item>tavily</item>
+    </string-array>
+    <string-array name="websearch_provider_names">
+        <item>Exa</item>
+        <item>LinkUp</item>
+        <item>Tavily</item>
+    </string-array>
+    <string-array name="websearch_provider_urls">
+        <item>https://api.exa.ai</item>
+        <item>https://api.linkup.so</item>
+        <item>https://api.tavily.com</item>
+    </string-array>
+</resources>

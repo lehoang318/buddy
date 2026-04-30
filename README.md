@@ -28,9 +28,9 @@
 
 ## 🚀 Quick Start
 
-1. Generate LLM API Key from [Ollama Cloud](https://docs.ollama.com/cloud#authentication) or any provider in [the supported list](./docs/providers.md)
+1. Generate LLM API Key from [Ollama Cloud](https://docs.ollama.com/cloud#authentication), [OpenRouter](https://openrouter.ai/), or any provider in [the supported list](./docs/providers.md). You can also add custom OpenAI-compatible providers.
 
-2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome)
+2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome), [Exa](https://exa.ai/), or [LinkUp](https://www.linkup.so/)
 
 3. **Download the APK**
   → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.3)
