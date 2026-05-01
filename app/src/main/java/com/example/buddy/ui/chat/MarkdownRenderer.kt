@@ -59,7 +59,7 @@ fun MarkdownRenderer(
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setLineSpacing(0f, 1.2f)
                 movementMethod = LinkMovementMethod.getInstance()
-                highlightColor = Color.TRANSPARENT
+//                highlightColor = Color.TRANSPARENT
                 setLinkTextColor("#58A6FF".toColorInt())
                 setBackgroundColor(Color.TRANSPARENT)
                 TextViewCompat.setCustomSelectionActionModeCallback(this, object : ActionMode.Callback {

@@ -47,7 +47,7 @@ This document outlines the current technical limitations and constraints of the 
 | **PDF Documents** | `.pdf` | No built-in text extraction on Android | Convert to text first |
 | **Binary Files** | Images, executables, archives | Only UTF-8 text encoding supported | Use text-based formats |
 | **Spreadsheets** | `.csv`, `.xlsx`, `.ods` | Not in supported list | Export as `.txt` or `.json` |
-| **Source Code** | `.py`, `.js`, `.java`, `.cpp`, etc. | Not in supported list | Rename to `.txt` or `.md` |
+| **Source Code** | `.java`, `.cpp`, `.ts`, `.go`, `.rs`, `.rb`, `.php`, `.swift`, `.kt`, `.scala` | Not in supported list | Rename to `.txt` or `.md` |
 | **Executable Scripts** | `.sh`, `.bat`, `.ps1` | Not in supported list | Rename to `.txt` |
 
 ### Important Notes
@@ -88,26 +88,6 @@ This document outlines the current technical limitations and constraints of the 
 - No ability to attach both an image and a text file simultaneously
 - No drag-and-drop functionality
 - No clipboard paste support for attachments
-
----
-
-## Web Search Limitations
-
-### Current Constraints
-
-- **API Dependency**: Requires external web search provider (Exa, LinkUp, or Tavily)
-- **Separate API Key**: Web search requires its own API key, separate from LLM provider
-- **Internet Required**: Web search functionality requires active internet connection
-- **Rate Limits**: Subject to web search provider's rate limits and usage quotas
-- **Search Quality**: Results depend on the quality and coverage of the chosen provider
-
-### Supported Providers
-
-| Provider | Best For | Notes |
-|----------|----------|-------|
-| **Exa** | Semantic search, research | Powerful content filtering |
-| **LinkUp** | Agentic search, privacy | Precise content retrieval |
-| **Tavily** | AI agents, RAG pipelines | Optimized for AI applications |
 
 ---
 
@@ -187,6 +167,6 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-**Last Updated**: v0.3
+**Last Updated**: v0.4.0
 
 **Note**: These limitations are subject to change in future updates.

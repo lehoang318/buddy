@@ -372,6 +372,7 @@ fun SettingsScreen(
                         )
                     }
                 }
+                val isLlmConnected = selectedProvider.isNotBlank() && apiKey.isNotBlank() && selectedModel.isNotBlank() && !isConnecting
                 IconButton(
                     onClick = {
                         connectError = null
@@ -387,9 +388,9 @@ fun SettingsScreen(
                         )
                     } else {
                         Icon(
-                            Icons.Default.SwapHoriz,
+                            if (isLlmConnected) Icons.Default.CheckCircle else Icons.Default.SwapHoriz,
                             contentDescription = "Connect to provider",
-                            tint = if (selectedProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
+                            tint = if (isLlmConnected) SendButton else if (selectedProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
                         )
                     }
                 }
@@ -511,6 +512,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+                val isWsConnected = selectedWebSearchProvider.isNotBlank() && webSearchApiKey.isNotBlank()
                 IconButton(
                     onClick = { showWsApiKeyDialog = true },
                     enabled = selectedWebSearchProvider.isNotBlank() && !isConnecting
@@ -523,9 +525,9 @@ fun SettingsScreen(
                         )
                     } else {
                         Icon(
-                            Icons.Default.SwapHoriz,
+                            if (isWsConnected) Icons.Default.CheckCircle else Icons.Default.SwapHoriz,
                             contentDescription = "Connect to web search provider",
-                            tint = if (selectedWebSearchProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
+                            tint = if (isWsConnected) SendButton else if (selectedWebSearchProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
                         )
                     }
                 }

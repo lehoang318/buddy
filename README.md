@@ -33,7 +33,7 @@
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome), [Exa](https://exa.ai/), or [LinkUp](https://www.linkup.so/)
 
 3. **Download the APK**
-  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.3)
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.4)
 
 4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 1V - Android 15).
 
@@ -51,6 +51,11 @@
 |----------|-------------|
 | [FAQ](./FAQ.md) | Common questions and answers |
 | [Supported Providers](./docs/providers.md) | LLM & Web Search provider details |
+| [Use Cases](./docs/use-cases.md) | Step-by-step configuration guides |
+| [Technical Limitations](./docs/limitations.md) | Known constraints and limitations |
+| [Dependencies](./docs/dependencies.md) | External library reference |
+| [Sequence Diagrams](./docs/seq_chat.md) | Chat flow sequence diagrams |
+| [Sequence Diagrams (Others)](./docs/seq_others.md) | Settings, events, and about flow diagrams |
 
 * Refer to [docs](./docs) for internal designs
 

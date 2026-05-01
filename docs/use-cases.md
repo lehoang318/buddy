@@ -59,7 +59,7 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 ![Model selection screenshot placeholder]
 
 #### Step 5: Configure AI Parameters (Optional)
-AI parameters are configured in a separate **Parameters** screen (accessible from the main menu via the Buddy logo icon). From Settings, you can return to chat, open the menu, and select "Parameters" to adjust:
+AI parameters are configured in the **Parameters** screen (accessible from the Buddy logo menu). From Settings, tap back to return to chat, then open the menu and select "Parameters" to adjust:
 
 1. Adjust the sliders for:
    - **Temperature**: Controls creativity (0.0 = factual, 1.0 = creative)
@@ -138,8 +138,8 @@ Add any OpenAI-compatible LLM provider that is not in the built-in list.
 
 ## 3. Changing AI Models
 
-* Tips
-- **Multimodal Models**: Image icons next to models' names indicate multimodal capability. Grey color means that multimodal is unsupported!
+### Tips
+- **Multimodal Models**: Image icons next to models' names indicate multimodal capability. A grey icon means the model does not support images.
 - **Model Capabilities**: Some models are better at specific tasks (writing, coding, analysis)
 - **Response Quality**: Try different models to find your preferred response style
 
@@ -158,13 +158,13 @@ Change to a different AI model while keeping the same AI provider.
 
 ### Steps
 
-#### Method 1: Using Chat Screen Dropdown (Quick Switch)
+#### Method 1: Using Chat Screen Top Bar (Quick Switch)
 
 1. **Open Chat Screen**
    - If not already on the chat screen, tap back button from any other screen to return to chat screen
 
-2. **Access Model Dropdown**
-   - Tap the dropdown arrow next to the current model name in the top bar
+2. **Access Model Selector**
+   - Tap the current model name in the top bar
    - This shows all available models from your current provider
 
 3. **Select New Model**
@@ -282,10 +282,10 @@ Change to a completely different AI provider and model.
 
 ## 4. Web Search Configuration
 
-### 4.1 Change Web Search Provider
+### ### 4.1 Change Web Search Provider
 
 <details>
-  <summary>4.1 Change Web Search Provider</summary>
+  <summary>Change Web Search Provider</summary>
 
 ### Overview
 Switch between different web search services to find current information.
@@ -359,7 +359,7 @@ Switch between different web search services to find current information.
 ### 4.2 Enable/Disable Web Search
 
 <details>
-  <summary>4.2 Enable/Disable Web Search</summary>
+  <summary>Enable/Disable Web Search</summary>
 
 ### Overview
 Toggle web search on or off to control whether Buddy searches the internet for answers.
@@ -489,7 +489,7 @@ When no providers are configured:
 - This is your first configuration step
 
 #### Step 3: Configure Your First Provider
-- Choose an AI provider (OpenAI recommended for beginners)
+- Choose an AI provider (OpenRouter recommended for beginners)
 - Enter your API key
 - Select your first model
 
@@ -551,9 +551,9 @@ When no providers are configured:
 4. Try connecting to different networks if needed
 
 ##### Try Alternative Providers
-1. Start with OpenAI (most popular and reliable)
-2. If issues persist, try Anthropic
-3. Consider local providers if you have technical setup
+1. Start with OpenRouter (most model variety)
+2. If issues persist, try Ollama Cloud or SiliconFlow
+3. Consider custom providers if you have a private endpoint
 4. Contact provider support if problems continue
 
 ##### Contact Support

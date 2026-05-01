@@ -8,13 +8,13 @@ This document provides detailed information about all supported AI and web searc
 
 Buddy supports OpenAI-compatible LLM providers, giving you flexibility to choose the best model for your needs.
 
-| Provider | Base URL | Description | Status |
-|----------|----------|-------------|--------|
-| **Fireworks AI** | `https://api.fireworks.ai/inference/v1` | Fast inference, open-source models | ✅ Tested |
-| **Ollama Cloud** | `https://ollama.com/v1` | Privacy-focused, no data retention | ✅ Tested |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | 400+ models from 60+ providers | ✅ Tested |
-| **SiliconFlow** | `https://api.siliconflow.cn/v1` | High-performance model inference | ✅ Tested |
-| **Together AI** | `https://api.together.xyz/v1` | Research-focused, fast inference | ✅ Tested |
+| Provider | Base URL | Description | Privacy Protection | Status |
+|----------|----------|-------------|--------|--------|
+| **Fireworks AI** | `https://api.fireworks.ai/inference/v1` | Fast inference, open-source models | ✅ SOC 2<br>✅ DPA<br>✅ No Training (API) | ❌ Untested |
+| **Together AI** | `https://api.together.xyz/v1` | Research-focused, fast inference |  ✅ SOC 2 (Type II)<br>✅ DPA<br>✅ No Training (API) | ❌ Untested |
+| **Ollama Cloud** | `https://ollama.com/v1/` | Privacy-focused, no data retention | ❌ SOC 2<br>❌ DPA<br>✅ No Training (API) | ✅ Tested |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | 400+ models from 60+ providers | ❌ SOC 2<br>❓ DPA<br>❓ No Training (API) | ✅ Tested |
+| **SiliconFlow** | `https://api.siliconflow.com/v1` | High-performance model inference | ❌ SOC 2<br>❓ DPA<br>❓ No Training (API) | ✅ Tested |
 
 Buddy also supports **custom OpenAI-compatible providers** via the Settings screen. You can add any provider that exposes an OpenAI-compatible chat completions API by providing its name, base URL, and API key.
 
@@ -72,16 +72,6 @@ Web search capabilities allow Buddy to access current, up-to-date information fr
 - **Custom provider keys**: Saved automatically when you connect a custom provider
 - **Web search keys**: Stored separately per web search provider
 
-### Provider Selection Tips
-
-| Use Case | Recommended Provider(s) |
-|----------|------------------------|
-| **Privacy-focused** | Ollama Cloud, LinkUp |
-| **Model experimentation** | OpenRouter |
-| **Coding/development** | Together AI, Fireworks AI |
-| **Cost-effective** | OpenRouter, LinkUp |
-| **Research** | Exa, SiliconFlow |
-
 ---
 
 ## Security & Privacy
@@ -95,11 +85,10 @@ Web search capabilities allow Buddy to access current, up-to-date information fr
 ### Data Privacy
 - **LLM Providers**: Your messages are sent to the provider you choose
 - **Web Search**: Search queries are sent to the web search provider
-- **Buddy App**: Does not store or log your conversations or API usage
+- **Buddy App**: Your conversations or API usage may be stored locally but shall never leave the device
 - **Recommendation**: Review each provider's privacy policy before use
 
 ### Best Practices
-- Use strong, unique API keys
 - Keep API keys secure and private
 - Monitor your API usage and costs
 - Review provider terms of service

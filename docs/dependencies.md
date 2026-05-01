@@ -16,8 +16,7 @@ This document provides a concise overview of the external libraries used in the 
 | `io.noties.markwon:*` | Text | 4.6.2 | Markdown rendering with tables, strikethrough, task lists, HTML, linkify, Coil images |
 | `androidx.datastore:datastore-preferences` | Storage | 1.2.1 | Persistent user settings |
 | `androidx.work:work-runtime-ktx` | Background | 2.9.1 | Deferrable background tasks (connectivity checks) |
-| `com.aallam.openai:openai-client` | Networking | BOM 4.1.0 | OpenAI API client (declared) |
-| `io.ktor:ktor-client-okhttp` | Networking | - | Ktor OkHttp engine (runtime) |
+
 | `junit` / `androidx.test.*` | Testing | 4.13.2 / 1.1.5 | Unit and UI testing framework |
 
 **Note**: Versions are managed through the Gradle version catalog (`libs.versions.toml`).

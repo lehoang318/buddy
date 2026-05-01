@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-04-08T17:25:15.253643999Z">
+        <DropdownSelection timestamp="2026-05-01T15:33:57.517975031Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=/home/k318/.android/avd/Xperia_1V.avd" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=QV7711J1J4" />
             </handle>
           </Target>
         </DropdownSelection>

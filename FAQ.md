@@ -78,10 +78,10 @@
   <summary>🔑 Where do I get an API key?</summary>
 
 You'll need an API key from an AI provider. Popular options include:
-- **OpenAI** (ChatGPT models)
-- **Anthropic** (Claude models) 
-- **Local models** (if you have your own server)
-- **Other compatible providers**
+- **OpenRouter** (400+ models from 60+ providers)
+- **Ollama Cloud** (privacy-focused, no data retention)
+- **SiliconFlow** (high-performance model inference)
+- **Custom providers** (any OpenAI-compatible endpoint)
 
 Visit your chosen provider's website to generate an API key.
 </details>
@@ -94,9 +94,10 @@ Visit your chosen provider's website to generate an API key.
 #### What is an LLM Provider?
 **LLM** stands for **Large Language Model**. Think of it as the "brain" of Buddy that understands and generates human-like text. Different providers offer different AI models:
 
-- **OpenAI**: Creates ChatGPT-style assistants, good for general conversation
-- **Anthropic**: Creates Claude models, known for being helpful and harmless
-- **Local providers**: Run AI models on your own computer or server (more technical)
+- **OpenRouter**: Access to 400+ models from 60+ providers, great for experimentation
+- **Ollama Cloud**: Privacy-focused with no data retention
+- **Fireworks AI / Together AI / SiliconFlow**: Fast inference with open-source models
+- **Custom providers**: Run AI models on your own server or use any OpenAI-compatible endpoint
 
 Each provider has different models with different strengths - some are better at writing, others at coding, others at analysis.
 
@@ -117,7 +118,7 @@ Web search is separate from your AI provider - you need both working together fo
 An **API key** is like a special password that lets Buddy securely connect to AI and web search services. Here's what you need to know:
 
 #### What it looks like:
-- Usually starts with `sk-` for AI providers
+- Usually starts with `sk-` or similar prefix for AI providers
 - For web search, might start with `tvly-` or other prefixes
 - Long string of letters and numbers
 - Example: `sk-123abc456def789ghi`
@@ -128,7 +129,7 @@ An **API key** is like a special password that lets Buddy securely connect to AI
 - **Security**: Only grants access to the specific services you pay for
 
 #### Where to find it:
-1. Go to your chosen provider's website (OpenAI, Anthropic, etc.)
+1. Go to your chosen provider's website (OpenRouter, Ollama Cloud, etc.)
 2. Sign in to your account
 3. Look for "API Keys", "Developer Keys", or "Account Settings"
 4. Create a new key and copy it
@@ -183,8 +184,8 @@ You can ask Buddy almost anything! Here are some examples:
 
 Yes! Buddy supports:
 - **Images**: Take a photo or select from your gallery
-- **Text files**: .txt, .md (markdown)
-- **Code files**: .json, .xml, .py, .js, etc.
+- **Text files**: .txt, .md, .log, .rst, .adoc, .asciidoc, .rtf
+- **Code files**: .json, .xml, .html, .py, .js
 - **Web pages**: Paste any URL to analyze the content
 
 Just tap the paperclip icon to attach files or use the camera icon to take photos.
@@ -272,7 +273,7 @@ Response times vary based on:
 - Provider status
 </details>
 
-### My images aren't being processed properly?
+### My images aren't being processed properly
 
 <details>
   <summary>📷 My images aren't being processed properly?</summary>
@@ -284,7 +285,7 @@ Make sure:
 - You're using a model that supports images (multimodal)
 </details>
 
-### Web search isn't working?
+### Web search isn't working
 
 <details>
   <summary>🌐 Web search isn't working?</summary>

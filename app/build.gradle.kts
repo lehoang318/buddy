@@ -73,11 +73,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // OpenAI-compatible API calls with streaming
-    implementation(platform(libs.openai.client.bom))
-    implementation(libs.openai.client)
-    runtimeOnly(libs.ktor.client.okhttp)
-
     // Image loading (Coil) — for multimodal image attachments
     implementation(libs.coil.compose)
 
