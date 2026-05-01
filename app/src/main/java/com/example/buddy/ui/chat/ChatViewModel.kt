@@ -71,6 +71,9 @@ class ChatViewModel(
         webSearch = web
         urlFetcher = fetcher
         val isOffline = client == null
+        if (clientChanged && client != null) {
+            client.activeModel = client.defaultModel
+        }
         _uiState.update { state ->
             val messages = if (state.messages.isEmpty() && client != null) {
                 listOf(
@@ -84,9 +87,7 @@ class ChatViewModel(
                 state.messages
             }
             val model = when {
-                clientChanged && client != null -> client.currentModel
-                state.selectedModel.isNotBlank() -> state.selectedModel
-                client != null -> client.currentModel
+                client != null -> client.activeModel
                 else -> ""
             }
             state.copy(
@@ -161,7 +162,7 @@ class ChatViewModel(
                         it.selectedModel
                     } else {
                         it.selectedModel.takeIf { s -> models.any { m -> m.id == s } }
-                            ?: llmClient?.currentModel?.takeIf { m -> models.any { mod -> mod.id == m } }
+                            ?: llmClient?.activeModel?.takeIf { m -> models.any { mod -> mod.id == m } }
                             ?: models.firstOrNull()?.id ?: it.selectedModel
                     }
                 )
@@ -170,6 +171,7 @@ class ChatViewModel(
     }
 
     fun selectModel(modelId: String) {
+        llmClient?.activeModel = modelId
         _uiState.update { it.copy(selectedModel = modelId) }
     }
 
@@ -335,7 +337,7 @@ class ChatViewModel(
         }
 
         val messages = buildLlmMessages(searchResultsText)
-        val model = _uiState.value.selectedModel.ifBlank { client.currentModel }
+        val model = client.activeModel
         val config = _uiState.value.generationConfig
 
         try {

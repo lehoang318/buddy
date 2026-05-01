@@ -24,8 +24,9 @@ private const val TAG = "LLM"
 class OpenAiCompatibleLlmClient private constructor(
     private val baseUrl: String,
     private val apiKey: String,
-    override val currentModel: String
+    override val defaultModel: String
 ) : LlmClient {
+    override var activeModel: String = defaultModel
     override val isReasoningSupported: Boolean = true
 
     private val client = OkHttpClient.Builder()
@@ -267,7 +268,7 @@ class OpenAiCompatibleLlmClient private constructor(
                 }
 
                 val requestBody = JsonObject().apply {
-                    addProperty("model", currentModel)
+                    addProperty("model", activeModel)
                     add("messages", JsonArray().apply {
                         add(systemMsg)
                         add(userMsg)
