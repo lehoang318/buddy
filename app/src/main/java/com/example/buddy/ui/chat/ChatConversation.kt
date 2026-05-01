@@ -40,6 +40,7 @@ import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.Role
 import com.example.buddy.ui.theme.*
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import com.example.buddy.R
 
 @Composable
@@ -64,6 +65,7 @@ fun MessageRow(message: ChatMessage) {
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
             if (message.webSearchUsed) WebSearchPill()
+            if (message.webSearchSkipped) WebSearchSkippedPill()
 
             message.imageBase64?.let { base64 ->
                 val bitmap = decodeBase64ToBitmap(base64)
@@ -267,7 +269,7 @@ fun WebSearchPill() {
             horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Icon(Icons.Default.Search, null, tint = SendButton, modifier = Modifier.size(11.dp))
-            Text("Web search used", color = SendButton, style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(R.string.web_search_used), color = SendButton, style = MaterialTheme.typography.labelSmall)
         }
     }
     Spacer(Modifier.height(6.dp))
@@ -286,7 +288,26 @@ fun WebSearchErrorPill(error: String) {
             horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Icon(Icons.Default.Warning, null, tint = SendButton, modifier = Modifier.size(11.dp))
-            Text("Web search failed: $error", color = SendButton, style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(R.string.web_search_failed, error), color = SendButton, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+}
+
+@Composable
+fun WebSearchSkippedPill() {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = SurfaceVariant,
+        border = BorderStroke(1.dp, Outline)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(Icons.Default.Block, null, tint = SendButton, modifier = Modifier.size(11.dp))
+            Text(stringResource(R.string.web_search_skipped), color = SendButton, style = MaterialTheme.typography.labelSmall)
         }
     }
     Spacer(Modifier.height(6.dp))

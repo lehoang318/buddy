@@ -29,15 +29,31 @@ interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
-    suspend fun generateSearchQueryRaw(userMessage: String): String?
+    suspend fun generateSearchQueryRaw(userMessage: String, correlationId: String? = null): String?
 
-    suspend fun generateSearchQuery(userMessage: String): String {
+    suspend fun generateSearchQuery(userMessage: String, correlationId: String? = null): String? {
         val input = userMessage.take(1024)
-        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(LlmDefaults.logPreviewMaxChars)}\nModel: $activeModel")
-        val raw = generateSearchQueryRaw(input)
+        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(LlmDefaults.logPreviewMaxChars)}\nModel: $activeModel", correlationId = correlationId)
+        val raw = generateSearchQueryRaw(input, correlationId)
+
+        if (raw != null && raw.trim().equals("NO_QUERY", ignoreCase = true)) {
+            EventLog.info(TAG_LLM, "Search query skipped (NO_QUERY)",
+                "LLM indicated no web search is needed for this input", correlationId = correlationId)
+            return null
+        }
+
         val processed = LlmDefaults.sanitizeSearchQueryResponse(raw)
-        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nProcessed: ${processed ?: "<fallback>"}")
-        return processed ?: userMessage.take(50)
+        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nProcessed: ${processed ?: "<fallback>"}", correlationId = correlationId)
+
+        if (processed != null) return processed
+
+        val fallbackLen = LlmDefaults.searchQueryFallbackLength
+        val fallback = userMessage.take(fallbackLen)
+        val reason = if (raw == null) "API call returned null (network error or no response)" else "Response stripped to nothing by sanitization"
+        EventLog.warning(TAG_LLM, "Search query fallback used",
+            "Reason: $reason\nRaw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nFallback (${fallback.length} chars): $fallback",
+            correlationId = correlationId)
+        return fallback
     }
 
     val defaultModel: String

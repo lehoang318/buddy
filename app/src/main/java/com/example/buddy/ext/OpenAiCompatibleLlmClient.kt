@@ -255,7 +255,7 @@ class OpenAiCompatibleLlmClient private constructor(
         }
     }
 
-    override suspend fun generateSearchQueryRaw(userMessage: String): String? {
+    override suspend fun generateSearchQueryRaw(userMessage: String, correlationId: String?): String? {
         return withContext(Dispatchers.IO) {
             try {
                 val systemMsg = JsonObject().apply {
@@ -277,7 +277,7 @@ class OpenAiCompatibleLlmClient private constructor(
                     addProperty("temperature", LlmDefaults.searchQueryTemperature)
                 }
 
-                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody))
+                EventLog.debug(TAG, "Search query request", gson.toJson(requestBody), correlationId = correlationId)
 
                 val request = Request.Builder()
                     .url("$normalizedBaseUrl/chat/completions")
@@ -288,7 +288,7 @@ class OpenAiCompatibleLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})")
+                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})", correlationId = correlationId)
                         return@withContext null
                     }
                     val bodyString = response.body?.string() ?: ""
@@ -298,11 +298,11 @@ class OpenAiCompatibleLlmClient private constructor(
                         val message = choices[0].asJsonObject.getAsJsonObject("message")
                         return@withContext message?.get("content")?.asString?.trim()
                     }
-                    EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}")
+                    EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}", correlationId = correlationId)
                     null
                 }
             } catch (e: Exception) {
-                EventLog.error(TAG, "Failed to generate search query", e.message)
+                EventLog.error(TAG, "Failed to generate search query", e.message, correlationId = correlationId)
                 null
             }
         }

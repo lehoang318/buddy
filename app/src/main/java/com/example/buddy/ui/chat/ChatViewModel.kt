@@ -300,6 +300,7 @@ class ChatViewModel(
         val shouldSearch = state.webSearchEnabled && search != null && userMsg.content.isNotBlank()
 
         var searchResultsText: String? = null
+        var searchSkipped = false
 
         if (shouldSearch) {
             ServiceHelper.onOperationStart(application)
@@ -308,6 +309,7 @@ class ChatViewModel(
             val helper = com.example.buddy.ext.WebSearchHelper(client, search)
             val result = helper.search(userMsg.content, correlationId)
             
+            searchSkipped = result.skipped
             result.resultsText?.let { searchResultsText = it }
             result.errorMessage?.let { error ->
                 val errorMsg = when {
@@ -329,7 +331,8 @@ class ChatViewModel(
                     role = Role.ASSISTANT,
                     content = "",
                     isStreaming = true,
-                    webSearchUsed = searchResultsText != null
+                    webSearchUsed = searchResultsText != null,
+                    webSearchSkipped = searchSkipped
                 ),
                 isLoading = false,
                 isStreaming = true

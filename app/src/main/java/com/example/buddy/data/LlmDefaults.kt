@@ -42,6 +42,9 @@ object LlmDefaults {
     val searchMaxResults: Int
         get() = res?.getInteger(R.integer.search_max_results) ?: 5
 
+    val searchQueryFallbackLength: Int
+        get() = res?.getInteger(R.integer.search_query_fallback_length) ?: 50
+
     val logPreviewMaxChars: Int
         get() = res?.getInteger(R.integer.log_preview_max_chars) ?: 1024
 
@@ -58,7 +61,7 @@ object LlmDefaults {
         text = Regex("(?i)^\\s*THOUGHT:.*", RegexOption.MULTILINE).replace(text, "")
         text = Regex("(?i)^\\s*REASONING:.*", RegexOption.MULTILINE).replace(text, "")
         text = text.removeSurrounding("\"").trim()
-        if (text.isBlank() || text.equals("NO_QUERY", ignoreCase = true)) return null
+        if (text.isBlank()) return null
         return text
     }
 }

@@ -12,11 +12,11 @@ class WebSearchHelper(
 
     data class SearchResult(
         val resultsText: String?,
-        val errorMessage: String?
+        val errorMessage: String?,
+        val skipped: Boolean = false
     )
 
     suspend fun search(userMessage: String, correlationId: String? = null): SearchResult {
-        var searchQuery: String? = null
         val cleanInput = userMessage
             .replace(Regex("""https?://\S+"""), "")
             .trim()
@@ -25,7 +25,11 @@ class WebSearchHelper(
 
         EventLog.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(LlmDefaults.logPreviewMaxChars)}\nCleaned: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
         return try {
-            searchQuery = llmClient.generateSearchQuery(cleanInput)
+            val searchQuery = llmClient.generateSearchQuery(cleanInput, correlationId)
+            if (searchQuery == null) {
+                EventLog.info(TAG, "Search skipped", "Query generation returned null (NO_QUERY or sanitization failed)", correlationId = correlationId)
+                return SearchResult(null, null, skipped = true)
+            }
             EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(LlmDefaults.logPreviewMaxChars)}", correlationId = correlationId)
 
             val results = webSearch.search(searchQuery)
