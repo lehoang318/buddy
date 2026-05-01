@@ -207,36 +207,47 @@ fun SettingsScreen(
     }
 
     showRemoveProviderConfirm?.let { providerToRemove ->
-        AlertDialog(
-            onDismissRequest = { showRemoveProviderConfirm = null },
-            title = { Text("Remove Provider", color = MaterialTheme.colorScheme.onSurface) },
-            text = { Text("Remove ${providerToRemove.name}?", color = MaterialTheme.colorScheme.onSurface) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            repo.removeCustomLlmProvider(providerToRemove.id)
-                            if (selectedProvider == providerToRemove.id) {
-                                selectedProvider = ""
-                                apiKey = ""
-                                availableModels = emptyList()
-                            }
-                        }
-                        showRemoveProviderConfirm = null
+        if (providerToRemove.id == selectedProvider) {
+            AlertDialog(
+                onDismissRequest = { showRemoveProviderConfirm = null },
+                title = { Text("Cannot Remove Active Provider", color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Please switch to a different provider before removing this one.", color = MaterialTheme.colorScheme.onSurface) },
+                confirmButton = {
+                    TextButton(onClick = { showRemoveProviderConfirm = null }) {
+                        Text("OK")
                     }
-                ) {
-                    Text("Remove", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveProviderConfirm = null }) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            textContentColor = MaterialTheme.colorScheme.onSurface
-        )
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { showRemoveProviderConfirm = null },
+                title = { Text("Remove Provider", color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Remove ${providerToRemove.name}?", color = MaterialTheme.colorScheme.onSurface) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                repo.removeCustomLlmProvider(providerToRemove.id)
+                            }
+                            showRemoveProviderConfirm = null
+                        }
+                    ) {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRemoveProviderConfirm = null }) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 
     Scaffold(

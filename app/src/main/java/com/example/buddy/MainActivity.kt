@@ -62,10 +62,12 @@ class MainActivity : ComponentActivity() {
     private val webSearchFlow = MutableStateFlow<WebSearch?>(null)
     private val urlFetcherFlow = MutableStateFlow<UrlFetcher?>(JsoupUrlFetcher())
     private val currentSettingsFlow = MutableStateFlow(LlmSettings())
+    private var lastLlmClientKey = Triple("", "", "")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LlmDefaults.init(this)
+        EventLog.init(this)
         settingsRepository = SettingsRepository(this)
 
         BackgroundScheduler.scheduleConnectivityChecks(this)
@@ -99,14 +101,22 @@ class MainActivity : ComponentActivity() {
                     val resolvedApiKey = llmKeys[llmProvider.id]?.takeIf { it.isNotBlank() }
                         ?: llmProvider.apiKey.takeIf { it.isNotBlank() }
                         ?: settings.apiKey
-                    val result = LlmClientFactory.createWithProvider(llmProvider, resolvedApiKey, settings.model)
-                    result.onSuccess { client ->
-                        llmClientFlow.value = client
-                    }.onFailure {
-                        llmClientFlow.value = null
+                    val clientKey = Triple(llmProvider.id, resolvedApiKey, settings.model)
+                    if (clientKey != lastLlmClientKey) {
+                        lastLlmClientKey = clientKey
+                        val result = LlmClientFactory.createWithProvider(llmProvider, resolvedApiKey, settings.model)
+                        result.onSuccess { client ->
+                            llmClientFlow.value = client
+                        }.onFailure {
+                            llmClientFlow.value = null
+                        }
                     }
                 } else {
-                    llmClientFlow.value = null
+                    val clientKey = Triple("", "", "")
+                    if (clientKey != lastLlmClientKey) {
+                        lastLlmClientKey = clientKey
+                        llmClientFlow.value = null
+                    }
                 }
 
                 val wsProviderId = settings.webSearchProvider

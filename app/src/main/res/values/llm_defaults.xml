@@ -10,10 +10,12 @@
     <integer name="reasoning_effort_high">24576</integer>
     <string name="default_system_message">You are a helpful assistant.</string>
     <item name="search_query_temperature" format="float" type="dimen">0.2</item>
-    <integer name="search_query_max_tokens">150</integer>
-    <integer name="search_max_results">5</integer>
+    <integer name="search_query_max_tokens">128</integer>
+    <integer name="search_max_results">4</integer>
     <integer name="search_query_fallback_length">50</integer>
     <integer name="log_preview_max_chars">1024</integer>
+    <integer name="event_log_max_events">32</integer>
+    <integer name="event_log_max_data_length">2048</integer>
     <string name="search_query_prompt"><![CDATA[You are a search query generator. Your job is to convert user questions into concise, effective web search queries.
 
 Rules:
