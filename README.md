@@ -22,8 +22,14 @@
 
 <div style="display: flex; justify-content: left; gap: 12px; flex-wrap: wrap;">
   <img src="./docs/res/chat-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
-  <img src="./docs/res/settings-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/main-menu.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
   <img src="./docs/res/app-info.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
+</div>
+<br>
+<div style="display: flex; justify-content: left; gap: 12px; flex-wrap: wrap;">
+  <img src="./docs/res/settings-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/parameters-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/events-screen.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
 </div>
 
 ## 🚀 Quick Start
