@@ -1,7 +1,6 @@
 package com.example.buddy.ext
 
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers

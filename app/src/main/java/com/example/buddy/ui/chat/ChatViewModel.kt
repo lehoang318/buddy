@@ -7,7 +7,6 @@ import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.buddy.data.ChatMessage as UiChatMessage
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.Role
@@ -25,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import com.example.buddy.data.ChatMessage as UiChatMessage
 
 private const val MAX_IMAGE_DIMENSION = 1440
 private const val JPEG_QUALITY = 85

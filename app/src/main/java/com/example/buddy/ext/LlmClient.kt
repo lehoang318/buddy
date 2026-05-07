@@ -1,10 +1,9 @@
 package com.example.buddy.ext
 
 import com.example.buddy.BuildConfig
-import com.example.buddy.data.ApiType
+import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmProvider
-import com.example.buddy.data.EventLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
