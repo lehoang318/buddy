@@ -4,10 +4,6 @@
     <item name="default_top_p" format="float" type="dimen">0.95</item>
     <integer name="default_top_k">20</integer>
     <integer name="default_max_tokens">4096</integer>
-    <integer name="reasoning_effort_minimal">1024</integer>
-    <integer name="reasoning_effort_low">4096</integer>
-    <integer name="reasoning_effort_medium">12288</integer>
-    <integer name="reasoning_effort_high">24576</integer>
     <string name="default_system_message">You are a helpful assistant.</string>
     <item name="search_query_temperature" format="float" type="dimen">0.2</item>
     <integer name="search_query_max_tokens">128</integer>

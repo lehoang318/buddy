@@ -71,5 +71,4 @@ object EventLog {
     fun error(tag: String, text: String, data: String? = null, correlationId: String? = null, durationMs: Long? = null) =
         add(EventLevel.ERROR, tag, text, data, correlationId, durationMs)
 
-    fun clear() { _events.value = emptyList() }
 }

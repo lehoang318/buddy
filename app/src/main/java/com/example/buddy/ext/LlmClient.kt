@@ -136,10 +136,6 @@ object LlmClientFactory {
         return OpenAiCompatibleLlmClient.create(provider.baseUrl, key, model)
     }
 
-    fun createWithBaseUrl(baseUrl: String, apiKey: String, model: String): Result<LlmClient> {
-        return OpenAiCompatibleLlmClient.create(baseUrl, apiKey, model)
-    }
-
     suspend fun getModels(provider: LlmProvider, apiKey: String): List<LlmModel> {
         val key = apiKey.ifBlank { provider.apiKey }
         val client = OpenAiCompatibleLlmClient.create(provider.baseUrl, key, "temp").getOrNull()

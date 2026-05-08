@@ -15,11 +15,4 @@ val OnSurfaceVariant = Color(0xFF5D5144)   // Darker text for surfaces
 val Outline = Color(0xFFCCC2B3)            // Outline/border color
 
 // Material Theme color mappings
-val Background = VintageBackground
-val OnBackground = TextColor
-val Surface = VintageBackground
 val OnSurface = TextColor
-val Primary = SendButton
-val OnPrimary = Color.White
-val Secondary = UserBubble
-val OnSecondary = Color.White

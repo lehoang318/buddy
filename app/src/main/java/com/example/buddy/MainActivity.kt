@@ -205,7 +205,6 @@ fun MainContent(
     } else if (showSettings) {
         SettingsScreen(
             onBack = { showSettings = false },
-            onSettingsSaved = { showSettings = false },
             initialSettings = currentSettings,
             settingsRepository = settingsRepository,
             onSaveModelSettings = { settings ->

@@ -74,7 +74,7 @@ private val levelIcons = mapOf(
     EventLevel.INFO to Icons.Filled.Info
 )
 
-private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.getDefault())
+private val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.ROOT)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

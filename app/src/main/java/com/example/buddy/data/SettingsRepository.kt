@@ -169,8 +169,8 @@ class SettingsRepository(private val context: Context) {
         val gson = Gson()
         dataStore.edit {
             val json = it[SettingsKeys.LLM_API_KEYS] ?: ""
-            val map = if (json.isBlank()) mutableMapOf<String, String>()
-            else try { gson.fromJson<MutableMap<String, String>>(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
+            val map: MutableMap<String, String> = if (json.isBlank()) mutableMapOf()
+            else try { gson.fromJson(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
             catch (_: Exception) { mutableMapOf() }
             map[providerId] = apiKey
             it[SettingsKeys.LLM_API_KEYS] = gson.toJson(map)
@@ -181,8 +181,8 @@ class SettingsRepository(private val context: Context) {
         val gson = Gson()
         dataStore.edit {
             val json = it[SettingsKeys.WEBSEARCH_API_KEYS] ?: ""
-            val map = if (json.isBlank()) mutableMapOf<String, String>()
-            else try { gson.fromJson<MutableMap<String, String>>(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
+            val map: MutableMap<String, String> = if (json.isBlank()) mutableMapOf()
+            else try { gson.fromJson(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
             catch (_: Exception) { mutableMapOf() }
             map[providerId] = apiKey
             it[SettingsKeys.WEBSEARCH_API_KEYS] = gson.toJson(map)

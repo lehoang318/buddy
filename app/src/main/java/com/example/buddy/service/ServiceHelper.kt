@@ -17,12 +17,6 @@ object ServiceHelper {
     private var pendingStopHandler: Handler? = null
     private var pendingStopRunnable: Runnable? = null
 
-    enum class OperationType {
-        LLM_STREAM,
-        WEB_SEARCH,
-        URL_FETCH
-    }
-
     fun onOperationStart(context: Context) {
         val count = activeOperations.incrementAndGet()
         Log.d(TAG, "Operation started. Active count: $count")
@@ -51,8 +45,6 @@ object ServiceHelper {
     }
 
     fun hasActiveOperations(): Boolean = activeOperations.get() > 0
-
-    fun getActiveOperationCount(): Int = activeOperations.get()
 
     private fun startForegroundService(context: Context) {
         val intent = Intent(context, BuddyForegroundService::class.java).apply {

@@ -40,7 +40,4 @@ object BackgroundScheduler {
             )
     }
 
-    fun cancelConnectivityChecks(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(CONNECTIVITY_WORKER_TAG)
-    }
 }

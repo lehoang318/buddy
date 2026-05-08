@@ -12,10 +12,6 @@ class ConnectivityWorker(
     params: WorkerParameters
 ) : Worker(context, params) {
 
-    companion object {
-        private const val TAG = "ConnectivityWorker"
-    }
-
     override fun doWork(): Result {
         return try {
             EventLog.info(TAG, "Background check started")

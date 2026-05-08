@@ -47,9 +47,8 @@ class JsoupUrlFetcher : UrlFetcher {
     override suspend fun fetchTextContent(url: String): String? = withContext(Dispatchers.IO) {
         if (!url.startsWith("https://")) return@withContext null
 
-        var lastException: Exception? = null
         val maxRetries = 2
-        
+
         for (attempt in 0..maxRetries) {
             try {
                 val doc = Jsoup.connect(url)
@@ -68,7 +67,6 @@ class JsoupUrlFetcher : UrlFetcher {
                 if (bodyText.isBlank()) return@withContext null
                 return@withContext "[$title]\n$bodyText"
             } catch (e: Exception) {
-                lastException = e
                 if (attempt < maxRetries) {
                     delay(500L * (attempt + 1))  // Exponential backoff
                 }

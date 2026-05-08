@@ -43,7 +43,7 @@ class ExaWebSearch(
                 addProperty("query", query)
                 addProperty("numResults", LlmDefaults.searchMaxResults)
                 addProperty("type", "auto")
-                add("contents", com.google.gson.JsonObject().apply {
+                add("contents", JsonObject().apply {
                     addProperty("text", true)
                 })
             }

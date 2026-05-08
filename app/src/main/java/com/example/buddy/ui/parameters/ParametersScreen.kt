@@ -30,6 +30,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,6 +48,7 @@ import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
+import java.util.Locale
 
 private const val TAG = "Settings"
 
@@ -66,9 +69,9 @@ fun ParametersScreen(
     val initialTopP = effectiveInitial.topP.takeIf { it > 0f } ?: LlmDefaults.topP
     val initialTopK = effectiveInitial.topK.takeIf { it > 0 } ?: LlmDefaults.topK
     
-    var temperature by remember(initialTemperature) { mutableStateOf(initialTemperature) }
-    var topP by remember(initialTopP) { mutableStateOf(initialTopP) }
-    var topK by remember(initialTopK) { mutableStateOf(initialTopK) }
+    var temperature by remember(initialTemperature) { mutableFloatStateOf(initialTemperature) }
+    var topP by remember(initialTopP) { mutableFloatStateOf(initialTopP) }
+    var topK by remember(initialTopK) { mutableIntStateOf(initialTopK) }
     var systemMessage by remember(effectiveInitial.systemMessage) { mutableStateOf(effectiveInitial.systemMessage) }
 
     fun resetToDefaults() {
@@ -120,7 +123,7 @@ fun ParametersScreen(
                 valueRange = 0f..1f,
                 steps = 9,
                 onValueChange = { temperature = it; onSaveParameters(temperature, topP, topK, systemMessage) },
-                valueDisplay = String.format("%.1f", temperature)
+                valueDisplay = String.format(Locale.US, "%.1f", temperature)
             )
 
             SliderWithLabel(
@@ -130,7 +133,7 @@ fun ParametersScreen(
                 valueRange = 0f..1f,
                 steps = 19,
                 onValueChange = { topP = it; onSaveParameters(temperature, topP, topK, systemMessage) },
-                valueDisplay = String.format("%.2f", topP)
+                valueDisplay = String.format(Locale.US, "%.2f", topP)
             )
 
             SliderWithLabel(
@@ -140,8 +143,7 @@ fun ParametersScreen(
                 valueRange = 1f..100f,
                 steps = 19,
                 onValueChange = { topK = it.toInt(); onSaveParameters(temperature, topP, topK, systemMessage) },
-                valueDisplay = topK.toString(),
-                isInt = true
+                valueDisplay = topK.toString()
             )
 
             OutlinedTextField(
@@ -175,8 +177,7 @@ private fun SliderWithLabel(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     onValueChange: (Float) -> Unit,
-    valueDisplay: String,
-    isInt: Boolean = false
+    valueDisplay: String
 ) {
     var showTooltip by remember { mutableStateOf(false) }
 

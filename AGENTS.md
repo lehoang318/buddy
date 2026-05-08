@@ -30,7 +30,7 @@
   - Web Search: Exa, LinkUp, Tavily
 - Provider IDs must match exactly when wiring web search: `"exa"`, `"linkup"`, `"tavily"`
 - Custom providers added via Settings screen, persisted as Gson JSON in DataStore under `SettingsKeys.CUSTOM_LLM_PROVIDERS`
-- API keys stored per-provider as JSON `Map<String, String>` in DataStore (`SettingsKeys.LLM_API_KEYS`) — auto-loaded on provider switch
+- API keys stored per-provider as JSON `Map<String, String>` in DataStore (`SettingsKeys.LLM_API_KEYS`) — autoloaded on provider switch
 
 ### Settings Repository
 - Jetpack DataStore (not SharedPreferences) — all settings as reactive `Flow`s
@@ -39,6 +39,7 @@
 - LLM client recreated reactively in `MainActivity` via `combine()` on settings flows
 
 ### Key Screens
+
 | Screen | File | Notes |
 |--------|------|-------|
 | ChatScreen | `ui/chat/ChatScreen.kt` | Top bar has model selector (clickable name opens ModelSelectionDialog), web search toggle, Buddy logo menu |

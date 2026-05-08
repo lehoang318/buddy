@@ -2,6 +2,7 @@ package com.example.buddy.ui.chat
 
 import android.app.Application
 import android.graphics.Bitmap
+import androidx.core.graphics.scale
 import android.net.Uri
 import android.util.Base64
 import androidx.lifecycle.ViewModel
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import java.util.Locale
 import com.example.buddy.data.ChatMessage as UiChatMessage
 
 private const val MAX_IMAGE_DIMENSION = 1440
@@ -101,25 +103,12 @@ class ChatViewModel(
         }
     }
 
-    fun updateConfig(config: LlmGenerationConfig, model: String) {
-        _uiState.update {
-            it.copy(
-                generationConfig = config,
-                selectedModel = model.takeIf { m -> m.isNotBlank() } ?: it.selectedModel
-            )
-        }
-    }
-
     fun toggleReasoningEffort() {
         val current = _uiState.value.generationConfig.reasoningEffort
         val next = llmClient?.toggleReasoning(current) ?: LlmDefaults.ReasoningEffort.HIGH
         _uiState.update {
             it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
         }
-    }
-
-    fun setOfflineMode(offline: Boolean) {
-        _uiState.update { it.copy(isOffline = offline) }
     }
 
     fun clearChat() {
@@ -441,7 +430,7 @@ class ChatViewModel(
                 val scale = MAX_IMAGE_DIMENSION.toFloat() / maxDim
                 val newWidth = (bitmap.width * scale).toInt()
                 val newHeight = (bitmap.height * scale).toInt()
-                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+                bitmap.scale(newWidth, newHeight)
             } else {
                 bitmap
             }
@@ -499,7 +488,7 @@ class ChatViewModel(
         return when {
             bytes < 1024 -> "$bytes B"
             bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-            else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+            else -> String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024.0))
         }
     }
 }

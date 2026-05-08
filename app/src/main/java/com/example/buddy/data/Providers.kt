@@ -18,7 +18,6 @@ data class LlmProvider(
     override val name: String,
     override val baseUrl: String,
     override val apiKey: String = "",
-    val apiType: ApiType = ApiType.OPENAI_COMPATIBLE
 ) : BaseProvider(id, name, baseUrl, apiKey)
 
 data class WebSearchProvider(
@@ -38,7 +37,6 @@ data class ProviderData(
 
 fun LlmProvider.toProviderData() = ProviderData(id, name, baseUrl, apiKey)
 fun ProviderData.toLlmProvider() = LlmProvider(id, name, baseUrl, apiKey)
-fun WebSearchProvider.toProviderData() = ProviderData(id, name, baseUrl, apiKey)
 fun ProviderData.toWebSearchProvider() = WebSearchProvider(id, name, baseUrl, apiKey)
 
 object BuiltInProviders {
@@ -53,7 +51,6 @@ object BuiltInProviders {
                 id = ids[i],
                 name = names[i],
                 baseUrl = urls[i],
-                apiType = ApiType.OPENAI_COMPATIBLE
             )
         }
     }

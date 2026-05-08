@@ -98,9 +98,8 @@ class OpenAiCompatibleLlmClient private constructor(
             .build()
 
         var retryCount = 0
-        val maxRetries = 2
         
-        while (retryCount <= maxRetries) {
+        while (true) {
             try {
                 client.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
@@ -133,7 +132,7 @@ class OpenAiCompatibleLlmClient private constructor(
             } catch (e: Exception) {
                 retryCount++
                 EventLog.warning(TAG, "Stream error (attempt $retryCount)", e.message)
-                if (retryCount <= maxRetries) {
+                if (retryCount <= 2) {
                     delay(1000L * retryCount)
                 } else {
                     throw e
@@ -193,8 +192,6 @@ class OpenAiCompatibleLlmClient private constructor(
             if (shortId.contains(pattern)) return true
         }
 
-        if (shortId.matches(Regex("gpt-4-[0-9].*"))) return true
-
         return false
     }
 
@@ -244,7 +241,6 @@ class OpenAiCompatibleLlmClient private constructor(
 
                 client.newCall(request).execute().use { response ->
                     val code = response.code
-                    val body = response.body?.string()
                     EventLog.info(TAG, "Connection check completed (code: $code)")
                     response.isSuccessful
                 }

@@ -80,7 +80,6 @@ private const val TAG = "Settings"
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onSettingsSaved: () -> Unit,
     initialSettings: LlmSettings? = null,
     settingsRepository: SettingsRepository? = null,
     onSaveModelSettings: (LlmSettings) -> Unit = {}
@@ -342,7 +341,7 @@ fun SettingsScreen(
                 ) {
                     OutlinedTextField(
                         value = allLlmProviders.find { it.id == selectedProvider }?.name
-                            ?: if (selectedProvider.isNotBlank()) selectedProvider else "",
+                            ?: selectedProvider.ifBlank { "" },
                         onValueChange = { },
                         readOnly = true,
                         label = { Text("Provider") },
@@ -515,7 +514,7 @@ fun SettingsScreen(
                 ) {
                     OutlinedTextField(
                         value = allWebSearchProviders.find { it.id == selectedWebSearchProvider }?.name
-                            ?: if (selectedWebSearchProvider.isNotBlank()) selectedWebSearchProvider else "",
+                            ?: selectedWebSearchProvider.ifBlank { "" },
                         onValueChange = { },
                         readOnly = true,
                         label = { Text("Provider") },
@@ -794,8 +793,7 @@ private fun SliderWithLabel(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     onValueChange: (Float) -> Unit,
-    valueDisplay: String,
-    isInt: Boolean = false
+    valueDisplay: String
 ) {
     var showTooltip by remember { mutableStateOf(false) }
 

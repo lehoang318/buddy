@@ -58,8 +58,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -283,7 +283,7 @@ fun BuddyChatTopBar(
     var titleWidthPx by remember { mutableIntStateOf(0) }
 
     val density = LocalDensity.current
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenWidth = with(density) { LocalWindowInfo.current.containerSize.width.toDp() }
     val titleWidthDp = with(density) { titleWidthPx.toDp() }
 
     val titleIconWidth = 36.dp
@@ -417,7 +417,7 @@ fun BuddyChatTopBar(
                         )
                     }
                 }
-            } else if (isOffline || availableModels.isEmpty()) {
+            } else {
                 Surface(
                     onClick = { onSettings() },
                     color = MaterialTheme.colorScheme.surfaceVariant,

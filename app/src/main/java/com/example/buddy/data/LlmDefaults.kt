@@ -31,8 +31,6 @@ object LlmDefaults {
 
     enum class ReasoningEffort { LOW, HIGH }
 
-    const val SEARCH_QUERY_MAX_WORDS = 20
-
     val searchQueryTemperature: Float
         get() = res?.let { ResourcesCompat.getFloat(it, R.dimen.search_query_temperature) } ?: 0.2f
 
@@ -57,7 +55,7 @@ object LlmDefaults {
         var text = raw
         text = Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL).replace(text, "")
         text = Regex("<thinking>.*?</thinking>", RegexOption.DOT_MATCHES_ALL).replace(text, "")
-        text = Regex("```[\\w]*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE).replace(text, "")
+        text = Regex("```\\w*\\s*THOUGHT:[\\s\\S]*?```", RegexOption.IGNORE_CASE).replace(text, "")
         text = Regex("(?i)^\\s*THOUGHT:.*", RegexOption.MULTILINE).replace(text, "")
         text = Regex("(?i)^\\s*REASONING:.*", RegexOption.MULTILINE).replace(text, "")
         text = text.removeSurrounding("\"").trim()

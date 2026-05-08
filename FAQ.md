@@ -22,7 +22,7 @@
     - [How do I use web search?](#how-do-i-use-web-search)
     - [Can I share files or images with Buddy?](#can-i-share-files-or-images-with-buddy)
     - [How do I change AI models?](#how-do-i-change-ai-models)
-  - [⚙️ Settings \& Customization](#️-settings--customization)
+  - [⚙️ Settings \& Customization](#settings--customization)
     - [What are the AI parameters for?](#what-are-the-ai-parameters-for)
     - [How do I reset my settings?](#how-do-i-reset-my-settings)
   - [🔧 Troubleshooting](#-troubleshooting)
@@ -184,7 +184,7 @@ You can ask Buddy almost anything! Here are some examples:
 
 Yes! Buddy supports:
 - **Images**: Take a photo or select from your gallery
-- **Text files**: .txt, .md, .log, .rst, .adoc, .asciidoc, .rtf
+- **Text files**: .txt, .md, .log, .rst, .adoc, .AsciiDoc, .rtf
 - **Code files**: .json, .xml, .html, .py, .js
 - **Web pages**: Paste any URL to analyze the content
 

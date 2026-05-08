@@ -67,8 +67,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -91,7 +92,8 @@ import com.example.buddy.ui.theme.VintageBackground
 @Composable
 fun MessageRow(message: ChatMessage) {
     val isUser = message.role == Role.USER
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val windowInfo = LocalWindowInfo.current
+    val screenWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
     val maxBubbleWidth = screenWidth * 0.8f
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

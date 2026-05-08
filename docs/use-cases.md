@@ -139,7 +139,7 @@ Add any OpenAI-compatible LLM provider that is not in the built-in list.
 ## 3. Changing AI Models
 
 ### Tips
-- **Multimodal Models**: Image icons next to models' names indicate multimodal capability. A grey icon means the model does not support images.
+- **Multimodal Models**: Image icons next to models' names indicate multimodal capability. A gray icon means the model does not support images.
 - **Model Capabilities**: Some models are better at specific tasks (writing, coding, analysis)
 - **Response Quality**: Try different models to find your preferred response style
 
@@ -282,7 +282,7 @@ Change to a completely different AI provider and model.
 
 ## 4. Web Search Configuration
 
-### ### 4.1 Change Web Search Provider
+### 4.1 Change Web Search Provider
 
 <details>
   <summary>Change Web Search Provider</summary>

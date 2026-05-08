@@ -2,10 +2,10 @@
 
 <table>
   <tr>
-    <td align="right" valign="top">
+    <td style="text-align:right; vertical-align:top">
       <img src="./docs/res/logo.png" alt="App Logo" width="256"/>
     </td>
-    <td align="left" valign="top">
+    <td style="text-align:left; vertical-align:top">
       <h3>✨ What you can do with <strong>Buddy</strong></h3>
       <ul>
         <li><strong>🌐 Live Web Search</strong>: Real-time web research for verified, up-to-date answers</li>
@@ -50,9 +50,10 @@
 * Default Model & Parameters
 * Web Search Provider
 
-7. **Enjoy!**
+1. **Enjoy!**
 
 ## Documentation
+
 | Document | Description |
 |----------|-------------|
 | [FAQ](./FAQ.md) | Common questions and answers |
