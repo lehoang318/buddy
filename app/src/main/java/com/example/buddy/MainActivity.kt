@@ -134,11 +134,16 @@ class MainActivity : ComponentActivity() {
                 val allWsProviders = builtInWebSearchProviders + customWs
                 val wsProvider = allWsProviders.find { it.id == settings.webSearchProvider }
 
-                if (wsProvider != null && wsProvider.id != lastWebSearchProvider) {
-                    lastWebSearchProvider = wsProvider.id
+                if (wsProvider != null) {
                     val hasWsKey = keyCache.getKey("ws_${wsProvider.id}")?.also { it.fill(0) } != null
-                    webSearchFlow.value = if (hasWsKey) createWebSearch(keyCache, wsProvider.id) else null
-                } else if (wsProvider == null) {
+                    if (wsProvider.id != lastWebSearchProvider || (hasWsKey && webSearchFlow.value == null)) {
+                        lastWebSearchProvider = wsProvider.id
+                        webSearchFlow.value = if (hasWsKey) createWebSearch(keyCache, wsProvider.id) else null
+                    } else if (!hasWsKey && webSearchFlow.value != null) {
+                        lastWebSearchProvider = ""
+                        webSearchFlow.value = null
+                    }
+                } else {
                     lastWebSearchProvider = ""
                     webSearchFlow.value = null
                 }

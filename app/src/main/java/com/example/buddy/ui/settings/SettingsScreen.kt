@@ -99,10 +99,20 @@ fun SettingsScreen(
     val effectiveInitial = initialSettings ?: savedSettings
 
     val resolvedInitialLlmKey = remember {
-        llmApiKeysMap[effectiveInitial.provider]?.takeIf { it.isNotBlank() } ?: effectiveInitial.apiKey
+        val fromCache = cache.getKey(effectiveInitial.provider)?.let { bytes ->
+            String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+        }
+        fromCache?.takeIf { it.isNotBlank() }
+            ?: llmApiKeysMap[effectiveInitial.provider]?.takeIf { it.isNotBlank() }
+            ?: effectiveInitial.apiKey
     }
     val resolvedInitialWsKey = remember {
-        wsApiKeysMap[effectiveInitial.webSearchProvider]?.takeIf { it.isNotBlank() } ?: effectiveInitial.webSearchApiKey
+        val fromCache = cache.getKey("ws_${effectiveInitial.webSearchProvider}")?.let { bytes ->
+            String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+        }
+        fromCache?.takeIf { it.isNotBlank() }
+            ?: wsApiKeysMap[effectiveInitial.webSearchProvider]?.takeIf { it.isNotBlank() }
+            ?: effectiveInitial.webSearchApiKey
     }
 
     var selectedProvider by remember(effectiveInitial.provider) { mutableStateOf(effectiveInitial.provider) }
