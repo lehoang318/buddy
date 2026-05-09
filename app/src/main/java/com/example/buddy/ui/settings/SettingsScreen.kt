@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmProvider
@@ -82,10 +83,12 @@ fun SettingsScreen(
     onBack: () -> Unit,
     initialSettings: LlmSettings? = null,
     settingsRepository: SettingsRepository? = null,
+    keyCache: SessionKeyCache? = null,
     onSaveModelSettings: (LlmSettings) -> Unit = {}
 ) {
     val context = LocalContext.current
     val repo = settingsRepository ?: remember { SettingsRepository(context) }
+    val cache = keyCache ?: remember { SessionKeyCache(context) }
     val coroutineScope = rememberCoroutineScope()
 
     val savedSettings by repo.settings.collectAsState(initial = initialSettings ?: LlmSettings())
@@ -130,17 +133,19 @@ fun SettingsScreen(
         isConnecting = true
         coroutineScope.launch {
             try {
-                val models = LlmClientFactory.getModels(provider, key)
-                if (models.isEmpty()) {
-                    connectError = "No models available. Please check your API Key."
-                } else {
-                    availableModels = models
-                    selectedModel = models.first().id
+                cache.saveKey(provider.id, key)
 
-                    val testResult = LlmClientFactory.createWithProvider(provider, key, selectedModel)
-                    testResult.fold(
-                        onSuccess = { testClient ->
-                            val connected = testClient.testConnection()
+                val testClient = LlmClientFactory.createTempForModels(provider, cache)
+                testClient.fold(
+                    onSuccess = { client ->
+                        val models = client.getModels()
+                        if (models.isEmpty()) {
+                            connectError = "No models available. Please check your API Key."
+                        } else {
+                            availableModels = models
+                            selectedModel = models.first().id
+
+                            val connected = client.testConnection()
                             if (connected) {
                                 apiKey = key
                                 selectedProvider = provider.id
@@ -159,12 +164,12 @@ fun SettingsScreen(
                             } else {
                                 connectError = "Connection failed. Please check your API Key."
                             }
-                        },
-                        onFailure = { e ->
-                            connectError = "Connection failed: ${e.message}"
                         }
-                    )
-                }
+                    },
+                    onFailure = { e ->
+                        connectError = "Connection failed: ${e.message}"
+                    }
+                )
             } catch (e: Exception) {
                 connectError = "Error: ${e.message}"
             } finally {
@@ -177,6 +182,7 @@ fun SettingsScreen(
     fun handleWsSave(key: String, onComplete: () -> Unit) {
         coroutineScope.launch {
             webSearchApiKey = key
+            cache.saveKey("ws_$selectedWebSearchProvider", key)
             repo.updateAll(
                 provider = selectedProvider,
                 apiKey = apiKey,
@@ -197,6 +203,7 @@ fun SettingsScreen(
             error = connectError,
             onConnect = { provider ->
                 coroutineScope.launch {
+                    cache.saveKey(provider.id, provider.apiKey)
                     repo.addCustomLlmProvider(provider)
                     if (provider.apiKey.isNotBlank()) {
                         repo.saveLlmApiKey(provider.id, provider.apiKey)

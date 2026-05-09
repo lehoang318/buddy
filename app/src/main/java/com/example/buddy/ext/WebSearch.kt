@@ -1,5 +1,6 @@
 package com.example.buddy.ext
 
+import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
 import com.google.gson.Gson
@@ -29,7 +30,8 @@ interface WebSearch {
 }
 
 class TavilyWebSearch(
-    private val apiKey: String
+    private val keyCache: SessionKeyCache,
+    private val providerId: String
 ) : WebSearch {
 
     private val client = OkHttpClient.Builder()
@@ -46,13 +48,21 @@ class TavilyWebSearch(
 
     private val gson = Gson()
 
-    override fun isAvailable(): Boolean = apiKey.isNotBlank()
+    override fun isAvailable(): Boolean {
+        val keyBytes = keyCache.getKey(providerId) ?: return false
+        keyBytes.fill(0)
+        return true
+    }
 
     override suspend fun search(query: String): List<SearchResult> {
         return withContext(Dispatchers.IO) {
+            val keyBytes = keyCache.getKey(providerId) ?: throw Exception("No API key for Tavily")
+            val tavilyKey = String(keyBytes, Charsets.UTF_8)
+            keyBytes.fill(0)
+
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
-                addProperty("api_key", apiKey)
+                addProperty("api_key", tavilyKey)
                 addProperty("max_results", LlmDefaults.searchMaxResults)
                 addProperty("search_depth", "basic")
             }

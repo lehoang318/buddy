@@ -12,8 +12,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.example.buddy.crypto.ApiKeyInterceptor
+import com.example.buddy.crypto.ExaApiKeyInterceptor
+import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
@@ -38,6 +43,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 private const val TAG = "Settings"
 
@@ -63,17 +71,26 @@ fun ProvideUrlFetcher(urlFetcher: UrlFetcher?, content: @Composable () -> Unit) 
 class MainActivity : ComponentActivity() {
 
     private lateinit var settingsRepository: SettingsRepository
+    private lateinit var keyCache: SessionKeyCache
     private val llmClientFlow = MutableStateFlow<LlmClient?>(null)
     private val webSearchFlow = MutableStateFlow<WebSearch?>(null)
     private val urlFetcherFlow = MutableStateFlow<UrlFetcher?>(JsoupUrlFetcher())
     private val currentSettingsFlow = MutableStateFlow(LlmSettings())
-    private var lastLlmClientKey = Triple("", "", "")
+    private var lastLlmClientKey = Pair("", "")
+    private var lastWebSearchProvider = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LlmDefaults.init(this)
         EventLog.init(this)
         settingsRepository = SettingsRepository(this)
+        keyCache = SessionKeyCache(this)
+
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                keyCache.clearCache()
+            }
+        })
 
         BackgroundScheduler.scheduleConnectivityChecks(this)
 
@@ -82,58 +99,47 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             combine(
-                combine(
-                    settingsRepository.settings,
-                    settingsRepository.isConfigured,
-                    settingsRepository.customLlmProviders,
-                    settingsRepository.customWebSearchProviders
-                ) { settings, isConfigured, customLlm, customWs ->
-                    Quadruple(settings, isConfigured, customLlm, customWs)
-                },
-                settingsRepository.llmApiKeysByProvider,
-                settingsRepository.webSearchApiKeysByProvider
-            ) { base, llmKeys, wsKeys ->
-                val settings = base.first
-                val isConfigured = base.second
-                val customLlmProviders = base.third
-                val customWebSearchProviders = base.fourth
+                settingsRepository.settings,
+                settingsRepository.customLlmProviders,
+                settingsRepository.customWebSearchProviders
+            ) { settings, customLlm, customWs ->
                 currentSettingsFlow.value = settings
 
-                val allLlmProviders = builtInLlmProviders + customLlmProviders
+                val allLlmProviders = builtInLlmProviders + customLlm
                 val llmProvider = allLlmProviders.find { it.id == settings.provider }
 
-                if (isConfigured && llmProvider != null) {
-                    val resolvedApiKey = llmKeys[llmProvider.id]?.takeIf { it.isNotBlank() }
-                        ?: llmProvider.apiKey.takeIf { it.isNotBlank() }
-                        ?: settings.apiKey
-                    val clientKey = Triple(llmProvider.id, resolvedApiKey, settings.model)
-                    if (clientKey != lastLlmClientKey) {
-                        lastLlmClientKey = clientKey
-                        val result = LlmClientFactory.createWithProvider(llmProvider, resolvedApiKey, settings.model)
-                        result.onSuccess { client ->
-                            llmClientFlow.value = client
-                        }.onFailure {
+                if (llmProvider != null) {
+                    val hasKey = keyCache.getKey(llmProvider.id)?.also { it.fill(0) } != null
+                    if (hasKey) {
+                        val clientKey = Pair(llmProvider.id, settings.model)
+                        if (clientKey != lastLlmClientKey) {
+                            lastLlmClientKey = clientKey
+                            val result = LlmClientFactory.createWithProvider(llmProvider, keyCache, settings.model)
+                            result.onSuccess { llmClientFlow.value = it }
+                                .onFailure { llmClientFlow.value = null }
+                        }
+                    } else {
+                        if (lastLlmClientKey != Pair("", "")) {
+                            lastLlmClientKey = Pair("", "")
                             llmClientFlow.value = null
                         }
                     }
                 } else {
-                    val clientKey = Triple("", "", "")
-                    if (clientKey != lastLlmClientKey) {
-                        lastLlmClientKey = clientKey
+                    if (lastLlmClientKey != Pair("", "")) {
+                        lastLlmClientKey = Pair("", "")
                         llmClientFlow.value = null
                     }
                 }
 
-                val wsProviderId = settings.webSearchProvider
-                val allWsProviders = builtInWebSearchProviders + customWebSearchProviders
-                val wsProvider = allWsProviders.find { it.id == wsProviderId }
-                val wsApiKey = wsKeys[wsProviderId]?.takeIf { it.isNotBlank() }
-                    ?: wsProvider?.apiKey?.takeIf { it.isNotBlank() }
-                    ?: settings.webSearchApiKey
+                val allWsProviders = builtInWebSearchProviders + customWs
+                val wsProvider = allWsProviders.find { it.id == settings.webSearchProvider }
 
-                if (wsProvider != null && wsApiKey.isNotBlank()) {
-                    webSearchFlow.value = createWebSearch(wsProviderId, wsApiKey) ?: TavilyWebSearch(wsApiKey)
-                } else {
+                if (wsProvider != null && wsProvider.id != lastWebSearchProvider) {
+                    lastWebSearchProvider = wsProvider.id
+                    val hasWsKey = keyCache.getKey("ws_${wsProvider.id}")?.also { it.fill(0) } != null
+                    webSearchFlow.value = if (hasWsKey) createWebSearch(keyCache, wsProvider.id) else null
+                } else if (wsProvider == null) {
+                    lastWebSearchProvider = ""
                     webSearchFlow.value = null
                 }
             }.collect { }
@@ -142,22 +148,40 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BuddyTheme {
-                MainContent(llmClientFlow, webSearchFlow, urlFetcherFlow, currentSettingsFlow, settingsRepository)
+                MainContent(llmClientFlow, webSearchFlow, urlFetcherFlow, currentSettingsFlow, settingsRepository, keyCache)
             }
         }
     }
 
-    private fun createWebSearch(providerId: String, apiKey: String): WebSearch? {
+    private fun createWebSearch(keyCache: SessionKeyCache, providerId: String): WebSearch? {
         return when (providerId) {
-            "linkup" -> LinkUpWebSearch(apiKey)
-            "exa" -> ExaWebSearch(apiKey)
-            "tavily" -> TavilyWebSearch(apiKey)
+            "linkup" -> {
+                val httpClient = OkHttpClient.Builder()
+                    .addInterceptor(ApiKeyInterceptor(keyCache, "ws_$providerId"))
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .pingInterval(30, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
+                    .connectionPool(ConnectionPool(3, 3, TimeUnit.MINUTES))
+                    .build()
+                LinkUpWebSearch(httpClient, keyCache, "ws_$providerId")
+            }
+            "exa" -> {
+                val httpClient = OkHttpClient.Builder()
+                    .addInterceptor(ExaApiKeyInterceptor(keyCache, "ws_$providerId"))
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .pingInterval(30, TimeUnit.SECONDS)
+                    .retryOnConnectionFailure(true)
+                    .connectionPool(ConnectionPool(3, 3, TimeUnit.MINUTES))
+                    .build()
+                ExaWebSearch(httpClient, keyCache, "ws_$providerId")
+            }
+            "tavily" -> TavilyWebSearch(keyCache, "ws_$providerId")
             else -> null
         }
     }
 }
-
-data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @Composable
 fun MainContent(
@@ -165,7 +189,8 @@ fun MainContent(
     webSearchFlow: StateFlow<WebSearch?>,
     urlFetcherFlow: StateFlow<UrlFetcher?>,
     currentSettingsFlow: StateFlow<LlmSettings>,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    keyCache: SessionKeyCache
 ) {
     val llmClient by llmClientFlow.collectAsStateWithLifecycle()
     val webSearch by webSearchFlow.collectAsStateWithLifecycle()
@@ -207,6 +232,7 @@ fun MainContent(
             onBack = { showSettings = false },
             initialSettings = currentSettings,
             settingsRepository = settingsRepository,
+            keyCache = keyCache,
             onSaveModelSettings = { settings ->
                 EventLog.info(TAG, "Model settings saved", "provider=${settings.provider}, model=${settings.model}")
                 scope.launch {
