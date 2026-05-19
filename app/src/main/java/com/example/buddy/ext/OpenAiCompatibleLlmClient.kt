@@ -11,36 +11,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
-import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.BufferedSource
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "LLM"
 
 class OpenAiCompatibleLlmClient private constructor(
     private val baseUrl: String,
-    private val apiKey: String,
-    override val defaultModel: String
+    override val defaultModel: String,
+    private val httpClient: OkHttpClient
 ) : LlmClient {
     override var activeModel: String = defaultModel
     override val isReasoningSupported: Boolean = true
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .pingInterval(30, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .connectionPool(ConnectionPool(
-            maxIdleConnections = 5,
-            keepAliveDuration = 5,
-            timeUnit = TimeUnit.MINUTES
-        ))
-        .build()
 
     private val gson = Gson()
 
@@ -91,7 +76,6 @@ class OpenAiCompatibleLlmClient private constructor(
 
         val request = Request.Builder()
             .url("$normalizedBaseUrl/chat/completions")
-            .header("Authorization", "Bearer $apiKey")
             .header("Content-Type", "application/json")
             .header("Accept", "text/event-stream")
             .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
@@ -101,7 +85,7 @@ class OpenAiCompatibleLlmClient private constructor(
         
         while (true) {
             try {
-                client.newCall(request).execute().use { response ->
+                httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         throw Exception("API error ${response.code}: ${response.body?.string()}")
                     }
@@ -200,12 +184,11 @@ class OpenAiCompatibleLlmClient private constructor(
             try {
                 val request = Request.Builder()
                     .url("$normalizedBaseUrl/models")
-                    .header("Authorization", "Bearer $apiKey")
                     .header("Content-Type", "application/json")
                     .get()
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@withContext emptyList()
                     val bodyString = response.body?.string() ?: ""
                     val json = gson.fromJson(bodyString, JsonObject::class.java)
@@ -234,12 +217,11 @@ class OpenAiCompatibleLlmClient private constructor(
                 EventLog.info(TAG, "Connection check", data = url)
                 val request = Request.Builder()
                     .url(url)
-                    .header("Authorization", "Bearer $apiKey")
                     .header("Content-Type", "application/json")
                     .get()
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                httpClient.newCall(request).execute().use { response ->
                     val code = response.code
                     EventLog.info(TAG, "Connection check completed (code: $code)")
                     response.isSuccessful
@@ -277,12 +259,11 @@ class OpenAiCompatibleLlmClient private constructor(
 
                 val request = Request.Builder()
                     .url("$normalizedBaseUrl/chat/completions")
-                    .header("Authorization", "Bearer $apiKey")
                     .header("Content-Type", "application/json")
                     .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})", correlationId = correlationId)
                         return@withContext null
@@ -313,9 +294,9 @@ class OpenAiCompatibleLlmClient private constructor(
     }
 
     companion object {
-        fun create(baseUrl: String, apiKey: String, model: String): Result<LlmClient> {
+        fun create(baseUrl: String, model: String, httpClient: OkHttpClient): Result<LlmClient> {
             return try {
-                Result.success(OpenAiCompatibleLlmClient(baseUrl, apiKey, model))
+                Result.success(OpenAiCompatibleLlmClient(baseUrl, model, httpClient))
             } catch (e: Exception) {
                 Result.failure(e)
             }

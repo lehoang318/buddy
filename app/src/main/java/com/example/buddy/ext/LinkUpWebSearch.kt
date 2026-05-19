@@ -1,40 +1,33 @@
 package com.example.buddy.ext
 
+import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.SocketTimeoutException
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "WebSearch"
 
 class LinkUpWebSearch(
-    private val apiKey: String
+    private val httpClient: OkHttpClient,
+    private val keyCache: SessionKeyCache,
+    private val providerId: String
 ) : WebSearch {
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .pingInterval(30, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .connectionPool(ConnectionPool(
-            maxIdleConnections = 3,
-            keepAliveDuration = 3,
-            timeUnit = TimeUnit.MINUTES
-        ))
-        .build()
 
     private val gson = Gson()
 
-    override fun isAvailable(): Boolean = apiKey.isNotBlank()
+    override fun isAvailable(): Boolean {
+        val keyBytes = keyCache.getKey(providerId) ?: return false
+        keyBytes.fill(0)
+        return true
+    }
 
     override suspend fun search(query: String): List<SearchResult> {
         return withContext(Dispatchers.IO) {
@@ -47,7 +40,6 @@ class LinkUpWebSearch(
             val request = Request.Builder()
                 .url("https://api.linkup.so/v1/search")
                 .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer $apiKey")
                 .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -56,7 +48,7 @@ class LinkUpWebSearch(
 
             for (attempt in 0..maxRetries) {
                 try {
-                    client.newCall(request).execute().use { response ->
+                    httpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
                             val errorBody = response.body?.string() ?: ""
                             val errorMsg = when (response.code) {

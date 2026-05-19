@@ -1,12 +1,17 @@
 package com.example.buddy.ext
 
 import com.example.buddy.BuildConfig
+import com.example.buddy.crypto.ApiKeyInterceptor
+import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmDefaults
 import com.example.buddy.data.LlmProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 private const val TAG_LLM = "LLM"
 
@@ -131,14 +136,24 @@ enum class LlmRole {
 }
 
 object LlmClientFactory {
-    fun createWithProvider(provider: LlmProvider, apiKey: String, model: String): Result<LlmClient> {
-        val key = apiKey.ifBlank { provider.apiKey }
-        return OpenAiCompatibleLlmClient.create(provider.baseUrl, key, model)
+    fun createWithProvider(provider: LlmProvider, keyCache: SessionKeyCache, model: String): Result<LlmClient> {
+        val httpClient = OkHttpClient.Builder()
+            .addInterceptor(ApiKeyInterceptor(keyCache, provider.id))
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(300, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .pingInterval(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .connectionPool(ConnectionPool(
+                maxIdleConnections = 5,
+                keepAliveDuration = 5,
+                timeUnit = TimeUnit.MINUTES
+            ))
+            .build()
+        return OpenAiCompatibleLlmClient.create(provider.baseUrl, model, httpClient)
     }
 
-    suspend fun getModels(provider: LlmProvider, apiKey: String): List<LlmModel> {
-        val key = apiKey.ifBlank { provider.apiKey }
-        val client = OpenAiCompatibleLlmClient.create(provider.baseUrl, key, "temp").getOrNull()
-        return client?.getModels() ?: emptyList()
+    fun createTempForModels(provider: LlmProvider, keyCache: SessionKeyCache): Result<LlmClient> {
+        return createWithProvider(provider, keyCache, "temp")
     }
 }

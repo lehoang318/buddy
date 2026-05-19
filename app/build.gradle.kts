@@ -86,6 +86,9 @@ dependencies {
     // DataStore — for persisting API keys / settings
     implementation(libs.androidx.datastore.preferences)
 
+    // EncryptedSharedPreferences — for encrypted API key storage
+    implementation(libs.androidx.security.crypto)
+
     // Markwon — Markdown rendering
     // Exclude the older annotations-java5 that conflicts with the newer annotations pulled by other deps
     implementation("io.noties.markwon:core:4.6.2") {

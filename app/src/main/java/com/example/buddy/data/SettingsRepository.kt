@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -21,7 +22,6 @@ enum class ApiType {
 
 object SettingsKeys {
     val PROVIDER = stringPreferencesKey("llm_provider")
-    val API_KEY = stringPreferencesKey("llm_api_key")
     val MODEL = stringPreferencesKey("llm_model")
     val TEMPERATURE = floatPreferencesKey("llm_temperature")
     val TOP_P = floatPreferencesKey("llm_top_p")
@@ -30,16 +30,12 @@ object SettingsKeys {
     val REASONING_EFFORT = stringPreferencesKey("llm_reasoning_effort")
     val SYSTEM_MESSAGE = stringPreferencesKey("llm_system_message")
     val WEBSEARCH_PROVIDER = stringPreferencesKey("websearch_provider")
-    val WEBSEARCH_API_KEY = stringPreferencesKey("websearch_api_key")
     val CUSTOM_LLM_PROVIDERS = stringPreferencesKey("custom_llm_providers")
     val CUSTOM_WEBSEARCH_PROVIDERS = stringPreferencesKey("custom_websearch_providers")
-    val LLM_API_KEYS = stringPreferencesKey("llm_api_keys")
-    val WEBSEARCH_API_KEYS = stringPreferencesKey("websearch_api_keys")
 }
 
 data class LlmSettings(
     val provider: String = "",
-    val apiKey: String = "",
     val model: String = "",
     val temperature: Float = 0f,
     val topP: Float = 0f,
@@ -48,7 +44,6 @@ data class LlmSettings(
     val reasoningEffort: String = "",
     val systemMessage: String = "",
     val webSearchProvider: String = "",
-    val webSearchApiKey: String = "",
     val customLlmProvidersJson: String = "",
     val customWebSearchProvidersJson: String = ""
 )
@@ -59,7 +54,6 @@ class SettingsRepository(private val context: Context) {
     val settings: Flow<LlmSettings> = dataStore.data.map { prefs ->
         LlmSettings(
             provider = prefs[SettingsKeys.PROVIDER] ?: "",
-            apiKey = prefs[SettingsKeys.API_KEY] ?: "",
             model = prefs[SettingsKeys.MODEL] ?: "",
             temperature = prefs[SettingsKeys.TEMPERATURE] ?: LlmDefaults.temperature,
             topP = prefs[SettingsKeys.TOP_P] ?: LlmDefaults.topP,
@@ -68,19 +62,13 @@ class SettingsRepository(private val context: Context) {
             reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
             systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: LlmDefaults.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
-            webSearchApiKey = prefs[SettingsKeys.WEBSEARCH_API_KEY] ?: "",
             customLlmProvidersJson = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: "",
             customWebSearchProvidersJson = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
         )
     }
 
-    val isConfigured: Flow<Boolean> = dataStore.data.map { prefs ->
-        !prefs[SettingsKeys.PROVIDER].isNullOrEmpty() && !prefs[SettingsKeys.API_KEY].isNullOrEmpty()
-    }
-
     suspend fun updateAll(
         provider: String,
-        apiKey: String,
         model: String,
         temperature: Float = LlmDefaults.temperature,
         topP: Float = LlmDefaults.topP,
@@ -88,12 +76,10 @@ class SettingsRepository(private val context: Context) {
         maxTokens: Int = LlmDefaults.maxTokens,
         reasoningEffort: String = "",
         systemMessage: String = LlmDefaults.defaultSystemMessage,
-        webSearchProvider: String = "",
-        webSearchApiKey: String = ""
+        webSearchProvider: String = ""
     ) {
         dataStore.edit {
             it[SettingsKeys.PROVIDER] = provider
-            it[SettingsKeys.API_KEY] = apiKey
             it[SettingsKeys.MODEL] = model
             it[SettingsKeys.TEMPERATURE] = temperature
             it[SettingsKeys.TOP_P] = topP
@@ -102,7 +88,6 @@ class SettingsRepository(private val context: Context) {
             it[SettingsKeys.REASONING_EFFORT] = reasoningEffort
             it[SettingsKeys.SYSTEM_MESSAGE] = systemMessage
             it[SettingsKeys.WEBSEARCH_PROVIDER] = webSearchProvider
-            it[SettingsKeys.WEBSEARCH_API_KEY] = webSearchApiKey
         }
     }
 
@@ -111,7 +96,7 @@ class SettingsRepository(private val context: Context) {
             val current = it[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
             val list = BuiltInProviders.deserializeProviderData(current).toMutableList()
             list.removeAll { p -> p.id == provider.id }
-            list.add(provider.toProviderData())
+            list.add(provider.toProviderDataWithoutKey())
             it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = BuiltInProviders.serializeProviderData(list)
         }
     }
@@ -151,41 +136,38 @@ class SettingsRepository(private val context: Context) {
         builtIn + custom
     }
 
-    val llmApiKeysByProvider: Flow<Map<String, String>> = dataStore.data.map { prefs ->
-        val json = prefs[SettingsKeys.LLM_API_KEYS] ?: ""
-        if (json.isBlank()) emptyMap()
-        else try { Gson().fromJson<Map<String, String>>(json, object : TypeToken<Map<String, String>>() {}.type) ?: emptyMap() }
-        catch (_: Exception) { emptyMap() }
-    }
-
-    val webSearchApiKeysByProvider: Flow<Map<String, String>> = dataStore.data.map { prefs ->
-        val json = prefs[SettingsKeys.WEBSEARCH_API_KEYS] ?: ""
-        if (json.isBlank()) emptyMap()
-        else try { Gson().fromJson<Map<String, String>>(json, object : TypeToken<Map<String, String>>() {}.type) ?: emptyMap() }
-        catch (_: Exception) { emptyMap() }
-    }
-
-    suspend fun saveLlmApiKey(providerId: String, apiKey: String) {
-        val gson = Gson()
-        dataStore.edit {
-            val json = it[SettingsKeys.LLM_API_KEYS] ?: ""
-            val map: MutableMap<String, String> = if (json.isBlank()) mutableMapOf()
-            else try { gson.fromJson(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
-            catch (_: Exception) { mutableMapOf() }
-            map[providerId] = apiKey
-            it[SettingsKeys.LLM_API_KEYS] = gson.toJson(map)
+    suspend fun migrateKeysToSessionCache(keyCache: com.example.buddy.crypto.SessionKeyCache) {
+        dataStore.data.first().let { prefs ->
+            val llmKeysJson = prefs[stringPreferencesKey("llm_api_keys")] ?: ""
+            if (llmKeysJson.isNotBlank()) {
+                try {
+                    val map: Map<String, String> = Gson().fromJson(llmKeysJson, object : TypeToken<Map<String, String>>() {}.type)
+                    map.forEach { (id, key) -> if (key.isNotBlank()) keyCache.saveKey(id, key) }
+                } catch (_: Exception) {}
+            }
+            val wsKeysJson = prefs[stringPreferencesKey("websearch_api_keys")] ?: ""
+            if (wsKeysJson.isNotBlank()) {
+                try {
+                    val map: Map<String, String> = Gson().fromJson(wsKeysJson, object : TypeToken<Map<String, String>>() {}.type)
+                    map.forEach { (id, key) -> if (key.isNotBlank()) keyCache.saveKey("ws_$id", key) }
+                } catch (_: Exception) {}
+            }
+            val legacyApiKey = prefs[stringPreferencesKey("llm_api_key")] ?: ""
+            val legacyWsKey = prefs[stringPreferencesKey("websearch_api_key")] ?: ""
+            val provider = prefs[SettingsKeys.PROVIDER] ?: ""
+            val wsProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: ""
+            if (legacyApiKey.isNotBlank() && provider.isNotBlank()) {
+                keyCache.saveKey(provider, legacyApiKey)
+            }
+            if (legacyWsKey.isNotBlank() && wsProvider.isNotBlank()) {
+                keyCache.saveKey("ws_$wsProvider", legacyWsKey)
+            }
         }
-    }
-
-    suspend fun saveWebSearchApiKey(providerId: String, apiKey: String) {
-        val gson = Gson()
         dataStore.edit {
-            val json = it[SettingsKeys.WEBSEARCH_API_KEYS] ?: ""
-            val map: MutableMap<String, String> = if (json.isBlank()) mutableMapOf()
-            else try { gson.fromJson(json, object : TypeToken<MutableMap<String, String>>() {}.type) }
-            catch (_: Exception) { mutableMapOf() }
-            map[providerId] = apiKey
-            it[SettingsKeys.WEBSEARCH_API_KEYS] = gson.toJson(map)
+            it.remove(stringPreferencesKey("llm_api_key"))
+            it.remove(stringPreferencesKey("websearch_api_key"))
+            it.remove(stringPreferencesKey("llm_api_keys"))
+            it.remove(stringPreferencesKey("websearch_api_keys"))
         }
     }
 }
