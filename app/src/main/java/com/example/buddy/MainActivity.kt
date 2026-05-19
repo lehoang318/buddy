@@ -98,11 +98,16 @@ class MainActivity : ComponentActivity() {
         val builtInWebSearchProviders = BuiltInProviders.loadWebSearchProviders(this)
 
         lifecycleScope.launch {
+            settingsRepository.migrateKeysToSessionCache(keyCache)
+        }
+
+        lifecycleScope.launch {
             combine(
                 settingsRepository.settings,
                 settingsRepository.customLlmProviders,
-                settingsRepository.customWebSearchProviders
-            ) { settings, customLlm, customWs ->
+                settingsRepository.customWebSearchProviders,
+                keyCache.keyIds
+            ) { settings, customLlm, customWs, _ ->
                 currentSettingsFlow.value = settings
 
                 val allLlmProviders = builtInLlmProviders + customLlm
@@ -216,14 +221,12 @@ fun MainContent(
                 scope.launch {
                     settingsRepository.updateAll(
                         provider = currentSettings.provider,
-                        apiKey = currentSettings.apiKey,
                         model = currentSettings.model,
                         temperature = temp,
                         topP = topP,
                         topK = topK,
                         systemMessage = sysMsg,
-                        webSearchProvider = currentSettings.webSearchProvider,
-                        webSearchApiKey = currentSettings.webSearchApiKey
+                        webSearchProvider = currentSettings.webSearchProvider
                     )
                 }
             }
@@ -243,13 +246,11 @@ fun MainContent(
                 scope.launch {
                     settingsRepository.updateAll(
                         provider = currentSettings.provider,
-                        apiKey = currentSettings.apiKey,
                         model = settings.model,
                         temperature = settings.temperature,
                         topP = settings.topP,
                         topK = settings.topK,
-                        webSearchProvider = settings.webSearchProvider,
-                        webSearchApiKey = settings.webSearchApiKey
+                        webSearchProvider = settings.webSearchProvider
                     )
                 }
             }

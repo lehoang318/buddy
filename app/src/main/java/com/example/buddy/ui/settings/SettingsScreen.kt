@@ -94,25 +94,17 @@ fun SettingsScreen(
     val savedSettings by repo.settings.collectAsState(initial = initialSettings ?: LlmSettings())
     val allLlmProviders by repo.allLlmProviders.collectAsState(initial = BuiltInProviders.loadLlmProviders(context))
     val allWebSearchProviders by repo.allWebSearchProviders.collectAsState(initial = BuiltInProviders.loadWebSearchProviders(context))
-    val llmApiKeysMap by repo.llmApiKeysByProvider.collectAsState(initial = emptyMap())
-    val wsApiKeysMap by repo.webSearchApiKeysByProvider.collectAsState(initial = emptyMap())
     val effectiveInitial = initialSettings ?: savedSettings
 
     val resolvedInitialLlmKey = remember {
-        val fromCache = cache.getKey(effectiveInitial.provider)?.let { bytes ->
+        cache.getKey(effectiveInitial.provider)?.let { bytes ->
             String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
-        }
-        fromCache?.takeIf { it.isNotBlank() }
-            ?: llmApiKeysMap[effectiveInitial.provider]?.takeIf { it.isNotBlank() }
-            ?: effectiveInitial.apiKey
+        } ?: ""
     }
     val resolvedInitialWsKey = remember {
-        val fromCache = cache.getKey("ws_${effectiveInitial.webSearchProvider}")?.let { bytes ->
+        cache.getKey("ws_${effectiveInitial.webSearchProvider}")?.let { bytes ->
             String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
-        }
-        fromCache?.takeIf { it.isNotBlank() }
-            ?: wsApiKeysMap[effectiveInitial.webSearchProvider]?.takeIf { it.isNotBlank() }
-            ?: effectiveInitial.webSearchApiKey
+        } ?: ""
     }
 
     var selectedProvider by remember(effectiveInitial.provider) { mutableStateOf(effectiveInitial.provider) }
@@ -161,15 +153,9 @@ fun SettingsScreen(
                                 selectedProvider = provider.id
                                 repo.updateAll(
                                     provider = provider.id,
-                                    apiKey = key,
                                     model = selectedModel,
-                                    webSearchProvider = selectedWebSearchProvider,
-                                    webSearchApiKey = webSearchApiKey
+                                    webSearchProvider = selectedWebSearchProvider
                                 )
-                                repo.saveLlmApiKey(provider.id, key)
-                                if (selectedWebSearchProvider.isNotBlank() && webSearchApiKey.isNotBlank()) {
-                                    repo.saveWebSearchApiKey(selectedWebSearchProvider, webSearchApiKey)
-                                }
                                 EventLog.info(TAG, "Settings connected", "provider=${provider.id}, model=$selectedModel, webSearch=$selectedWebSearchProvider")
                             } else {
                                 connectError = "Connection failed. Please check your API Key."
@@ -195,12 +181,9 @@ fun SettingsScreen(
             cache.saveKey("ws_$selectedWebSearchProvider", key)
             repo.updateAll(
                 provider = selectedProvider,
-                apiKey = apiKey,
                 model = selectedModel,
-                webSearchProvider = selectedWebSearchProvider,
-                webSearchApiKey = key
+                webSearchProvider = selectedWebSearchProvider
             )
-            repo.saveWebSearchApiKey(selectedWebSearchProvider, key)
             EventLog.info(TAG, "Web search settings saved", "provider=$selectedWebSearchProvider")
             onComplete()
         }
@@ -215,9 +198,6 @@ fun SettingsScreen(
                 coroutineScope.launch {
                     cache.saveKey(provider.id, provider.apiKey)
                     repo.addCustomLlmProvider(provider)
-                    if (provider.apiKey.isNotBlank()) {
-                        repo.saveLlmApiKey(provider.id, provider.apiKey)
-                    }
                     selectedProvider = provider.id
                     apiKey = provider.apiKey
                     handleConnect(provider, provider.apiKey) { success ->
@@ -288,6 +268,7 @@ fun SettingsScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
+                            cache.removeKey(providerToRemove.id)
                             coroutineScope.launch {
                                 repo.removeCustomLlmProvider(providerToRemove.id)
                             }
@@ -319,10 +300,8 @@ fun SettingsScreen(
                         onSaveModelSettings(
                             LlmSettings(
                                 provider = effectiveInitial.provider,
-                                apiKey = effectiveInitial.apiKey,
                                 model = selectedModel,
-                                webSearchProvider = selectedWebSearchProvider,
-                                webSearchApiKey = webSearchApiKey
+                                webSearchProvider = selectedWebSearchProvider
                             )
                         )
                         onBack()
@@ -412,8 +391,9 @@ fun SettingsScreen(
                                 } else null,
                                 onClick = {
                                     selectedProvider = provider.id
-                                    val savedKey = llmApiKeysMap[provider.id]?.takeIf { it.isNotBlank() }
-                                        ?: provider.apiKey.takeIf { it.isNotBlank() } ?: ""
+                                    val savedKey = cache.getKey(provider.id)?.let { bytes ->
+                                        String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+                                    } ?: ""
                                     apiKey = savedKey
                                     providerDropdownExpanded = false
                                 }
@@ -431,7 +411,7 @@ fun SettingsScreen(
                         )
                     }
                 }
-                val isLlmConnected = selectedProvider.isNotBlank() && apiKey.isNotBlank() && selectedModel.isNotBlank() && !isConnecting
+                val isLlmConnected = selectedProvider.isNotBlank() && cache.hasKey(selectedProvider) && selectedModel.isNotBlank() && !isConnecting
                 IconButton(
                     onClick = {
                         connectError = null
@@ -562,8 +542,9 @@ fun SettingsScreen(
                                 text = { Text(provider.name, color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
                                     selectedWebSearchProvider = provider.id
-                                    val savedKey = wsApiKeysMap[provider.id]?.takeIf { it.isNotBlank() }
-                                        ?: provider.apiKey.takeIf { it.isNotBlank() } ?: ""
+                                    val savedKey = cache.getKey("ws_${provider.id}")?.let { bytes ->
+                                        String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+                                    } ?: ""
                                     webSearchApiKey = savedKey
                                     webSearchProviderDropdownExpanded = false
                                 }
@@ -571,7 +552,7 @@ fun SettingsScreen(
                         }
                     }
                 }
-                val isWsConnected = selectedWebSearchProvider.isNotBlank() && webSearchApiKey.isNotBlank()
+                val isWsConnected = selectedWebSearchProvider.isNotBlank() && cache.hasKey("ws_$selectedWebSearchProvider")
                 IconButton(
                     onClick = { showWsApiKeyDialog = true },
                     enabled = selectedWebSearchProvider.isNotBlank() && !isConnecting

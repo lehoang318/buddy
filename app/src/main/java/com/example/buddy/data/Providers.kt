@@ -36,6 +36,7 @@ data class ProviderData(
 )
 
 fun LlmProvider.toProviderData() = ProviderData(id, name, baseUrl, apiKey)
+fun LlmProvider.toProviderDataWithoutKey() = ProviderData(id, name, baseUrl, apiKey = "")
 fun ProviderData.toLlmProvider() = LlmProvider(id, name, baseUrl, apiKey)
 fun ProviderData.toWebSearchProvider() = WebSearchProvider(id, name, baseUrl, apiKey)
 
