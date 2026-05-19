@@ -67,18 +67,23 @@ Web search capabilities allow Buddy to access current, up-to-date information fr
 
 ### API Key Storage
 
-- **Per-provider keys**: API keys are stored per-provider, so switching providers automatically loads the correct key
-- **Built-in provider keys**: If a built-in provider has a pre-configured API key in `providers.xml`, it is used as fallback
-- **Custom provider keys**: Saved automatically when you connect a custom provider
-- **Web search keys**: Stored separately per web search provider
+- **Encrypted storage**: All API keys are stored in `EncryptedSharedPreferences` with AES-256 GCM encryption backed by Android Keystore
+- **Per-provider isolation**: Each provider's key is stored and retrieved independently — switching providers automatically loads the correct key
+- **No plaintext persistence**: Keys are not stored in the app's DataStore or any other plaintext storage
+- **Custom provider keys**: Saved automatically when you connect a custom provider; the key is stored separately from the provider configuration
+- **Web search keys**: Stored separately per web search provider with a `ws_` prefix to avoid ID collisions
+- **In-memory caching**: Keys are cached in memory during the session and cleared when the app goes to background
 
 ---
 
 ## Security & Privacy
 
 ### API Key Security
-- All API keys are stored locally on your device
+- All API keys are encrypted at rest using `EncryptedSharedPreferences` (AES-256 GCM)
+- The encryption master key is stored in Android Keystore (hardware-backed on supported devices)
 - Keys are never transmitted to Buddy servers
+- Key byte arrays are zeroed in memory after each use
+- In-memory cache is cleared when the app enters background
 - Use password field to hide keys when entering
 - Rotate keys regularly if compromised
 

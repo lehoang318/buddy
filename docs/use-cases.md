@@ -44,10 +44,11 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 ![Provider selection screenshot placeholder]
 
 #### Step 3: Enter Your API Key
-1. In the "API Key" field, enter your API key
-2. API keys typically look like: `sk-123abc456def789ghi`
-3. Tap the eye icon to show/hide your key for verification
-4. Tap the sync button (🔄) to test the connection
+1. Tap the connect button (🔄 swap icon) next to the provider dropdown
+2. In the dialog that opens, enter your API key
+3. API keys typically look like: `sk-123abc456def789ghi`
+4. Tap the eye icon to show/hide your key for verification
+5. Tap "Connect" to test the connection and fetch available models
 
 ![API key entry screenshot placeholder]
 
@@ -77,8 +78,9 @@ AI parameters are configured in the **Parameters** screen (accessible from the B
    - **Exa** — Semantic search, content filtering
    - **LinkUp** — Agentic search, precise content retrieval
    - **Tavily** — AI-optimized, fast results
-2. Enter your web search API key (if required)
-3. Web search enables current information queries
+2. Tap the connect button (🔄 swap icon) next to the provider dropdown
+3. In the dialog, enter your web search API key and tap "Connect"
+4. Web search enables current information queries
 
 ![Web search configuration screenshot placeholder]
 
@@ -224,9 +226,10 @@ Change to a completely different AI provider and model.
 3. The available models will update based on the new provider
 
 #### Step 3: Enter New API Key
-1. If the new provider requires a different API key, enter it in the "API Key" field
-2. Tap the sync button (🔄) to test the connection
-3. Wait for the connection to be verified
+1. If the new provider requires a different API key, tap the connect button (🔄 swap icon)
+2. In the dialog, enter the new provider's API key
+3. Tap "Connect" to test the connection and fetch models
+4. Wait for the connection to be verified
 
 #### Step 4: Select New Model
 1. Once connected, choose a model from the "Default Model" dropdown
@@ -313,9 +316,9 @@ Switch between different web search services to find current information.
    - **Tavily** — AI-optimized, fast results
 
 #### Step 4: Enter New API Key (if needed)
-1. If the new provider requires an API key, enter it in the "API Key" field
-2. API keys vary by provider (e.g., `tvly-` for Tavily)
-3. Tap the sync button to test the connection
+1. If the new provider requires an API key, tap the connect button (🔄 swap icon)
+2. In the dialog, enter the API key (e.g., `tvly-...` for Tavily)
+3. Tap "Connect" to save and verify the key
 
 #### Step 5: Test Web Search
 1. Go back to the chat screen
@@ -579,7 +582,7 @@ When no providers are configured:
 - Master basic chat before exploring advanced features
 - Take time to understand each setting's impact
 
-#### Backup Your Settings
+#### Note Your Preferences
 - If you find good configurations, note them down
 - Some providers may have different optimal settings
 - You can always reset and start over

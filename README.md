@@ -39,18 +39,20 @@
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome), [Exa](https://exa.ai/), or [LinkUp](https://www.linkup.so/)
 
 3. **Download the APK**
-  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.4)
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.5)
 
 4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 1V - Android 15).
 
 5. **Open the app** and grant camera permissions if you want to use photo capture feature.
 
-6. Settings
-* LLM Provider
-* Default Model & Parameters
-* Web Search Provider
+6. **Configure Settings**:
+   * LLM Provider & API Key
+   * Default Model & Parameters
+   * Web Search Provider & API Key
 
-1. **Enjoy!**
+> Your keys are safe with Buddy — they're secured by Android Keystore and never stored as plaintext.
+
+7. **Enjoy!**
 
 ## Documentation
 

@@ -14,7 +14,8 @@ This document provides a concise overview of the external libraries used in the 
 | `org.jsoup:jsoup` | Data | 1.22.1 | HTML parsing for URL content fetching |
 | `io.coil-kt:coil-compose` | Images | 2.7.0 | Image loading and caching |
 | `io.noties.markwon:*` | Text | 4.6.2 | Markdown rendering with tables, strikethrough, task lists, HTML, linkify, Coil images |
-| `androidx.datastore:datastore-preferences` | Storage | 1.2.1 | Persistent user settings |
+| `androidx.security:security-crypto` | Security | 1.1.0-alpha06 | EncryptedSharedPreferences for API key storage |
+| `androidx.datastore:datastore-preferences` | Storage | 1.2.1 | Persistent app settings (non-sensitive) |
 | `androidx.work:work-runtime-ktx` | Background | 2.9.1 | Deferrable background tasks (connectivity checks) |
 
 | `junit` / `androidx.test.*` | Testing | 4.13.2 / 1.1.5 | Unit and UI testing framework |

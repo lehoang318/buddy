@@ -9,13 +9,15 @@ sequenceDiagram
     participant User
     participant MainActivity
     participant SettingsScreen
+    participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
     participant LLMClient
 
     User->>MainActivity: Open app
-    MainActivity->>MainActivity: Load settings from repository
-    MainActivity->>MainActivity: Create LLM client if configured
+    MainActivity->>SettingsRepository: Load settings from DataStore
+    MainActivity->>SessionKeyCache: Load API keys from EncryptedSharedPreferences
+    MainActivity->>MainActivity: Create LLM client if key exists
     MainActivity->>MainActivity: Display Chat Screen
 
     User->>MainActivity: Tap Buddy logo
@@ -29,24 +31,24 @@ sequenceDiagram
     User->>SettingsScreen: Select provider from dropdown
     SettingsScreen->>SettingsScreen: Update selected provider
 
-    User->>SettingsScreen: Enter API key
-    SettingsScreen->>SettingsScreen: Update API key field
-
-    User->>SettingsScreen: Tap sync button
-    SettingsScreen->>SettingsScreen: handleConnect()
-    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    User->>SettingsScreen: Tap connect button
+    SettingsScreen->>SettingsScreen: Show ApiKeyConnectDialog
+    User->>SettingsScreen: Enter API key and tap Connect
+    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
+    SettingsScreen->>LlmClientFactory: getModels(provider)
+    LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return list of models
 
     Note over SettingsScreen: Auto-select first model: selectedModel = models.first().id
 
-    SettingsScreen->>LlmClientFactory: createWithProvider(provider, apiKey, selectedModel)
+    SettingsScreen->>LlmClientFactory: createWithProvider(provider, selectedModel)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
     LLMClient-->>SettingsScreen: Connection successful
 
-    SettingsScreen->>SettingsRepository: updateAll(settings)
-    SettingsRepository->>SettingsRepository: Save settings locally
+    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
+    SettingsRepository->>SettingsRepository: Save non-sensitive settings
     SettingsRepository-->>SettingsScreen: Settings saved
 
     User->>SettingsScreen: Tap back button
@@ -61,6 +63,7 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant SettingsScreen
+    participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
 
@@ -74,20 +77,22 @@ sequenceDiagram
 
     User->>SettingsScreen: Enter name, base URL, API key
     SettingsScreen->>SettingsScreen: Tap "Add"
-    SettingsScreen->>SettingsRepository: addCustomLlmProvider(provider)
-    SettingsRepository->>SettingsRepository: Save to DataStore
+    SettingsScreen->>SessionKeyCache: saveKey(providerId, apiKey)
+    SettingsScreen->>SettingsRepository: addCustomLlmProvider(provider config without key)
+    SettingsRepository->>SettingsRepository: Save to DataStore (key stripped)
     SettingsRepository-->>SettingsScreen: Provider saved
 
     SettingsScreen->>SettingsScreen: Select new provider from dropdown
     SettingsScreen->>SettingsScreen: handleConnect()
-    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    SettingsScreen->>LlmClientFactory: getModels(provider)
+    LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return list of models
 
     Note over SettingsScreen: Auto-select first model
 
-    SettingsScreen->>SettingsRepository: updateAll(settings)
-    SettingsRepository->>SettingsRepository: Save settings locally
+    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
+    SettingsRepository->>SettingsRepository: Save non-sensitive settings (no apiKey)
     SettingsRepository-->>SettingsScreen: Settings saved
 
     SettingsScreen-->>User: Return to chat screen
@@ -127,7 +132,9 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant SettingsScreen
+    participant SessionKeyCache
     participant SettingsRepository
+    participant MainActivity
     participant WebSearch
 
     User->>SettingsScreen: Open settings
@@ -136,17 +143,17 @@ sequenceDiagram
     User->>SettingsScreen: Select web search provider from dropdown
     SettingsScreen->>SettingsScreen: Update selected provider
 
-    User->>SettingsScreen: Enter web search API key
-    SettingsScreen->>SettingsScreen: Update API key field
-
-    User->>SettingsScreen: Tap back button
-    SettingsScreen->>SettingsRepository: updateAll(settings)
-    SettingsRepository->>SettingsRepository: Save settings locally
+    User->>SettingsScreen: Tap connect button
+    SettingsScreen->>SettingsScreen: Show ApiKeyConnectDialog
+    User->>SettingsScreen: Enter API key and tap Connect
+    SettingsScreen->>SessionKeyCache: saveKey("ws_${providerId}", key)
+    SettingsScreen->>SettingsRepository: updateAll(provider, model, webSearchProvider)
+    SettingsRepository->>SettingsRepository: Save settings (no key)
     SettingsRepository-->>SettingsScreen: Settings saved
 
-    SettingsScreen->>MainActivity: onSettingsSaved()
-    MainActivity->>MainActivity: Create WebSearch instance
-    MainActivity->>MainActivity: Update web search capability
+    SettingsScreen->>MainActivity: onBack()
+    MainActivity->>MainActivity: keyCache.keyIds flow triggers combine
+    MainActivity->>MainActivity: Create WebSearch instance with ApiKeyInterceptor
     MainActivity-->>User: Return to chat screen
 ```
 
@@ -156,28 +163,33 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant SettingsScreen
+    participant SessionKeyCache
     participant LlmClientFactory
     participant LLMClient
 
-    User->>SettingsScreen: Enter API key and tap sync
-    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    User->>SettingsScreen: Enter API key in dialog and tap Connect
+    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
+    SettingsScreen->>LlmClientFactory: getModels(provider)
+    LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     Note over LlmClientFactory: Invalid API key
     LlmClientFactory-->>SettingsScreen: Return error
 
-    SettingsScreen->>SettingsScreen: Show error dialog
+    SettingsScreen->>SettingsScreen: Show error message
     SettingsScreen-->>User: Display "Invalid API key" message
 
     User->>SettingsScreen: Dismiss error dialog
     SettingsScreen->>SettingsScreen: Clear error state
 
-    User->>SettingsScreen: Enter correct API key
-    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    User->>SettingsScreen: Enter correct API key and tap Connect
+    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
+    SettingsScreen->>LlmClientFactory: getModels(provider)
+    LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return list of models
 
-    User->>SettingsScreen: Select model and tap sync
-    SettingsScreen->>LlmClientFactory: createWithProvider(provider, apiKey, model)
+    User->>SettingsScreen: Select model
+    SettingsScreen->>LlmClientFactory: createWithProvider(provider, model)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
     LLMClient-->>SettingsScreen: Connection successful
@@ -372,15 +384,18 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant SettingsScreen
+    participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
 
     User->>SettingsScreen: Open settings
     SettingsScreen->>SettingsScreen: Display current settings
 
-    User->>SettingsScreen: Tap sync button to refresh models
+    User->>SettingsScreen: Tap connect button to refresh models
     SettingsScreen->>SettingsScreen: handleConnect()
-    SettingsScreen->>LlmClientFactory: getModels(provider, apiKey)
+    SettingsScreen->>SessionKeyCache: saveKey(providerId, key) (if new)
+    SettingsScreen->>LlmClientFactory: getModels(provider)
+    LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     LlmClientFactory-->>SettingsScreen: Return updated model list
 
@@ -393,7 +408,7 @@ sequenceDiagram
 
     User->>SettingsScreen: Tap back to save
     SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
-    SettingsScreen->>SettingsRepository: updateAll(settings)
+    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
     SettingsRepository-->>SettingsScreen: Settings saved
 
     SettingsScreen-->>User: Return to chat screen

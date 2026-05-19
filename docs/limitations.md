@@ -135,12 +135,20 @@ This document outlines the current technical limitations and constraints of the 
 
 ## Security Considerations
 
+### API Key Storage
+
+- **Encrypted at rest**: Keys are stored using `EncryptedSharedPreferences` with AES-256 GCM encryption, backed by Android Keystore
+- **Not in DataStore**: Keys are kept separate from app settings — plaintext DataStore does not contain API keys
+- **In-memory zeroing**: Key byte arrays are explicitly zeroed after use (`ByteArray.fill(0)`) to prevent memory scraping
+- **Cache clearing**: In-memory key cache is cleared when the app enters background (`ON_STOP`)
+- **Per-provider isolation**: Each provider's key is stored and retrieved independently
+- **No cloud storage**: Keys never leave the device
+
 ### Data Privacy
 
 - **Local Storage**: Conversations are stored locally on your device
 - **API Transmission**: Messages are sent to your chosen AI provider
 - **No Cloud Backup**: No automatic backup to external servers
-- **API Key Security**: Keys stored locally; not transmitted to Buddy servers
 
 ### Recommendations
 
@@ -167,6 +175,6 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
-**Last Updated**: v0.4.0
+**Last Updated**: v0.5.0
 
 **Note**: These limitations are subject to change in future updates.

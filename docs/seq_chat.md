@@ -15,9 +15,8 @@ sequenceDiagram
     User->>ChatScreen: Type message and send
     ChatScreen->>ViewModel: onInputChange(message)
     ViewModel->>ViewModel: Validate message
-    ViewModel->>SettingsRepository: getSettings()
-    SettingsRepository-->>ViewModel: Return settings (model, apiKey, etc.)
-    ViewModel->>ViewModel: Create request with settings
+    ViewModel->>LocalLlmClient: Resolve client from CompositionLocal
+    LocalLlmClient-->>ViewModel: Return LLM client
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
@@ -185,12 +184,10 @@ sequenceDiagram
     participant ChatScreen
     participant ViewModel
     participant LLMClient
-    participant SettingsRepository
 
     User->>ChatScreen: Type message and send
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>SettingsRepository: getSettings()
-    SettingsRepository-->>ViewModel: Return settings
+    ViewModel->>ViewModel: Validate message
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
@@ -241,14 +238,12 @@ sequenceDiagram
     participant ChatScreen
     participant ViewModel
     participant LLMClient
-    participant SettingsRepository
 
     User->>ChatScreen: Type message and send
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>SettingsRepository: getSettings()
-    SettingsRepository-->>ViewModel: Return settings
+    ViewModel->>ViewModel: Validate message
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare API request
+    LLMClient->>LLMClient: Prepare API request (ApiKeyInterceptor injects key)
     LLMClient->>LLMClient: Send to provider
     Note over LLMClient: Provider rejects invalid key (HTTP 401)
     LLMClient-->>ViewModel: Throw exception with error details
@@ -265,12 +260,10 @@ sequenceDiagram
     participant ChatScreen
     participant ViewModel
     participant LLMClient
-    participant SettingsRepository
 
     User->>ChatScreen: Send message
     ChatScreen->>ViewModel: sendMessage()
-    ViewModel->>SettingsRepository: getSettings()
-    SettingsRepository-->>ViewModel: Return current settings
+    ViewModel->>ViewModel: Validate message
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Process with current model
     LLMClient-->>ViewModel: Stream response tokens
