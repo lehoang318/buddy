@@ -61,6 +61,7 @@
 | [FAQ](./FAQ.md) | Common questions and answers |
 | [Supported Providers](./docs/providers.md) | LLM & Web Search provider details |
 | [Use Cases](./docs/use-cases.md) | Step-by-step configuration guides |
+| [Context Management](./docs/context-management.md) | History summarization, compression, and Web Data architecture |
 | [Technical Limitations](./docs/limitations.md) | Known constraints and limitations |
 | [Dependencies](./docs/dependencies.md) | External library reference |
 | [Sequence Diagrams](./docs/seq_chat.md) | Chat flow sequence diagrams |

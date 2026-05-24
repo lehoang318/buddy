@@ -40,7 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.ui.theme.OnSurfaceVariant
@@ -65,9 +65,9 @@ fun ParametersScreen(
     val savedSettings by settingsRepository.settings.collectAsState(initial = initialSettings ?: LlmSettings())
     val effectiveInitial = initialSettings ?: savedSettings
 
-    val initialTemperature = effectiveInitial.temperature.takeIf { it > 0f } ?: LlmDefaults.temperature
-    val initialTopP = effectiveInitial.topP.takeIf { it > 0f } ?: LlmDefaults.topP
-    val initialTopK = effectiveInitial.topK.takeIf { it > 0 } ?: LlmDefaults.topK
+    val initialTemperature = effectiveInitial.temperature.takeIf { it > 0f } ?: AppResources.llm.temperature
+    val initialTopP = effectiveInitial.topP.takeIf { it > 0f } ?: AppResources.llm.topP
+    val initialTopK = effectiveInitial.topK.takeIf { it > 0 } ?: AppResources.llm.topK
     
     var temperature by remember(initialTemperature) { mutableFloatStateOf(initialTemperature) }
     var topP by remember(initialTopP) { mutableFloatStateOf(initialTopP) }
@@ -75,9 +75,9 @@ fun ParametersScreen(
     var systemMessage by remember(effectiveInitial.systemMessage) { mutableStateOf(effectiveInitial.systemMessage) }
 
     fun resetToDefaults() {
-        temperature = LlmDefaults.temperature
-        topP = LlmDefaults.topP
-        topK = LlmDefaults.topK
+        temperature = AppResources.llm.temperature
+        topP = AppResources.llm.topP
+        topK = AppResources.llm.topK
     }
 
     Scaffold(

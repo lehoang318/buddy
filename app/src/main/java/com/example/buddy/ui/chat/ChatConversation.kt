@@ -77,7 +77,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
 import com.example.buddy.data.ChatMessage
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.example.buddy.data.Role
 import com.example.buddy.ui.theme.Dimens
 import com.example.buddy.ui.theme.OnSurfaceVariant
@@ -421,8 +421,8 @@ fun InputBar(
     pendingFileName: String?,
     fileTooLargeError: String?,
     isOffline: Boolean,
-    urlFetchInProgress: Boolean,
-    reasoningEffort: LlmDefaults.ReasoningEffort?,
+    isProcessing: Boolean,
+    reasoningEffort: AppResources.ReasoningEffort?,
     onToggleReasoning: () -> Unit,
     onTextChange: (String) -> Unit,
     onClearImage: () -> Unit,
@@ -431,7 +431,7 @@ fun InputBar(
     onTakePhoto: () -> Unit,
     onSend: () -> Unit
 ) {
-    val canSend = text.isNotBlank() || pendingImage != null || pendingFile != null
+    val canSend = text.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -559,7 +559,7 @@ fun InputBar(
                         contentDescription = "Toggle Reasoning",
                         tint = when {
                             isOffline -> OnSurfaceVariant
-                            reasoningEffort == LlmDefaults.ReasoningEffort.HIGH -> SendButton
+                            reasoningEffort == AppResources.ReasoningEffort.HIGH -> SendButton
                             else -> SecondaryIcons
                         }
                     )
@@ -567,15 +567,15 @@ fun InputBar(
 
                 IconButton(
                     onClick = onSend,
-                    enabled = canSend && !isOffline && !urlFetchInProgress,
+                    enabled = canSend && !isOffline && !isProcessing,
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (canSend && !isOffline && !urlFetchInProgress) SendButton else Outline,
+                            if (canSend && !isOffline && !isProcessing) SendButton else Outline,
                             CircleShape
                         )
                 ) {
-                    if (urlFetchInProgress) {
+                    if (isProcessing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,

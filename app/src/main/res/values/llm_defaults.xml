@@ -10,24 +10,6 @@
     <integer name="search_max_results">4</integer>
     <integer name="search_query_fallback_length">50</integer>
     <integer name="log_preview_max_chars">1024</integer>
-    <integer name="event_log_max_events">32</integer>
-    <integer name="event_log_max_data_length">2048</integer>
-    <string name="search_query_prompt"><![CDATA[You are a search query generator. Your job is to convert user questions into concise, effective web search queries.
-
-Rules:
-* If the user\'s message does not require a web search (e.g., casual conversation, greetings, simple acknowledgments, or questions about the assistant itself), return exactly NO_QUERY.
-* Output ONLY the search query — no explanation, no preamble, no punctuation wrapper.
-* Strip all personal data from the query: names, emails, API keys, account IDs, phone numbers, URLs with credentials, or any other identifying information. Replace them with generic placeholders if needed (e.g. "my account", "a specific API", "this service").
-* Keep the query short, specific, and optimized for a search engine.
-* Focus on the intent, not the literal wording of the question.
-* If conversation history provides context (e.g., pronouns, references to earlier topics), use it to make the query specific instead of vague.
-
-Examples:
-* "Why is my Gmail account john.doe@gmail.com not receiving emails?" → Gmail not receiving emails fix
-* "Hello" → NO_QUERY
-* "How do I rotate my AWS key AKIAIOSFODNN7EXAMPLE?" → rotate AWS access key
-* "What's the weather like?" → current weather forecast
-* "thank you" → NO_QUERY
-* "who are you?" → NO_QUERY
-* "What time is it in Tokyo?" → Tokyo current time]]></string>
+    <item name="summary_temperature" format="float" type="dimen">0.2</item>
+    <integer name="summary_max_tokens">512</integer>
 </resources>

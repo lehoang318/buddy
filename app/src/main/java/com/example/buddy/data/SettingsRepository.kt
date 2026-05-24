@@ -55,12 +55,12 @@ class SettingsRepository(private val context: Context) {
         LlmSettings(
             provider = prefs[SettingsKeys.PROVIDER] ?: "",
             model = prefs[SettingsKeys.MODEL] ?: "",
-            temperature = prefs[SettingsKeys.TEMPERATURE] ?: LlmDefaults.temperature,
-            topP = prefs[SettingsKeys.TOP_P] ?: LlmDefaults.topP,
-            topK = prefs[SettingsKeys.TOP_K] ?: LlmDefaults.topK,
-            maxTokens = prefs[SettingsKeys.MAX_TOKENS] ?: LlmDefaults.maxTokens,
+            temperature = prefs[SettingsKeys.TEMPERATURE] ?: AppResources.llm.temperature,
+            topP = prefs[SettingsKeys.TOP_P] ?: AppResources.llm.topP,
+            topK = prefs[SettingsKeys.TOP_K] ?: AppResources.llm.topK,
+            maxTokens = prefs[SettingsKeys.MAX_TOKENS] ?: AppResources.llm.maxTokens,
             reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
-            systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: LlmDefaults.defaultSystemMessage,
+            systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: AppResources.llm.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
             customLlmProvidersJson = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: "",
             customWebSearchProvidersJson = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
@@ -70,12 +70,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun updateAll(
         provider: String,
         model: String,
-        temperature: Float = LlmDefaults.temperature,
-        topP: Float = LlmDefaults.topP,
-        topK: Int = LlmDefaults.topK,
-        maxTokens: Int = LlmDefaults.maxTokens,
+        temperature: Float = AppResources.llm.temperature,
+        topP: Float = AppResources.llm.topP,
+        topK: Int = AppResources.llm.topK,
+        maxTokens: Int = AppResources.llm.maxTokens,
         reasoningEffort: String = "",
-        systemMessage: String = LlmDefaults.defaultSystemMessage,
+        systemMessage: String = AppResources.llm.defaultSystemMessage,
         webSearchProvider: String = ""
     ) {
         dataStore.edit {

@@ -188,7 +188,7 @@ fun ChatScreen(
                 pendingFileName = state.pendingFileName,
                 fileTooLargeError = state.fileTooLargeError,
                 isOffline = state.isOffline,
-                urlFetchInProgress = state.urlFetchInProgress,
+                isProcessing = state.isLoading || state.isStreaming || state.urlFetchInProgress,
                 reasoningEffort = state.generationConfig.reasoningEffort,
                 onToggleReasoning = vm::toggleReasoningEffort,
                 onTextChange = vm::onInputChange,

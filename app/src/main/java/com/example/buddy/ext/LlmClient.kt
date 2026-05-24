@@ -4,8 +4,10 @@ import com.example.buddy.BuildConfig
 import com.example.buddy.crypto.ApiKeyInterceptor
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.example.buddy.data.LlmProvider
+import com.example.buddy.data.Summary
+import com.example.buddy.data.SummaryPoint
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
@@ -26,19 +28,21 @@ data class LlmGenerationConfig(
     val topP: Float = 0f,
     val topK: Int = 0,
     val maxTokens: Int = 0,
-    val reasoningEffort: LlmDefaults.ReasoningEffort? = null
+    val reasoningEffort: AppResources.ReasoningEffort? = null
 )
 
 interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
-    suspend fun generateSearchQueryRaw(userMessage: String, correlationId: String? = null): String?
+    suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): String?
+    suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String? = null): Summary
+    suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String? = null): Summary
 
-    suspend fun generateSearchQuery(userMessage: String, correlationId: String? = null): String? {
+    suspend fun generateSearchQuery(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): String? {
         val input = userMessage.take(1024)
-        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(LlmDefaults.logPreviewMaxChars)}\nModel: $activeModel", correlationId = correlationId)
-        val raw = generateSearchQueryRaw(input, correlationId)
+        EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(AppResources.search.logPreviewMaxChars)}\nModel: $activeModel", correlationId = correlationId)
+        val raw = generateSearchQueryRaw(input, summaries, correlationId)
 
         if (raw != null && raw.trim().equals("NO_QUERY", ignoreCase = true)) {
             EventLog.info(TAG_LLM, "Search query skipped (NO_QUERY)",
@@ -46,16 +50,15 @@ interface LlmClient {
             return null
         }
 
-        val processed = LlmDefaults.sanitizeSearchQueryResponse(raw)
-        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nProcessed: ${processed ?: "<fallback>"}", correlationId = correlationId)
+        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(AppResources.search.logPreviewMaxChars) ?: "<null>"}", correlationId = correlationId)
 
-        if (processed != null) return processed
+        if (!raw.isNullOrBlank()) return raw.trim()
 
-        val fallbackLen = LlmDefaults.searchQueryFallbackLength
+        val fallbackLen = AppResources.search.queryFallbackLength
         val fallback = userMessage.take(fallbackLen)
-        val reason = if (raw == null) "API call returned null (network error or no response)" else "Response stripped to nothing by sanitization"
+        val reason = "API call returned null or blank (network error or no response)"
         EventLog.warning(TAG_LLM, "Search query fallback used",
-            "Reason: $reason\nRaw: ${raw?.take(LlmDefaults.logPreviewMaxChars)}\nFallback (${fallback.length} chars): $fallback",
+            "Reason: $reason\nRaw: ${raw?.take(AppResources.search.logPreviewMaxChars)}\nFallback (${fallback.length} chars): $fallback",
             correlationId = correlationId)
         return fallback
     }
@@ -71,10 +74,10 @@ interface LlmClient {
         correlationId: String? = null
     ): Flow<String> {
         val startTime = System.currentTimeMillis()
-        val resolvedTemp = config.temperature.takeIf { it > 0 } ?: LlmDefaults.temperature
-        val resolvedTopP = config.topP.takeIf { it > 0 } ?: LlmDefaults.topP
-        val resolvedTopK = config.topK.takeIf { it > 0 } ?: LlmDefaults.topK
-        val resolvedMaxTokens = config.maxTokens.takeIf { it > 0 } ?: LlmDefaults.maxTokens
+        val resolvedTemp = config.temperature.takeIf { it > 0 } ?: AppResources.llm.temperature
+        val resolvedTopP = config.topP.takeIf { it > 0 } ?: AppResources.llm.topP
+        val resolvedTopK = config.topK.takeIf { it > 0 } ?: AppResources.llm.topK
+        val resolvedMaxTokens = config.maxTokens.takeIf { it > 0 } ?: AppResources.llm.maxTokens
         val paramDetail = "model=$model, temp=$resolvedTemp, topP=$resolvedTopP, topK=$resolvedTopK, maxTokens=$resolvedMaxTokens, reasoning=${config.reasoningEffort}"
         EventLog.info(TAG_LLM, "Request sent: ${messages.size} messages", data = paramDetail, correlationId = correlationId)
         if (BuildConfig.DEBUG) {
@@ -84,7 +87,7 @@ interface LlmClient {
                 if (systemMsg != null) appendLine("System: $systemMsg")
                 appendLine("Messages:")
                 messages.forEach {
-                    val preview = it.content.take(LlmDefaults.logPreviewMaxChars) + if (it.content.length > LlmDefaults.logPreviewMaxChars) "..." else ""
+                    val preview = it.content.take(AppResources.search.logPreviewMaxChars) + if (it.content.length > AppResources.search.logPreviewMaxChars) "..." else ""
                     appendLine("${it.role}: $preview")
                 }
             }
@@ -103,15 +106,15 @@ interface LlmClient {
             }
     }
 
-    fun toggleReasoning(current: LlmDefaults.ReasoningEffort?): LlmDefaults.ReasoningEffort {
+    fun toggleReasoning(current: AppResources.ReasoningEffort?): AppResources.ReasoningEffort {
         val next = when (current) {
-            LlmDefaults.ReasoningEffort.LOW -> LlmDefaults.ReasoningEffort.HIGH
-            LlmDefaults.ReasoningEffort.HIGH -> LlmDefaults.ReasoningEffort.LOW
-            else -> LlmDefaults.ReasoningEffort.HIGH
+            AppResources.ReasoningEffort.LOW -> AppResources.ReasoningEffort.HIGH
+            AppResources.ReasoningEffort.HIGH -> AppResources.ReasoningEffort.LOW
+            else -> AppResources.ReasoningEffort.HIGH
         }
         val effortStr = when (next) {
-            LlmDefaults.ReasoningEffort.LOW -> "low"
-            LlmDefaults.ReasoningEffort.HIGH -> "high"
+            AppResources.ReasoningEffort.LOW -> "low"
+            AppResources.ReasoningEffort.HIGH -> "high"
         }
         val message = if (isReasoningSupported) {
             "Reasoning effort set: $effortStr"

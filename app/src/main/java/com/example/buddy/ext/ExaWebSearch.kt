@@ -2,7 +2,7 @@ package com.example.buddy.ext
 
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +34,7 @@ class ExaWebSearch(
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
-                addProperty("numResults", LlmDefaults.searchMaxResults)
+                addProperty("numResults", AppResources.search.maxResults)
                 addProperty("type", "auto")
                 add("contents", JsonObject().apply {
                     addProperty("text", true)
@@ -66,7 +66,8 @@ class ExaWebSearch(
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val results = json.getAsJsonArray("results")
-                        return@withContext results?.map { resultObj ->
+                            ?: throw Exception("Missing 'results' array in response")
+                        return@withContext results.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             val textElement = obj.get("text")
                             val content = when {
@@ -79,7 +80,7 @@ class ExaWebSearch(
                                 url = obj.get("url")?.asString ?: "",
                                 content = content
                             )
-                        } ?: emptyList()
+                        }
                     }
                 } catch (e: SocketTimeoutException) {
                     lastException = e

@@ -62,14 +62,15 @@ class LinkUpWebSearch(
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val searchResults = json.getAsJsonArray("results")
-                        return@withContext searchResults?.map { resultObj ->
+                            ?: throw Exception("Missing 'results' array in response")
+                        return@withContext searchResults.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             SearchResult(
                                 title = obj.get("name")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
                                 content = obj.get("content")?.asString ?: ""
                             )
-                        } ?: emptyList()
+                        }
                     }
                 } catch (e: SocketTimeoutException) {
                     lastException = e
