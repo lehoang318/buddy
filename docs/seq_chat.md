@@ -10,20 +10,30 @@ sequenceDiagram
     participant ChatScreen
     participant ViewModel
     participant LLMClient
-    participant SettingsRepository
 
     User->>ChatScreen: Type message and send
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate message
-    ViewModel->>LocalLlmClient: Resolve client from CompositionLocal
-    LocalLlmClient-->>ViewModel: Return LLM client
+    ViewModel->>ViewModel: Validate message, add to uiState
+    ViewModel->>ViewModel: processingLock.withLock {
+    ViewModel->>ViewModel: buildLlmMessages() with summaries context
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
     LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process and accumulate response
+    ViewModel->>ViewModel: Accumulate and display response
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    ViewModel->>LLMClient: generateSummary(question, response)
+    LLMClient-->>ViewModel: Summary JSON (2-3 points)
+    ViewModel->>ViewModel: Append to summaries list
+    alt exceeds maxSummaries
+        ViewModel->>LLMClient: compressSummaries(batch)
+        LLMClient-->>ViewModel: Compressed summary
+        ViewModel->>ViewModel: Replace oldest batch
+    end
+    ViewModel->>ViewModel: }  (lock released)
     ViewModel->>ChatScreen: Update UI with response
-    ChatScreen-->>User: Display response
+    ChatScreen-->>User: Display final response
 ```
 
 ### 2. Chat with Web Search Enabled
@@ -39,22 +49,27 @@ sequenceDiagram
 
     User->>ChatScreen: Type message about current events
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Check web search enabled flag
-    ViewModel->>WebSearchHelper: search(message)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message)
-    LLMClient-->>WebSearchHelper: Return focused search query
+    ViewModel->>ViewModel: Validate, add to uiState, lock mutex
+    ViewModel->>WebSearchHelper: search(message, summaries)
+    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
+    Note over WebSearchHelper: Summaries injected as system context
+    LLMClient-->>WebSearchHelper: Return search query
     WebSearchHelper->>WebSearch: search(query)
     WebSearch->>WebSearch: Query web search provider
     WebSearch-->>WebSearchHelper: Return search results
-    WebSearchHelper-->>ViewModel: Return formatted results
-    ViewModel->>ViewModel: Combine message + search results
-    ViewModel->>LLMClient: streamCompletion(combinedContext)
-    LLMClient->>LLMClient: Prepare API request with context
-    LLMClient->>LLMClient: Send to provider
+    WebSearchHelper-->>ViewModel: Raw search results
+    ViewModel->>ViewModel: buildLlmMessages() with Web Data system message
+    ViewModel->>LLMClient: streamCompletion(messages with ## Web Data)
     LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process response
+    ViewModel->>ViewModel: Accumulate and display
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    ViewModel->>LLMClient: generateSummary(question, response)
+    LLMClient-->>ViewModel: Summary JSON
+    ViewModel->>ViewModel: Append to summaries list
+    ViewModel->>ViewModel: Release mutex
     ViewModel->>ChatScreen: Update UI with response
-    ChatScreen-->>User: Display response with citations
+    ChatScreen-->>User: Display final response
 ```
 
 ### 3. Chat with URL Context
@@ -69,17 +84,21 @@ sequenceDiagram
 
     User->>ChatScreen: Type message with URL
     ChatScreen->>ViewModel: onInputChange(message + url)
-    ViewModel->>ViewModel: Detect URL in message
-    ViewModel->>UrlFetcher: fetchUrl(url)
-    UrlFetcher->>UrlFetcher: Make HTTP request to URL
-    UrlFetcher-->>ViewModel: Return webpage content
-    ViewModel->>ViewModel: Extract relevant content from URL
-    ViewModel->>ViewModel: Combine message + URL content
-    ViewModel->>LLMClient: streamCompletion(combinedContext, model, config)
-    LLMClient->>LLMClient: Prepare API request with context
+    ViewModel->>ViewModel: Detect URL, add to uiState, lock mutex
+    ViewModel->>UrlFetcher: fetchAll(urls)
+    UrlFetcher->>UrlFetcher: Fetch each URL
+    UrlFetcher-->>ViewModel: List<FetchedUrl>
+    ViewModel->>ViewModel: buildLlmMessages() with ## Web Data > Fetched URL
+    ViewModel->>LLMClient: streamCompletion(messages with Web Data)
+    LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
     LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process and accumulate response
+    ViewModel->>ViewModel: Accumulate response
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    ViewModel->>LLMClient: generateSummary(question, response)
+    LLMClient-->>ViewModel: Summary JSON
+    ViewModel->>ViewModel: Append to summaries, release mutex
     ViewModel->>ChatScreen: Update UI with response
     ChatScreen-->>User: Display response referencing URL
 ```
@@ -154,24 +173,27 @@ sequenceDiagram
 
     User->>ChatScreen: Type message with URL, enable web search
     ChatScreen->>ViewModel: onInputChange(message + url)
-    ViewModel->>ViewModel: Detect URL and web search enabled
+    ViewModel->>ViewModel: Detect URL, add to uiState, lock mutex
     ViewModel->>UrlFetcher: fetchAll(urls)
     UrlFetcher->>UrlFetcher: Make HTTP requests to URLs
-    UrlFetcher-->>ViewModel: Return webpage content
-    ViewModel->>ViewModel: Extract content from URLs
-    ViewModel->>WebSearchHelper: search(message)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message)
+    UrlFetcher-->>ViewModel: Return List<FetchedUrl>
+    ViewModel->>WebSearchHelper: search(message, summaries)
+    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
     LLMClient-->>WebSearchHelper: Return search query
     WebSearchHelper->>WebSearch: search(query)
     WebSearch->>WebSearch: Query web search provider
     WebSearch-->>WebSearchHelper: Return search results
-    WebSearchHelper-->>ViewModel: Return formatted results
-    ViewModel->>ViewModel: Combine message + URL + search results
-    ViewModel->>LLMClient: streamCompletion(fullContext)
-    LLMClient->>LLMClient: Prepare API request with all context
-    LLMClient->>LLMClient: Send to provider
+    WebSearchHelper-->>ViewModel: Raw search results
+    ViewModel->>ViewModel: buildLlmMessages() with ## Web Data
+    Note over ViewModel: Web Data includes ### Fetched URL + ### Web Search
+    ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process response
+    ViewModel->>ViewModel: Accumulate response
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    ViewModel->>LLMClient: generateSummary(question, response)
+    LLMClient-->>ViewModel: Summary JSON
+    ViewModel->>ViewModel: Append to summaries, release mutex
     ViewModel->>ChatScreen: Update UI with response
     ChatScreen-->>User: Display comprehensive response
 ```
@@ -187,13 +209,14 @@ sequenceDiagram
 
     User->>ChatScreen: Type message and send
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate message
+    ViewModel->>ViewModel: Validate message, lock mutex
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
     Note over LLMClient: Connection timeout or error
     LLMClient-->>ViewModel: Throw exception
-    ViewModel->>ViewModel: Catch exception
+    ViewModel->>ViewModel: Catch exception, no summary generated
+    ViewModel->>ViewModel: Release mutex
     ViewModel->>ChatScreen: Update UI with error message
     ChatScreen-->>User: Display "Error: [exception message]" in chat
 ```
@@ -211,21 +234,24 @@ sequenceDiagram
 
     User->>ChatScreen: Type message about current events
     ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Check web search enabled
-    ViewModel->>WebSearchHelper: search(message)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message)
+    ViewModel->>ViewModel: Validate, lock mutex
+    ViewModel->>WebSearchHelper: search(message, summaries)
+    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
     LLMClient-->>WebSearchHelper: Return search query
     WebSearchHelper->>WebSearch: search(query)
     Note over WebSearch: Invalid API key or network error
     WebSearch-->>WebSearchHelper: Return error
-    WebSearchHelper-->>ViewModel: Return error message
+    WebSearchHelper-->>ViewModel: Error message, no results
     ViewModel->>ViewModel: Set webSearchError in uiState
-    ViewModel->>ViewModel: Continue without web search results
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare API request
-    LLMClient->>LLMClient: Send to provider
+    ViewModel->>ViewModel: buildLlmMessages() without ## Web Search
+    ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process and accumulate response
+    ViewModel->>ViewModel: Accumulate response
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    ViewModel->>LLMClient: generateSummary(question, response)
+    LLMClient-->>ViewModel: Summary JSON
+    ViewModel->>ViewModel: Append to summaries, release mutex
     ViewModel->>ChatScreen: Update UI with response + error pill
     ChatScreen-->>User: Display response with error notification
 ```

@@ -8,9 +8,14 @@ import org.jsoup.Jsoup
 
 private const val TAG = "UrlFetcher"
 
+data class FetchedUrl(
+    val url: String,
+    val content: String
+)
+
 data class UrlFetchResult(
-    val fetchedText: String?,
-    val warnings: List<String>
+    val urls: List<FetchedUrl> = emptyList(),
+    val warnings: List<String> = emptyList()
 )
 
 interface UrlFetcher {
@@ -19,13 +24,13 @@ interface UrlFetcher {
 
     suspend fun fetchAll(urls: List<String>, correlationId: String? = null): UrlFetchResult {
         val warnings = mutableListOf<String>()
-        val results = urls.mapNotNull { url ->
+        val fetched = urls.mapNotNull { url ->
             try {
                 EventLog.info(TAG, "Fetching URL", "URL: $url", correlationId = correlationId)
                 val content = fetchTextContent(url)
                 if (content != null) {
                     EventLog.info(TAG, "Fetch succeeded", "URL: $url\nLength: ${content.length}", correlationId = correlationId)
-                    "Source: $url\n$content"
+                    FetchedUrl(url = url, content = content)
                 } else {
                     EventLog.error(TAG, "Fetch failed", "URL: $url", correlationId = correlationId)
                     warnings.add("Failed to fetch: $url")
@@ -37,8 +42,7 @@ interface UrlFetcher {
                 null
             }
         }
-        val fetchedText = if (results.isNotEmpty()) results.joinToString("\n\n---\n\n") else null
-        return UrlFetchResult(fetchedText, warnings)
+        return UrlFetchResult(urls = fetched, warnings = warnings)
     }
 }
 

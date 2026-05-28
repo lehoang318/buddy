@@ -2,7 +2,7 @@ package com.example.buddy.ext
 
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +63,7 @@ class TavilyWebSearch(
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
                 addProperty("api_key", tavilyKey)
-                addProperty("max_results", LlmDefaults.searchMaxResults)
+                addProperty("max_results", AppResources.search.maxResults)
                 addProperty("search_depth", "basic")
             }
 

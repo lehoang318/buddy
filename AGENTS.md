@@ -54,6 +54,14 @@
 - File attachments: max 100KB, supported extensions: `.txt`, `.md`, `.log`, `.rst`, `.adoc`, `.asciidoc`, `.rtf`, `.json`, `.xml`, `.html`, `.py`, `.js`
 - Image processing: max dimension 1440px, converted to JPEG at 85% quality, Base64-encoded
 - Single attachment only — new attachment replaces previous one
+- Context managed via **structured summarization**: each Q&A exchange is summarized into 2–3 points by a separate LLM call after streaming completes. Points have a `key` boolean for critical decisions.
+- Summaries replace full history — only last N Q&A pairs sent as raw messages (default: 2 pairs, configurable via `max_qa_pairs` in `conversation.xml`)
+- **Mutex-based processing queue**: if user sends a follow-up message before summary generation completes, the new request waits behind the lock until the current turn's summary is done
+- Summaries compressed when exceeding `maxSummaries` (20): oldest half are merged into 1 summary by LLM, key points preserved mechanically
+- **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
+- `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
+- Search query generation receives summaries context for pronoun/reference resolution
+- See `docs/context-management.md` for full details
 
 ## Conventions
 - No comments added to code
@@ -64,6 +72,7 @@
 - `README.md` — project overview and quick start
 - `docs/providers.md` — provider reference (URLs, privacy, status)
 - `docs/dependencies.md` — external library catalog
+- `docs/context-management.md` — history summarization, compression, and Web Data architecture
 - `docs/use-cases.md` — step-by-step user guides
 - `docs/limitations.md` — known technical constraints
 - `docs/seq_chat.md` — chat sequence diagrams

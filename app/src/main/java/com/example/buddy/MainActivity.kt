@@ -21,7 +21,7 @@ import com.example.buddy.crypto.ExaApiKeyInterceptor
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.LlmDefaults
+import com.example.buddy.data.AppResources
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.ext.ExaWebSearch
@@ -81,8 +81,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        LlmDefaults.init(this)
-        EventLog.init(this)
+        AppResources.init(this)
         settingsRepository = SettingsRepository(this)
         keyCache = SessionKeyCache(this)
 

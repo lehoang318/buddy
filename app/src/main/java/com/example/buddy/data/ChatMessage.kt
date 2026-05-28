@@ -12,7 +12,6 @@ data class ChatMessage(
     val attachedFileUri: Uri? = null,
     val attachedFileName: String? = null,
     val attachedFileText: String? = null,
-    val fetchedUrlText: String? = null,
     val isStreaming: Boolean = false,
     val isComplete: Boolean = false,
     val webSearchUsed: Boolean = false,

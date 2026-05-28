@@ -113,6 +113,40 @@ This document outlines the current technical limitations and constraints of the 
 
 ---
 
+## Context Management
+
+### Summarization-Based History
+
+| Aspect | Detail |
+|--------|--------|
+| **Context Strategy** | Structured summarization — each exchange condensed into 2–3 points |
+| **Raw History** | Only last 2 Q&A pairs sent as raw messages (configurable via `max_qa_pairs`) |
+| **Max Summaries** | 20 before compression triggers |
+| **Compression** | Oldest 10 summaries merged into 1; key decisions preserved mechanically |
+| **Summary Points** | Each point has `text` + `key` boolean for critical decisions |
+
+### Context Window Budget (Approximate)
+
+| Component | Tokens |
+|-----------|--------|
+| System prompt | ~50 |
+| Summaries (20 compressed) | ~800 |
+| Web Data (URLs + search) | ~600 |
+| Last 2 Q&A pairs | Variable |
+| Current message | Variable |
+| **Total base (before current turn)** | **~1,500** |
+
+### Known Limitations
+
+- **Summary quality depends on LLM**: if the LLM fails to generate a summary, that exchange is not represented in future context
+- **Key/non-key classification**: the LLM may misclassify points as key or non-key, affecting what is preserved during compression
+- **Key points accumulate**: key points (user decisions, constraints) are never discarded — very long sessions with many key decisions may gradually grow the summary context
+- **No persistent storage**: summaries exist only in-memory during a session; clearing chat or restarting the app loses all summaries
+- **Mutex serialization**: while one message is being summarized, the next message must wait behind the lock — fast follow-up messages may see slight processing delays
+- **No token counting**: the system does not count tokens before sending; though the architecture keeps the base small, unusually long file attachments or search results could still push past a model's context limit
+
+---
+
 ## Platform Limitations
 
 ### Android-Specific Constraints

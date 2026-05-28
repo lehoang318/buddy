@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <integer name="max_summaries">20</integer>
+    <integer name="max_qa_pairs">2</integer>
+    <integer name="min_summary_points">2</integer>
+    <integer name="max_summary_points">3</integer>
+
+    <string name="key_prefix">[KEY] </string>
+    <string name="point_indent">  + </string>
+    <string name="context_header">## Use the context below when relevant:</string>
+    <string name="web_data_header">## Web Data</string>
+
+    <string-array name="restrictive_patterns">
+        <item>strictly prohibited</item>
+        <item>not permitted</item>
+        <item>no terminal commands</item>
+        <item>external tools not</item>
+        <item>only permitted</item>
+        <item>terminal commands and external tools are strictly prohibited</item>
+        <item>pre-approved sources</item>
+        <item>approved source materials</item>
+        <item>no external tools</item>
+        <item>no terminal</item>
+        <item>not allowed</item>
+        <item>sources are not permitted</item>
+    </string-array>
+</resources>
