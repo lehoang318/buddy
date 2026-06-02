@@ -112,7 +112,7 @@ object AppResources {
             return buildString {
                 appendLine(contextHeader)
                 summaries.forEach { summary ->
-                    appendLine("- ${summary.question}")
+                    appendLine("### ${summary.question}")
                     appendLine(formatSummaryAsText(summary))
                 }
             }.trimEnd()
@@ -130,6 +130,56 @@ object AppResources {
         val compressSummaries: String
             get() = res?.getString(R.string.compress_summaries_prompt)
                 ?: "You are a summarizer. Below are multiple conversation summaries that need to be merged into a single compact summary.\n\nProduce a JSON object with %1\$d-%2\$d points summarizing the combined information from all entries.\n\nSummaries to merge:\n%3\$s"
+    }
+
+    object togetherAi {
+        val adjustableEffortModels: Set<String>
+            get() = res?.getStringArray(R.array.together_reasoning_effort_models)?.toSet() ?: emptySet()
+
+        val hybridModels: Set<String>
+            get() = res?.getStringArray(R.array.together_reasoning_hybrid_models)?.toSet() ?: emptySet()
+
+        val effortChatLow: String
+            get() = res?.getString(R.string.together_effort_chat_low) ?: "low"
+        val effortChatHigh: String
+            get() = res?.getString(R.string.together_effort_chat_high) ?: "high"
+        val effortSearch: String
+            get() = res?.getString(R.string.together_effort_search) ?: "low"
+
+        val hybridChatLow: Boolean
+            get() = res?.getBoolean(R.bool.together_hybrid_chat_low) ?: false
+        val hybridChatHigh: Boolean
+            get() = res?.getBoolean(R.bool.together_hybrid_chat_high) ?: true
+        val hybridSearch: Boolean
+            get() = res?.getBoolean(R.bool.together_hybrid_search) ?: false
+    }
+
+    object siliconflow {
+        val reasoningModels: Set<String>
+            get() = res?.getStringArray(R.array.siliconflow_reasoning_models)?.toSet() ?: emptySet()
+
+        val hybridChatLow: Boolean
+            get() = res?.getBoolean(R.bool.siliconflow_hybrid_chat_low) ?: false
+        val hybridChatHigh: Int
+            get() = res?.getInteger(R.integer.siliconflow_hybrid_chat_high) ?: 8192
+        val hybridSearch: Boolean
+            get() = res?.getBoolean(R.bool.siliconflow_hybrid_search) ?: false
+
+        val reasoningChatLow: Int
+            get() = res?.getInteger(R.integer.siliconflow_reasoning_chat_low) ?: 2048
+        val reasoningChatHigh: Int
+            get() = res?.getInteger(R.integer.siliconflow_reasoning_chat_high) ?: 8192
+        val reasoningSearch: Int
+            get() = res?.getInteger(R.integer.siliconflow_reasoning_search) ?: 2048
+    }
+
+    object defaults {
+        val reasoningChatLow: String
+            get() = res?.getString(R.string.default_reasoning_chat_low) ?: "low"
+        val reasoningChatHigh: String
+            get() = res?.getString(R.string.default_reasoning_chat_high) ?: "high"
+        val reasoningSearch: String
+            get() = res?.getString(R.string.default_reasoning_search) ?: "low"
     }
 
     object events {

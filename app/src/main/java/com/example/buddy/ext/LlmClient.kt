@@ -153,7 +153,15 @@ object LlmClientFactory {
                 timeUnit = TimeUnit.MINUTES
             ))
             .build()
-        return OpenAiCompatibleLlmClient.create(provider.baseUrl, model, httpClient)
+        val client: OpenAIClient = when (provider.id) {
+            "together" -> TogetherAIClient(provider.baseUrl, model, httpClient)
+            "fireworks" -> FireworksAIClient(provider.baseUrl, model, httpClient)
+            "openrouter" -> OpenRouterClient(provider.baseUrl, model, httpClient)
+            "ollama" -> OllamaCloudClient(provider.baseUrl, model, httpClient)
+            "siliconflow" -> SiliconFlowClient(provider.baseUrl, model, httpClient)
+            else -> OpenAIClient(provider.baseUrl, model, httpClient)
+        }
+        return Result.success(client)
     }
 
     fun createTempForModels(provider: LlmProvider, keyCache: SessionKeyCache): Result<LlmClient> {

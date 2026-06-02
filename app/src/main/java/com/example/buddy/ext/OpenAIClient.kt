@@ -6,6 +6,7 @@ import com.example.buddy.data.Summary
 import com.example.buddy.data.SummaryPoint
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -21,15 +22,15 @@ import okio.BufferedSource
 
 private const val TAG = "LLM"
 
-class OpenAiCompatibleLlmClient private constructor(
-    private val baseUrl: String,
+open class OpenAIClient internal constructor(
+    protected val baseUrl: String,
     override val defaultModel: String,
-    private val httpClient: OkHttpClient
+    protected val httpClient: OkHttpClient
 ) : LlmClient {
     override var activeModel: String = defaultModel
     override val isReasoningSupported: Boolean = true
 
-    private val gson = Gson()
+    protected val gson = Gson()
 
     private val normalizedBaseUrl: String
         get() = baseUrl.trimEnd('/')
@@ -63,16 +64,7 @@ class OpenAiCompatibleLlmClient private constructor(
             addProperty("max_tokens", config.maxTokens.takeIf { it > 0 } ?: AppResources.llm.maxTokens)
             addProperty("temperature", config.temperature.takeIf { it > 0 } ?: AppResources.llm.temperature)
             addProperty("top_p", config.topP.takeIf { it > 0 } ?: AppResources.llm.topP)
-            if (config.reasoningEffort != null) {
-                val effortStr = when (config.reasoningEffort) {
-                    AppResources.ReasoningEffort.LOW -> "low"
-                    AppResources.ReasoningEffort.HIGH -> "high"
-                    else -> return@apply
-                }
-                add("reasoning", JsonObject().apply {
-                    addProperty("effort", effortStr)
-                })
-            }
+            addReasoningParameter(this, config.reasoningEffort, forSearchQuery = false)
             addProperty("stream", true)
         }
 
@@ -127,7 +119,16 @@ class OpenAiCompatibleLlmClient private constructor(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun detectMultimodalFromApi(modelObj: JsonObject): Boolean {
+    protected open fun addReasoningParameter(requestBody: JsonObject, effort: AppResources.ReasoningEffort?, forSearchQuery: Boolean = false) {
+    }
+
+    protected open fun shouldIncludeModel(modelJson: JsonObject): Boolean {
+        return true
+    }
+
+    protected open fun getModelDisplayName(modelId: String): String = modelId
+
+    protected open fun detectMultimodalFromApi(modelObj: JsonObject): Boolean {
         try {
             val architecture = modelObj.getAsJsonObject("architecture")
             if (architecture != null) {
@@ -162,7 +163,7 @@ class OpenAiCompatibleLlmClient private constructor(
         return false
     }
 
-    private fun detectMultimodalFromId(modelId: String): Boolean {
+    open fun isModelMultimodal(modelId: String): Boolean {
         val id = modelId.lowercase()
         val shortId = id.substringAfterLast('/')
 
@@ -193,13 +194,22 @@ class OpenAiCompatibleLlmClient private constructor(
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return@withContext emptyList()
                     val bodyString = response.body?.string() ?: ""
-                    val json = gson.fromJson(bodyString, JsonObject::class.java)
-                    val data = json.getAsJsonArray("data")
-                    data.map { modelObj ->
+                    val element = gson.fromJson(bodyString, JsonElement::class.java)
+                    val data = when {
+                        element.isJsonArray -> element.asJsonArray
+                        element.isJsonObject && element.asJsonObject.has("data") ->
+                            element.asJsonObject.getAsJsonArray("data")
+                        else -> {
+                            EventLog.warning(TAG, "Unexpected /models response format")
+                            return@withContext emptyList()
+                        }
+                    }
+                    data.mapNotNull { modelObj ->
                         val modelJson = modelObj.asJsonObject
+                        if (!shouldIncludeModel(modelJson)) return@mapNotNull null
                         val id = modelJson.get("id").asString
-                        val isMultimodal = detectMultimodalFromApi(modelJson) || detectMultimodalFromId(id)
-                        LlmModel(id = id, name = id, isMultimodal = isMultimodal)
+                        val isMultimodal = detectMultimodalFromApi(modelJson) || isModelMultimodal(id)
+                        LlmModel(id = id, name = getModelDisplayName(id), isMultimodal = isMultimodal)
                     }.sortedWith(
                         compareByDescending<LlmModel> { it.isMultimodal }
                             .thenBy { it.name }
@@ -238,10 +248,6 @@ class OpenAiCompatibleLlmClient private constructor(
     override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?): String? {
         return withContext(Dispatchers.IO) {
             try {
-                val systemMsg = JsonObject().apply {
-                    addProperty("role", "system")
-                    addProperty("content", AppResources.search.queryPrompt)
-                }
                 val userMsg = JsonObject().apply {
                     addProperty("role", "user")
                     addProperty("content", userMessage)
@@ -250,18 +256,20 @@ class OpenAiCompatibleLlmClient private constructor(
                 val requestBody = JsonObject().apply {
                     addProperty("model", activeModel)
                     add("messages", JsonArray().apply {
-                        add(systemMsg)
-                        if (summaries.isNotEmpty()) {
-                            val contextSummary = JsonObject().apply {
-                                addProperty("role", "system")
-                                addProperty("content", AppResources.summaries.formatSummariesContext(summaries))
-                            }
-                            add(contextSummary)
+                        val systemContent = if (summaries.isNotEmpty()) {
+                            AppResources.search.queryPrompt + "\n\n" + AppResources.summaries.formatSummariesContext(summaries)
+                        } else {
+                            AppResources.search.queryPrompt
                         }
+                        add(JsonObject().apply {
+                            addProperty("role", "system")
+                            addProperty("content", systemContent)
+                        })
                         add(userMsg)
                     })
-                    addProperty("max_tokens", AppResources.search.queryMaxTokens)
+                    addProperty("max_tokens", 4096)
                     addProperty("temperature", AppResources.search.queryTemperature)
+                    addReasoningParameter(this, AppResources.ReasoningEffort.LOW, forSearchQuery = true)
                 }
 
                 EventLog.debug(TAG, "Search query request", gson.toJson(requestBody), correlationId = correlationId)
@@ -282,7 +290,9 @@ class OpenAiCompatibleLlmClient private constructor(
                     val choices = json.getAsJsonArray("choices")
                     if (choices != null && choices.size() > 0) {
                         val message = choices[0].asJsonObject.getAsJsonObject("message")
-                        return@withContext message?.get("content")?.asString?.trim()
+                        val content = message?.get("content")?.asString?.trim()
+                        if (content.isNullOrBlank()) return@withContext null
+                        return@withContext content.take(256)
                     }
                     EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}", correlationId = correlationId)
                     null
@@ -514,16 +524,6 @@ class OpenAiCompatibleLlmClient private constructor(
             LlmRole.USER -> "user"
             LlmRole.ASSISTANT -> "assistant"
             LlmRole.SYSTEM -> "system"
-        }
-    }
-
-    companion object {
-        fun create(baseUrl: String, model: String, httpClient: OkHttpClient): Result<LlmClient> {
-            return try {
-                Result.success(OpenAiCompatibleLlmClient(baseUrl, model, httpClient))
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
         }
     }
 }

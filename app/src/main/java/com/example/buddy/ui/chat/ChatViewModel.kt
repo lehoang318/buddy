@@ -413,15 +413,12 @@ class ChatViewModel(
         searchResults: List<com.example.buddy.ext.SearchResult> = emptyList(),
         fetchedUrls: List<FetchedUrl> = emptyList()
     ): List<LlmMessage> {
-        val result = mutableListOf(
-            LlmMessage(role = LlmRole.SYSTEM, content = AppResources.llm.defaultSystemMessage)
-        )
+        val systemParts = mutableListOf<String>()
+        systemParts.add("## Instructions\n" + AppResources.llm.defaultSystemMessage)
 
         val summaries = _uiState.value.summaries
         if (summaries.isNotEmpty()) {
-            result.add(
-                LlmMessage(role = LlmRole.SYSTEM, content = AppResources.summaries.formatSummariesContext(summaries))
-            )
+            systemParts.add(AppResources.summaries.formatSummariesContext(summaries))
         }
 
         if (fetchedUrls.isNotEmpty() || searchResults.isNotEmpty()) {
@@ -444,10 +441,12 @@ class ChatViewModel(
                 }
             }
 
-            result.add(
-                LlmMessage(role = LlmRole.SYSTEM, content = webParts.joinToString("\n"))
-            )
+            systemParts.add(webParts.joinToString("\n"))
         }
+
+        val result = mutableListOf(
+            LlmMessage(role = LlmRole.SYSTEM, content = systemParts.joinToString("\n\n"))
+        )
 
         val allMessages = _uiState.value.messages
             .filter { it.role != Role.SYSTEM }
