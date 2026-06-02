@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hybrid fallback: enable_thinking (LOW/search) or thinking_budget (HIGH) -->
+    <bool name="siliconflow_hybrid_chat_low">false</bool>
+    <integer name="siliconflow_hybrid_chat_high">8192</integer>
+    <bool name="siliconflow_hybrid_search">false</bool>
+
+    <!-- Reasoning: supports thinking_budget (integer) -->
+    <string-array name="siliconflow_reasoning_models">
+        <item>deepseek-ai/DeepSeek-R1</item>
+        <item>deepseek-ai/DeepSeek-R1-Distill-Qwen-32B</item>
+        <item>deepseek-ai/DeepSeek-R1-Distill-Qwen-14B</item>
+        <item>deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B</item>
+        <item>Qwen/QwQ-32B</item>
+        <item>THUDM/GLM-Z1-32B-0414</item>
+        <item>THUDM/GLM-Z1-9B-0414</item>
+        <item>MiniMaxAI/MiniMax-M2.1</item>
+        <item>MiniMaxAI/MiniMax-M2.5</item>
+        <item>moonshotai/Kimi-K2-Thinking</item>
+        <item>Qwen/Qwen3-235B-A22B-Thinking-2507</item>
+        <item>Qwen/Qwen3-30B-A3B-Thinking-2507</item>
+        <item>Qwen/Qwen3-Next-80B-A3B-Thinking</item>
+        <item>Qwen/Qwen3-Omni-30B-A3B-Thinking</item>
+        <item>Qwen/Qwen3-VL-32B-Thinking</item>
+        <item>Qwen/Qwen3-VL-8B-Thinking</item>
+        <item>Qwen/Qwen3-VL-235B-A22B-Thinking</item>
+        <item>Qwen/Qwen3-VL-30B-A3B-Thinking</item>
+    </string-array>
+    <integer name="siliconflow_reasoning_chat_low">2048</integer>
+    <integer name="siliconflow_reasoning_chat_high">8192</integer>
+    <integer name="siliconflow_reasoning_search">2048</integer>
+</resources>

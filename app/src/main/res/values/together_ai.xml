@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adjustable effort: supports reasoning_effort = "low" / "medium" / "high" -->
+    <string-array name="together_reasoning_effort_models">
+        <item>openai/gpt-oss-120b</item>
+        <item>openai/gpt-oss-20b</item>
+    </string-array>
+    <string name="together_effort_chat_low">low</string>
+    <string name="together_effort_chat_high">high</string>
+    <string name="together_effort_search">low</string>
+
+    <!-- Hybrid: supports reasoning = {"enabled": true / false} -->
+    <string-array name="together_reasoning_hybrid_models">
+        <item>deepseek-ai/DeepSeek-V4-Pro</item>
+        <item>zai-org/GLM-5.1</item>
+        <item>zai-org/GLM-5</item>
+        <item>moonshotai/Kimi-K2.6</item>
+        <item>moonshotai/Kimi-K2.5</item>
+        <item>Qwen/Qwen3.6-Plus</item>
+        <item>Qwen/Qwen3.5-397B-A17B</item>
+        <item>Qwen/Qwen3.5-9B</item>
+        <item>deepcogito/cogito-v2-1-671b</item>
+    </string-array>
+    <bool name="together_hybrid_chat_low">false</bool>
+    <bool name="together_hybrid_chat_high">true</bool>
+    <bool name="together_hybrid_search">false</bool>
+</resources>

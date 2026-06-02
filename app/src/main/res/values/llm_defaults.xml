@@ -12,4 +12,7 @@
     <integer name="log_preview_max_chars">1024</integer>
     <item name="summary_temperature" format="float" type="dimen">0.2</item>
     <integer name="summary_max_tokens">512</integer>
+    <string name="default_reasoning_chat_low">low</string>
+    <string name="default_reasoning_chat_high">high</string>
+    <string name="default_reasoning_search">low</string>
 </resources>

@@ -7,7 +7,7 @@
 
     <string name="key_prefix">[KEY] </string>
     <string name="point_indent">  + </string>
-    <string name="context_header">## Use the context below when relevant:</string>
+    <string name="context_header">## Memory</string>
     <string name="web_data_header">## Web Data</string>
 
     <string-array name="restrictive_patterns">
