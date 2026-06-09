@@ -13,15 +13,15 @@ import com.example.buddy.data.AppResources
 import com.example.buddy.data.Role
 import com.example.buddy.data.Summary
 import com.example.buddy.data.SummaryPoint
-import com.example.buddy.ext.FetchedUrl
-import com.example.buddy.ext.LlmClient
-import com.example.buddy.ext.LlmGenerationConfig
-import com.example.buddy.ext.LlmMessage
-import com.example.buddy.ext.LlmModel
-import com.example.buddy.ext.LlmRole
-import com.example.buddy.ext.UrlFetcher
-import com.example.buddy.ext.WebSearch
-import com.example.buddy.ext.WebSearchHelper
+import com.example.buddy.ext.fetch.FetchedUrl
+import com.example.buddy.ext.fetch.UrlFetcher
+import com.example.buddy.ext.llm.LlmClient
+import com.example.buddy.ext.llm.LlmGenerationConfig
+import com.example.buddy.ext.llm.LlmMessage
+import com.example.buddy.ext.llm.LlmModel
+import com.example.buddy.ext.search.SearchResult
+import com.example.buddy.ext.search.WebSearch
+import com.example.buddy.ext.search.WebSearchHelper
 import com.example.buddy.service.BuddyForegroundService
 import com.example.buddy.service.ServiceHelper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -302,7 +302,7 @@ class ChatViewModel(
         val state = _uiState.value
         val shouldSearch = state.webSearchEnabled && search != null && userMsg.content.isNotBlank()
 
-        var searchResults: List<com.example.buddy.ext.SearchResult> = emptyList()
+        var searchResults: List<SearchResult> = emptyList()
         var searchSkipped = false
 
         if (shouldSearch) {
@@ -410,7 +410,7 @@ class ChatViewModel(
     }
 
     private fun buildLlmMessages(
-        searchResults: List<com.example.buddy.ext.SearchResult> = emptyList(),
+        searchResults: List<SearchResult> = emptyList(),
         fetchedUrls: List<FetchedUrl> = emptyList()
     ): List<LlmMessage> {
         val systemParts = mutableListOf<String>()
@@ -445,7 +445,7 @@ class ChatViewModel(
         }
 
         val result = mutableListOf(
-            LlmMessage(role = LlmRole.SYSTEM, content = systemParts.joinToString("\n\n"))
+            LlmMessage(role = Role.SYSTEM, content = systemParts.joinToString("\n\n"))
         )
 
         val allMessages = _uiState.value.messages
@@ -468,14 +468,14 @@ class ChatViewModel(
 
         val recentPairs = pairs.takeLast(AppResources.summaries.maxQaPairs)
         for (pair in recentPairs) {
-            result.add(LlmMessage(role = LlmRole.USER, content = pair.first.content))
-            result.add(LlmMessage(role = LlmRole.ASSISTANT, content = pair.second.content))
+            result.add(LlmMessage(role = Role.USER, content = pair.first.content))
+            result.add(LlmMessage(role = Role.ASSISTANT, content = pair.second.content))
         }
 
         if (currentUserMsg != null) {
             result.add(
                 LlmMessage(
-                    role = LlmRole.USER,
+                    role = Role.USER,
                     content = buildMessageContent(currentUserMsg),
                     imageBase64 = currentUserMsg.imageBase64
                 )

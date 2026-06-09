@@ -1,8 +1,10 @@
-package com.example.buddy.ext
+package com.example.buddy.ext.search.providers
 
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchResult
+import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -17,17 +19,6 @@ import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "WebSearch"
-
-data class SearchResult(
-    val title: String,
-    val url: String,
-    val content: String
-)
-
-interface WebSearch {
-    suspend fun search(query: String): List<SearchResult>
-    fun isAvailable(): Boolean
-}
 
 class TavilyWebSearch(
     private val keyCache: SessionKeyCache,

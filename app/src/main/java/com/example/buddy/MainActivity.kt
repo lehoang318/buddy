@@ -16,22 +16,18 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.example.buddy.crypto.ApiKeyInterceptor
-import com.example.buddy.crypto.ExaApiKeyInterceptor
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
-import com.example.buddy.ext.ExaWebSearch
-import com.example.buddy.ext.JsoupUrlFetcher
-import com.example.buddy.ext.LinkUpWebSearch
-import com.example.buddy.ext.LlmClient
-import com.example.buddy.ext.LlmClientFactory
-import com.example.buddy.ext.TavilyWebSearch
-import com.example.buddy.ext.UrlFetcher
-import com.example.buddy.ext.WebSearch
+import com.example.buddy.ext.fetch.JsoupUrlFetcher
+import com.example.buddy.ext.fetch.UrlFetcher
+import com.example.buddy.ext.llm.LlmClient
+import com.example.buddy.ext.llm.LlmClientFactory
+import com.example.buddy.ext.search.WebSearch
+import com.example.buddy.ext.search.WebSearchFactory
 import com.example.buddy.service.BackgroundScheduler
 import com.example.buddy.ui.about.AboutScreen
 import com.example.buddy.ui.chat.ChatScreen
@@ -43,9 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
-import okhttp3.ConnectionPool
-import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
+
 
 private const val TAG = "Settings"
 
@@ -142,7 +136,7 @@ class MainActivity : ComponentActivity() {
                     val hasWsKey = keyCache.getKey("ws_${wsProvider.id}")?.also { it.fill(0) } != null
                     if (wsProvider.id != lastWebSearchProvider || (hasWsKey && webSearchFlow.value == null)) {
                         lastWebSearchProvider = wsProvider.id
-                        webSearchFlow.value = if (hasWsKey) createWebSearch(keyCache, wsProvider.id) else null
+                        webSearchFlow.value = if (hasWsKey) WebSearchFactory.create(keyCache, wsProvider.id) else null
                     } else if (!hasWsKey && webSearchFlow.value != null) {
                         lastWebSearchProvider = ""
                         webSearchFlow.value = null
@@ -159,35 +153,6 @@ class MainActivity : ComponentActivity() {
             BuddyTheme {
                 MainContent(llmClientFlow, webSearchFlow, urlFetcherFlow, currentSettingsFlow, settingsRepository, keyCache)
             }
-        }
-    }
-
-    private fun createWebSearch(keyCache: SessionKeyCache, providerId: String): WebSearch? {
-        return when (providerId) {
-            "linkup" -> {
-                val httpClient = OkHttpClient.Builder()
-                    .addInterceptor(ApiKeyInterceptor(keyCache, "ws_$providerId"))
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
-                    .pingInterval(30, TimeUnit.SECONDS)
-                    .retryOnConnectionFailure(true)
-                    .connectionPool(ConnectionPool(3, 3, TimeUnit.MINUTES))
-                    .build()
-                LinkUpWebSearch(httpClient, keyCache, "ws_$providerId")
-            }
-            "exa" -> {
-                val httpClient = OkHttpClient.Builder()
-                    .addInterceptor(ExaApiKeyInterceptor(keyCache, "ws_$providerId"))
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
-                    .pingInterval(30, TimeUnit.SECONDS)
-                    .retryOnConnectionFailure(true)
-                    .connectionPool(ConnectionPool(3, 3, TimeUnit.MINUTES))
-                    .build()
-                ExaWebSearch(httpClient, keyCache, "ws_$providerId")
-            }
-            "tavily" -> TavilyWebSearch(keyCache, "ws_$providerId")
-            else -> null
         }
     }
 }

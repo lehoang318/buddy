@@ -1,6 +1,7 @@
-package com.example.buddy.ext
+package com.example.buddy.ext.llm.providers
 
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.llm.OpenAIClient
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import okhttp3.OkHttpClient

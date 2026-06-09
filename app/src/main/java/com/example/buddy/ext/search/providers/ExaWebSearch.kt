@@ -1,7 +1,10 @@
-package com.example.buddy.ext
+package com.example.buddy.ext.search.providers
 
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
+import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchResult
+import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
@@ -15,7 +18,7 @@ import java.net.SocketTimeoutException
 
 private const val TAG = "WebSearch"
 
-class LinkUpWebSearch(
+class ExaWebSearch(
     private val httpClient: OkHttpClient,
     private val keyCache: SessionKeyCache,
     private val providerId: String
@@ -32,13 +35,16 @@ class LinkUpWebSearch(
     override suspend fun search(query: String): List<SearchResult> {
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
-                addProperty("q", query)
-                addProperty("depth", "standard")
-                addProperty("outputType", "searchResults")
+                addProperty("query", query)
+                addProperty("numResults", AppResources.search.maxResults)
+                addProperty("type", "auto")
+                add("contents", JsonObject().apply {
+                    addProperty("text", true)
+                })
             }
 
             val request = Request.Builder()
-                .url("https://api.linkup.so/v1/search")
+                .url("https://api.exa.ai/search")
                 .header("Content-Type", "application/json")
                 .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
                 .build()
@@ -52,8 +58,8 @@ class LinkUpWebSearch(
                         if (!response.isSuccessful) {
                             val errorBody = response.body?.string() ?: ""
                             val errorMsg = when (response.code) {
-                                401, 403 -> "Invalid LinkUp API key"
-                                429 -> "LinkUp usage limit exceeded"
+                                401, 403 -> "Invalid Exa API key"
+                                429 -> "Exa usage limit exceeded"
                                 else -> "Web search failed: HTTP ${response.code}"
                             }
                             EventLog.error(TAG, "Search failed", "Query: $query\nCode: ${response.code}\nError: $errorMsg\nBody: $errorBody")
@@ -61,14 +67,20 @@ class LinkUpWebSearch(
                         }
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
-                        val searchResults = json.getAsJsonArray("results")
+                        val results = json.getAsJsonArray("results")
                             ?: throw Exception("Missing 'results' array in response")
-                        return@withContext searchResults.map { resultObj ->
+                        return@withContext results.map { resultObj ->
                             val obj = resultObj.asJsonObject
+                            val textElement = obj.get("text")
+                            val content = when {
+                                textElement?.isJsonObject == true -> textElement.asJsonObject.get("text")?.asString ?: ""
+                                textElement?.isJsonPrimitive == true -> textElement.asString
+                                else -> ""
+                            }
                             SearchResult(
-                                title = obj.get("name")?.asString ?: "",
+                                title = obj.get("title")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = obj.get("content")?.asString ?: ""
+                                content = content
                             )
                         }
                     }

@@ -1,9 +1,10 @@
-package com.example.buddy.crypto
+package com.example.buddy.ext.search.providers
 
+import com.example.buddy.crypto.SessionKeyCache
 import okhttp3.Interceptor
 import okhttp3.Response
 
-class ApiKeyInterceptor(
+class ExaApiKeyInterceptor(
     private val keyCache: SessionKeyCache,
     private val providerId: String
 ) : Interceptor {
@@ -16,7 +17,7 @@ class ApiKeyInterceptor(
         keyBytes.fill(0)
 
         val request = chain.request().newBuilder()
-            .header("Authorization", "Bearer $keyString")
+            .header("x-api-key", keyString)
             .build()
         return chain.proceed(request)
     }

@@ -1,8 +1,9 @@
-package com.example.buddy.ext
+package com.example.buddy.ext.llm
 
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
 import com.example.buddy.data.Summary
+import com.example.buddy.data.Role
 import com.example.buddy.data.SummaryPoint
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -519,11 +520,11 @@ open class OpenAIClient internal constructor(
         }
     }
 
-    private fun LlmRole.toApiRole(): String {
+    private fun Role.toApiRole(): String {
         return when (this) {
-            LlmRole.USER -> "user"
-            LlmRole.ASSISTANT -> "assistant"
-            LlmRole.SYSTEM -> "system"
+            Role.USER -> "user"
+            Role.ASSISTANT -> "assistant"
+            Role.SYSTEM -> "system"
         }
     }
 }

@@ -2,8 +2,6 @@ package com.example.buddy.data
 
 import android.net.Uri
 
-enum class Role { USER, ASSISTANT, SYSTEM }
-
 data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
     val role: Role,

@@ -10,19 +10,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -37,9 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,10 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.BuiltInProviders
@@ -65,15 +54,15 @@ import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmProvider
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
-import com.example.buddy.ext.LlmClientFactory
-import com.example.buddy.ext.LlmModel
+import com.example.buddy.ext.llm.LlmClientFactory
+import com.example.buddy.ext.llm.LlmModel
+import com.example.buddy.ui.components.SliderWithLabel
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 private const val TAG = "Settings"
 
@@ -573,282 +562,5 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ApiKeyConnectDialog(
-    title: String,
-    initialApiKey: String,
-    isConnecting: Boolean,
-    error: String?,
-    onDismiss: () -> Unit,
-    onConnect: (String) -> Unit
-) {
-    var apiKey by remember { mutableStateOf(initialApiKey) }
-    var showKey by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = { if (!isConnecting) onDismiss() },
-        title = { Text(title, color = MaterialTheme.colorScheme.onSurface) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("API Key") },
-                    placeholder = { Text("sk-...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { showKey = !showKey }) {
-                            Icon(
-                                imageVector = if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle API Key visibility",
-                                tint = SendButton
-                            )
-                        }
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextColor,
-                        unfocusedTextColor = TextColor,
-                        focusedContainerColor = SurfaceVariant,
-                        unfocusedContainerColor = SurfaceVariant,
-                        focusedBorderColor = SendButton,
-                        unfocusedBorderColor = Outline,
-                        focusedLabelColor = SendButton,
-                        unfocusedLabelColor = OnSurfaceVariant
-                    )
-                )
-                if (error != null) {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConnect(apiKey) },
-                enabled = apiKey.isNotBlank() && !isConnecting
-            ) {
-                if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = SendButton,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Connect")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isConnecting
-            ) {
-                Text("Cancel")
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface
-    )
-}
-
-@Composable
-private fun AddProviderDialog(
-    onDismiss: () -> Unit,
-    isConnecting: Boolean,
-    error: String?,
-    onConnect: (LlmProvider) -> Unit
-) {
-    val providerId by remember { mutableStateOf("custom_${UUID.randomUUID().toString().take(8)}") }
-    var name by remember { mutableStateOf("") }
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = { if (!isConnecting) onDismiss() },
-        title = { Text("Add Custom Provider", color = MaterialTheme.colorScheme.onSurface) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Provider Name") },
-                    placeholder = { Text("My Provider") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextColor,
-                        unfocusedTextColor = TextColor,
-                        focusedContainerColor = SurfaceVariant,
-                        unfocusedContainerColor = SurfaceVariant,
-                        focusedBorderColor = SendButton,
-                        unfocusedBorderColor = Outline,
-                        focusedLabelColor = SendButton,
-                        unfocusedLabelColor = OnSurfaceVariant
-                    )
-                )
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    label = { Text("Base URL") },
-                    placeholder = { Text("https://api.example.com/v1") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextColor,
-                        unfocusedTextColor = TextColor,
-                        focusedContainerColor = SurfaceVariant,
-                        unfocusedContainerColor = SurfaceVariant,
-                        focusedBorderColor = SendButton,
-                        unfocusedBorderColor = Outline,
-                        focusedLabelColor = SendButton,
-                        unfocusedLabelColor = OnSurfaceVariant
-                    )
-                )
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("API Key") },
-                    placeholder = { Text("sk-...") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextColor,
-                        unfocusedTextColor = TextColor,
-                        focusedContainerColor = SurfaceVariant,
-                        unfocusedContainerColor = SurfaceVariant,
-                        focusedBorderColor = SendButton,
-                        unfocusedBorderColor = Outline,
-                        focusedLabelColor = SendButton,
-                        unfocusedLabelColor = OnSurfaceVariant
-                    )
-                )
-                if (error != null) {
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConnect(
-                        LlmProvider(
-                            id = providerId,
-                            name = name.ifBlank { "Custom ($providerId)" },
-                            baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" },
-                            apiKey = apiKey
-                        )
-                    )
-                },
-                enabled = (name.isNotBlank() || baseUrl.isNotBlank()) && apiKey.isNotBlank() && !isConnecting
-            ) {
-                if (isConnecting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = SendButton,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("Connect")
-                }
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurface
-    )
-}
-
-@Composable
-private fun SliderWithLabel(
-    label: String,
-    tooltip: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit,
-    valueDisplay: String
-) {
-    var showTooltip by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(label, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
-                IconButton(
-                    onClick = { showTooltip = !showTooltip },
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = "Tooltip for $label",
-                        tint = OnSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-            Text(valueDisplay, color = SendButton, style = MaterialTheme.typography.labelMedium)
-        }
-
-        if (showTooltip) {
-            Surface(
-                color = SurfaceVariant,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    tooltip,
-                    color = OnSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-        }
-
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = SendButton,
-                activeTrackColor = SendButton,
-                inactiveTrackColor = Outline
-            )
-        )
     }
 }

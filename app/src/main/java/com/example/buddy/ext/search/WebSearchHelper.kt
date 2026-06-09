@@ -1,8 +1,9 @@
-package com.example.buddy.ext
+package com.example.buddy.ext.search
 
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
 import com.example.buddy.data.Summary
+import com.example.buddy.ext.llm.LlmClient
 
 private const val TAG = "WebSearch"
 
@@ -11,14 +12,14 @@ class WebSearchHelper(
     private val webSearch: WebSearch
 ) {
 
-    data class SearchResult(
-        val rawResults: List<com.example.buddy.ext.SearchResult> = emptyList(),
+    data class WebSearchOutcome(
+        val rawResults: List<SearchResult> = emptyList(),
         val resultsText: String? = null,
         val errorMessage: String? = null,
         val skipped: Boolean = false
     )
 
-    suspend fun search(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): SearchResult {
+    suspend fun search(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): WebSearchOutcome {
         val cleanInput = userMessage
             .replace(Regex("""https?://\S+"""), "")
             .trim()
@@ -29,7 +30,7 @@ class WebSearchHelper(
             val searchQuery = llmClient.generateSearchQuery(cleanInput, summaries, correlationId)
             if (searchQuery == null) {
                 EventLog.info(TAG, "Search skipped", "Query generation returned null (NO_QUERY or sanitization failed)", correlationId = correlationId)
-                return SearchResult(skipped = true)
+                return WebSearchOutcome(skipped = true)
             }
             EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(AppResources.search.logPreviewMaxChars)}", correlationId = correlationId)
 
@@ -46,13 +47,13 @@ class WebSearchHelper(
 
             if (results.isEmpty()) {
                 EventLog.warning(TAG, "Search returned no results", "Query: $searchQuery")
-                SearchResult(errorMessage = "Web search returned no results")
+                WebSearchOutcome(errorMessage = "Web search returned no results")
             } else {
-                SearchResult(rawResults = results, resultsText = resultsText)
+                WebSearchOutcome(rawResults = results, resultsText = resultsText)
             }
         } catch (e: Exception) {
             EventLog.error(TAG, "Search failed", e.message, correlationId = correlationId)
-            SearchResult(errorMessage = e.message)
+            WebSearchOutcome(errorMessage = e.message)
         }
     }
 }

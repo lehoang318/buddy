@@ -16,7 +16,7 @@
     </string-array>
     <string-array name="llm_provider_urls">
         <item>https://api.fireworks.ai/inference/v1</item>
-        <item>https://api.together.xyz/v1</item>
+        <item>https://api.together.ai/v1</item>
         <item>https://ollama.com/v1/</item>
         <item>https://openrouter.ai/api/v1</item>
         <item>https://api.siliconflow.com/v1</item>
