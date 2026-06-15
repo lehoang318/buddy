@@ -14,13 +14,24 @@ import kotlin.concurrent.write
 
 class SessionKeyCache(context: Context) {
 
-    private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
-        PREF_FILE_NAME,
-        MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
-        context,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private val prefs: SharedPreferences = try {
+        EncryptedSharedPreferences.create(
+            PREF_FILE_NAME,
+            MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (e: Exception) {
+        context.deleteSharedPreferences(PREF_FILE_NAME)
+        EncryptedSharedPreferences.create(
+            PREF_FILE_NAME,
+            MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
 
     private val cache = ConcurrentHashMap<String, ByteArray>()
     private val lock = ReentrantReadWriteLock()

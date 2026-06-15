@@ -36,6 +36,41 @@ open class OpenAIClient internal constructor(
     private val normalizedBaseUrl: String
         get() = baseUrl.trimEnd('/')
 
+    private fun executeStreamingRequest(requestBody: JsonObject): String? {
+        requestBody.addProperty("stream", true)
+
+        val request = Request.Builder()
+            .url("$normalizedBaseUrl/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
+            .build()
+
+        return httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val source: BufferedSource = response.body!!.source()
+            val content = StringBuilder()
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line()?.trim() ?: break
+                if (line.isEmpty() || !line.startsWith("data:")) continue
+                val data = line.removePrefix("data:").trim()
+                if (data == "[DONE]") break
+                try {
+                    val json = gson.fromJson(data, JsonObject::class.java)
+                    val choices = json.getAsJsonArray("choices")
+                    if (choices != null && choices.size() > 0) {
+                        val delta = choices[0].asJsonObject.getAsJsonObject("delta")
+                        if (delta != null && delta.has("content") && !delta.get("content").isJsonNull) {
+                            val chunk = delta.get("content").asString
+                            if (!chunk.isNullOrEmpty()) content.append(chunk)
+                        }
+                    }
+                } catch (_: Exception) { }
+            }
+            content.toString().takeIf { it.isNotBlank() }
+        }
+    }
+
     override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> = flow {
         val apiMessages = messages.map { msg ->
             val messageObj = JsonObject()
@@ -257,10 +292,11 @@ open class OpenAIClient internal constructor(
                 val requestBody = JsonObject().apply {
                     addProperty("model", activeModel)
                     add("messages", JsonArray().apply {
+                        val limitNote = "\n\nYour response must be under ${AppResources.search.queryMaxTokens} tokens."
                         val systemContent = if (summaries.isNotEmpty()) {
-                            AppResources.search.queryPrompt + "\n\n" + AppResources.summaries.formatSummariesContext(summaries)
+                            AppResources.search.queryPrompt + limitNote + "\n\n" + AppResources.summaries.formatSummariesContext(summaries)
                         } else {
-                            AppResources.search.queryPrompt
+                            AppResources.search.queryPrompt + limitNote
                         }
                         add(JsonObject().apply {
                             addProperty("role", "system")
@@ -275,29 +311,12 @@ open class OpenAIClient internal constructor(
 
                 EventLog.debug(TAG, "Search query request", gson.toJson(requestBody), correlationId = correlationId)
 
-                val request = Request.Builder()
-                    .url("$normalizedBaseUrl/chat/completions")
-                    .header("Content-Type", "application/json")
-                    .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        EventLog.warning(TAG, "Failed to generate search query (code: ${response.code})", correlationId = correlationId)
-                        return@withContext null
-                    }
-                    val bodyString = response.body?.string() ?: ""
-                    val json = gson.fromJson(bodyString, JsonObject::class.java)
-                    val choices = json.getAsJsonArray("choices")
-                    if (choices != null && choices.size() > 0) {
-                        val message = choices[0].asJsonObject.getAsJsonObject("message")
-                        val content = message?.get("content")?.asString?.trim()
-                        if (content.isNullOrBlank()) return@withContext null
-                        return@withContext content.take(256)
-                    }
-                    EventLog.debug(TAG, "Search query no choices", "Body: ${bodyString.take(500)}", correlationId = correlationId)
-                    null
+                val content = executeStreamingRequest(requestBody)
+                if (content == null) {
+                    EventLog.warning(TAG, "Failed to generate search query", correlationId = correlationId)
+                    return@withContext null
                 }
+                return@withContext content.take(AppResources.search.queryMaxTokens)
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate search query", e.message, correlationId = correlationId)
                 null
@@ -313,7 +332,8 @@ open class OpenAIClient internal constructor(
 
                 val systemMsg = JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", AppResources.prompts.summarizerSystem.format(AppResources.summaries.minPoints, AppResources.summaries.maxPoints))
+                    addProperty("content", AppResources.prompts.summarizerSystem.format(AppResources.summaries.minPoints, AppResources.summaries.maxPoints) +
+                        "\n\nYour response must fit within ${AppResources.summaries.maxTokens} tokens maximum.")
                 }
                 val userMsg = JsonObject().apply {
                     addProperty("role", "user")
@@ -331,73 +351,77 @@ open class OpenAIClient internal constructor(
                     add("response_format", JsonObject().apply {
                         addProperty("type", "json_object")
                     })
+                    addReasoningParameter(this, null, forSearchQuery = false)
                 }
 
                 EventLog.debug(TAG, "Summary generation request", correlationId = null)
 
-                val request = Request.Builder()
-                    .url("$normalizedBaseUrl/chat/completions")
-                    .header("Content-Type", "application/json")
-                    .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
-                    .build()
+                val content = executeStreamingRequest(requestBody)
+                if (content == null) {
+                    EventLog.warning(TAG, "Failed to generate summary")
+                    return@withContext Summary(question = userQuestion, points = emptyList())
+                }
 
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        EventLog.warning(TAG, "Failed to generate summary (code: ${response.code})")
-                        return@withContext Summary(question = userQuestion, points = emptyList())
-                    }
-                    val bodyString = response.body?.string() ?: ""
-                    val json = gson.fromJson(bodyString, JsonObject::class.java)
-                    val choices = json.getAsJsonArray("choices")
-                    if (choices != null && choices.size() > 0) {
-                        val message = choices[0].asJsonObject.getAsJsonObject("message")
-                        val content = message?.get("content")?.asString
-                        if (content != null) {
-                            try {
-                                val parsed = try {
-                                    gson.fromJson(content, JsonObject::class.java)
-                                } catch (_: Exception) {
-                                    try {
-                                        val array = gson.fromJson(content, JsonArray::class.java)
-                                        JsonObject().apply { add("points", array) }
-                                    } catch (_: Exception) {
-                                        val text = try {
-                                            gson.fromJson(content, String::class.java)
-                                        } catch (_: Exception) {
-                                            content.takeIf { it.isNotBlank() }
-                                        }
-                                        if (text != null && text.isNotBlank()) {
-                                            JsonObject().apply {
-                                                add("points", JsonArray().apply {
-                                                    add(JsonObject().apply {
-                                                        addProperty("text", text)
-                                                        addProperty("key", false)
-                                                    })
-                                                })
-                                            }
-                                        } else {
-                                            null
-                                        }
-                                    }
+                val cleanContent = content.trim()
+                    .removePrefix("```json\n")
+                    .removePrefix("```json")
+                    .removePrefix("```\n")
+                    .removePrefix("```")
+                    .removeSuffix("\n```")
+                    .removeSuffix("```")
+                    .trim()
+                    .let { if (it.startsWith("\"") && it.endsWith("\"")) it.removeSurrounding("\"") else it }
+
+                try {
+                    val parsed = try {
+                        gson.fromJson(cleanContent, JsonObject::class.java)
+                    } catch (_: Exception) {
+                        try {
+                            val array = gson.fromJson(cleanContent, JsonArray::class.java)
+                            JsonObject().apply { add("points", array) }
+                        } catch (_: Exception) {
+                            val text = try {
+                                gson.fromJson(cleanContent, String::class.java)
+                            } catch (_: Exception) {
+                                cleanContent.takeIf { it.isNotBlank() }
+                            }
+                            if (text != null && text.isNotBlank()) {
+                                JsonObject().apply {
+                                    add("points", JsonArray().apply {
+                                        add(JsonObject().apply {
+                                            addProperty("text", text)
+                                            addProperty("key", false)
+                                        })
+                                    })
                                 }
-                                val pointsArray = parsed?.getAsJsonArray("points") ?: throw Exception("Missing points array")
-                                val points = pointsArray.mapNotNull { elem ->
-                                    val obj = elem.asJsonObject
-                                    val text = obj.get("text")?.asString
-                                    if (text.isNullOrBlank()) return@mapNotNull null
-                                    SummaryPoint(text = text, key = obj.get("key")?.asBoolean ?: false)
-                                }
-                                val sanitized = AppResources.summaries.sanitizeSummaryPoints(points)
-                                EventLog.debug(TAG, "Summary generated",
-                                    "Question: ${userQuestion.take(200)}\nPoints: ${sanitized.size}\n" +
-                                    sanitized.joinToString("\n") { "${if (it.key) "[KEY] " else ""}${it.text}" })
-                                return@withContext Summary(question = userQuestion, points = sanitized)
-                            } catch (e: Exception) {
-                                EventLog.warning(TAG, "Failed to parse summary JSON", e.message)
+                            } else {
+                                null
                             }
                         }
                     }
-                    Summary(question = userQuestion, points = emptyList())
+                    val pointsArray = parsed?.getAsJsonArray("points") ?: throw Exception("Missing points array")
+                    val points = pointsArray.mapNotNull { elem ->
+                        if (elem.isJsonObject) {
+                            val obj = elem.asJsonObject
+                            val text = obj.get("text")?.asString
+                            if (text.isNullOrBlank()) return@mapNotNull null
+                            SummaryPoint(text = text, key = obj.get("key")?.asBoolean ?: false)
+                        } else if (elem.isJsonPrimitive) {
+                            val text = elem.asString
+                            if (text.isBlank()) return@mapNotNull null
+                            SummaryPoint(text = text, key = false)
+                        } else {
+                            null
+                        }
+                    }
+                    val sanitized = AppResources.summaries.sanitizeSummaryPoints(points)
+                    EventLog.debug(TAG, "Summary generated",
+                        "Question: ${userQuestion.take(200)}\nPoints: ${sanitized.size}\n" +
+                        sanitized.joinToString("\n") { "${if (it.key) "[KEY] " else ""}${it.text}" })
+                    return@withContext Summary(question = userQuestion, points = sanitized)
+                } catch (e: Exception) {
+                    EventLog.warning(TAG, "Failed to parse summary JSON", e.message)
+                    return@withContext Summary(question = userQuestion, points = emptyList())
                 }
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate summary", e.message)
@@ -432,7 +456,7 @@ open class OpenAIClient internal constructor(
 
                 val systemMsg = JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", prompt)
+                    addProperty("content", prompt + "\n\nYour response must fit within ${AppResources.summaries.maxTokens} tokens maximum.")
                 }
 
                 val requestBody = JsonObject().apply {
@@ -445,73 +469,77 @@ open class OpenAIClient internal constructor(
                     add("response_format", JsonObject().apply {
                         addProperty("type", "json_object")
                     })
+                    addReasoningParameter(this, null, forSearchQuery = false)
                 }
 
                 EventLog.debug(TAG, "Summary compression request", "Compressing ${summariesToCompress.size} summaries")
 
-                val request = Request.Builder()
-                    .url("$normalizedBaseUrl/chat/completions")
-                    .header("Content-Type", "application/json")
-                    .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
-                    .build()
+                val content = executeStreamingRequest(requestBody)
+                if (content == null) {
+                    EventLog.warning(TAG, "Failed to compress summaries")
+                    return@withContext Summary(question = "Earlier conversation", points = keyPoints)
+                }
 
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        EventLog.warning(TAG, "Failed to compress summaries (code: ${response.code})")
-                        return@withContext Summary(question = "Earlier conversation", points = keyPoints)
-                    }
-                    val bodyString = response.body?.string() ?: ""
-                    val json = gson.fromJson(bodyString, JsonObject::class.java)
-                    val choices = json.getAsJsonArray("choices")
-                    if (choices != null && choices.size() > 0) {
-                        val message = choices[0].asJsonObject.getAsJsonObject("message")
-                        val content = message?.get("content")?.asString
-                        if (content != null) {
-                            try {
-                                val parsed = try {
-                                    gson.fromJson(content, JsonObject::class.java)
-                                } catch (_: Exception) {
-                                    try {
-                                        val array = gson.fromJson(content, JsonArray::class.java)
-                                        JsonObject().apply { add("points", array) }
-                                    } catch (_: Exception) {
-                                        val text = try {
-                                            gson.fromJson(content, String::class.java)
-                                        } catch (_: Exception) {
-                                            content.takeIf { it.isNotBlank() }
-                                        }
-                                        if (text != null && text.isNotBlank()) {
-                                            JsonObject().apply {
-                                                add("points", JsonArray().apply {
-                                                    add(JsonObject().apply {
-                                                        addProperty("text", text)
-                                                        addProperty("key", false)
-                                                    })
-                                                })
-                                            }
-                                        } else {
-                                            null
-                                        }
-                                    }
+                val cleanContent = content.trim()
+                    .removePrefix("```json\n")
+                    .removePrefix("```json")
+                    .removePrefix("```\n")
+                    .removePrefix("```")
+                    .removeSuffix("\n```")
+                    .removeSuffix("```")
+                    .trim()
+                    .let { if (it.startsWith("\"") && it.endsWith("\"")) it.removeSurrounding("\"") else it }
+
+                try {
+                    val parsed = try {
+                        gson.fromJson(cleanContent, JsonObject::class.java)
+                    } catch (_: Exception) {
+                        try {
+                            val array = gson.fromJson(cleanContent, JsonArray::class.java)
+                            JsonObject().apply { add("points", array) }
+                        } catch (_: Exception) {
+                            val text = try {
+                                gson.fromJson(cleanContent, String::class.java)
+                            } catch (_: Exception) {
+                                cleanContent.takeIf { it.isNotBlank() }
+                            }
+                            if (text != null && text.isNotBlank()) {
+                                JsonObject().apply {
+                                    add("points", JsonArray().apply {
+                                        add(JsonObject().apply {
+                                            addProperty("text", text)
+                                            addProperty("key", false)
+                                        })
+                                    })
                                 }
-                                val pointsArray = parsed?.getAsJsonArray("points") ?: throw Exception("Missing points array")
-                                val llmPoints = pointsArray.mapNotNull { elem ->
-                                    val obj = elem.asJsonObject
-                                    val text = obj.get("text")?.asString
-                                    if (text.isNullOrBlank()) return@mapNotNull null
-                                    SummaryPoint(text = text, key = false)
-                                }
-                                val combined = llmPoints + keyPoints
-                                val sanitized = AppResources.summaries.sanitizeSummaryPoints(combined)
-                                EventLog.debug(TAG, "Summary compression completed",
-                                    "LLM points: ${llmPoints.size}, Key points retained: ${keyPoints.size}, Combined: ${combined.size}")
-                                return@withContext Summary(question = "Earlier conversation", points = sanitized)
-                            } catch (e: Exception) {
-                                EventLog.warning(TAG, "Failed to parse compressed summary JSON", e.message)
+                            } else {
+                                null
                             }
                         }
                     }
-                    Summary(question = "Earlier conversation", points = keyPoints)
+                    val pointsArray = parsed?.getAsJsonArray("points") ?: throw Exception("Missing points array")
+                    val llmPoints = pointsArray.mapNotNull { elem ->
+                        if (elem.isJsonObject) {
+                            val obj = elem.asJsonObject
+                            val text = obj.get("text")?.asString
+                            if (text.isNullOrBlank()) return@mapNotNull null
+                            SummaryPoint(text = text, key = false)
+                        } else if (elem.isJsonPrimitive) {
+                            val text = elem.asString
+                            if (text.isBlank()) return@mapNotNull null
+                            SummaryPoint(text = text, key = false)
+                        } else {
+                            null
+                        }
+                    }
+                    val combined = llmPoints + keyPoints
+                    val sanitized = AppResources.summaries.sanitizeSummaryPoints(combined)
+                    EventLog.debug(TAG, "Summary compression completed",
+                        "LLM points: ${llmPoints.size}, Key points retained: ${keyPoints.size}, Combined: ${combined.size}")
+                    return@withContext Summary(question = "Earlier conversation", points = sanitized)
+                } catch (e: Exception) {
+                    EventLog.warning(TAG, "Failed to parse compressed summary JSON", e.message)
+                    return@withContext Summary(question = "Earlier conversation", points = keyPoints)
                 }
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to compress summaries", e.message)

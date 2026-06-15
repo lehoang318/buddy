@@ -39,7 +39,7 @@ class TogetherAIClient(
                     forSearchQuery -> AppResources.togetherAi.hybridSearch
                     effort == AppResources.ReasoningEffort.LOW -> AppResources.togetherAi.hybridChatLow
                     effort == AppResources.ReasoningEffort.HIGH -> AppResources.togetherAi.hybridChatHigh
-                    else -> return
+                    else -> false
                 }
                 requestBody.add("reasoning", JsonObject().apply {
                     addProperty("enabled", enabled)

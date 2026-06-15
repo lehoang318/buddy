@@ -444,6 +444,8 @@ class ChatViewModel(
             systemParts.add(webParts.joinToString("\n"))
         }
 
+        systemParts.add("## Output Limit\nYour response may not exceed ${AppResources.llm.maxTokens} tokens.")
+
         val result = mutableListOf(
             LlmMessage(role = Role.SYSTEM, content = systemParts.joinToString("\n\n"))
         )
