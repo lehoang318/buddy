@@ -31,9 +31,23 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import com.example.buddy.LocalLlmClient
 import com.example.buddy.LocalUrlFetcher
 import com.example.buddy.LocalWebSearch
+import com.example.buddy.data.Role
+import kotlinx.coroutines.launch
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,11 +75,21 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val keyboard = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(state.messages.size) {
-        if (state.messages.isNotEmpty()) {
-            listState.animateScrollToItem(state.messages.lastIndex)
+    val userMessageIndices by remember(state.messages) {
+        derivedStateOf {
+            state.messages.mapIndexedNotNull { index, msg ->
+                if (msg.role == Role.USER) index + 1 else null
+            }
         }
     }
+
+    val isScrollable by remember {
+        derivedStateOf {
+            listState.canScrollForward || listState.canScrollBackward
+        }
+    }
+
+    val scope = rememberCoroutineScope()
 
     val context = LocalContext.current
     val attachmentPickerLauncher = rememberLauncherForActivityResult(
@@ -167,32 +191,89 @@ fun ChatScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            state = listState,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
+                .padding(horizontal = 12.dp)
         ) {
-            item {
-                DayLabel("Today")
-            }
-            items(state.messages, key = { it.id }) { msg ->
-                MessageRow(message = msg)
-            }
-            if (state.isLoading) {
-                item { TypingIndicator() }
-            }
-            state.urlFetchWarnings.forEach { warning ->
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
                 item {
-                    UrlFetchWarningPill(warning = warning)
+                    DayLabel("Today")
+                }
+                items(state.messages, key = { it.id }) { msg ->
+                    MessageRow(message = msg)
+                }
+                if (state.isLoading) {
+                    item { TypingIndicator() }
+                }
+                state.urlFetchWarnings.forEach { warning ->
+                    item {
+                        UrlFetchWarningPill(warning = warning)
+                    }
+                }
+                state.webSearchError?.let { error ->
+                    item {
+                        WebSearchErrorPill(error = error)
+                    }
                 }
             }
-            state.webSearchError?.let { error ->
-                item {
-                    WebSearchErrorPill(error = error)
+
+            if (isScrollable && userMessageIndices.isNotEmpty()) {
+                val lastUserIndex = userMessageIndices.last()
+                val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+                val topIndex = listState.firstVisibleItemIndex
+                val canGoUp = userMessageIndices.first() < topIndex
+                val canGoDown = lastVisibleItemIndex < lastUserIndex
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 16.dp, end = 4.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            val topIdx = listState.firstVisibleItemIndex
+                            val pos = userMessageIndices.indexOfFirst { it >= topIdx }.let { if (it >= 0) it else userMessageIndices.lastIndex }
+                            if (pos > 0) {
+                                scope.launch {
+                                    listState.animateScrollToItem(userMessageIndices[pos - 1])
+                                }
+                            } else if (userMessageIndices.isNotEmpty() && userMessageIndices[0] < topIdx) {
+                                scope.launch {
+                                    listState.animateScrollToItem(userMessageIndices[0])
+                                }
+                            }
+                        },
+                        enabled = canGoUp,
+                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Previous",
+                            tint = if (canGoUp) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                listState.animateScrollToItem(lastUserIndex)
+                            }
+                        },
+                        enabled = canGoDown,
+                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardDoubleArrowDown,
+                            contentDescription = "Latest",
+                            tint = if (canGoDown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
                 }
             }
         }
