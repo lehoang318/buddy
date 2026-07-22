@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +79,25 @@ fun WebSearchSkippedPill() {
         ) {
             Icon(Icons.Default.Block, null, tint = SendButton, modifier = Modifier.size(11.dp))
             Text(stringResource(R.string.web_search_skipped), color = SendButton, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+}
+
+@Composable
+fun WebSearchCancelledPill() {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = SurfaceVariant,
+        border = BorderStroke(1.dp, Outline)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Icon(Icons.Default.Stop, null, tint = SendButton, modifier = Modifier.size(11.dp))
+            Text(stringResource(R.string.web_search_cancelled), color = SendButton, style = MaterialTheme.typography.labelSmall)
         }
     }
     Spacer(Modifier.height(6.dp))

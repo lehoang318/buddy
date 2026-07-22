@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +64,7 @@ fun InputBar(
     fileTooLargeError: String?,
     isOffline: Boolean,
     isProcessing: Boolean,
+    isCancelling: Boolean,
     reasoningEffort: AppResources.ReasoningEffort?,
     onToggleReasoning: () -> Unit,
     onTextChange: (String) -> Unit,
@@ -70,7 +72,8 @@ fun InputBar(
     onClearFile: () -> Unit,
     onPickAttachment: () -> Unit,
     onTakePhoto: () -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onCancel: () -> Unit
 ) {
     val canSend = text.isNotBlank()
 
@@ -207,23 +210,38 @@ fun InputBar(
                 }
 
                 IconButton(
-                    onClick = onSend,
-                    enabled = canSend && !isOffline && !isProcessing,
+                    onClick = {
+                        when {
+                            isProcessing && !isCancelling -> onCancel()
+                            !isProcessing -> onSend()
+                        }
+                    },
+                    enabled = !isOffline && (isProcessing || canSend) && !isCancelling,
                     modifier = Modifier
                         .size(40.dp)
                         .background(
-                            if (canSend && !isOffline && !isProcessing) SendButton else Outline,
+                            when {
+                                isCancelling -> Outline
+                                isProcessing -> SendButton
+                                canSend && !isOffline -> SendButton
+                                else -> Outline
+                            },
                             CircleShape
                         )
                 ) {
-                    if (isProcessing) {
-                        CircularProgressIndicator(
+                    when {
+                        isCancelling -> CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                             color = TextColor
                         )
-                    } else {
-                        Icon(
+                        isProcessing -> Icon(
+                            Icons.Default.Stop,
+                            contentDescription = "Stop",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        else -> Icon(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
                             tint = if (canSend && !isOffline) Color.White else OnSurfaceVariant,

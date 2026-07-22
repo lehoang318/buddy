@@ -1,6 +1,7 @@
 package com.example.buddy.ext.fetch
 
 import com.example.buddy.data.EventLog
+import kotlinx.coroutines.CancellationException
 
 private const val TAG = "UrlFetcher"
 
@@ -32,6 +33,8 @@ interface UrlFetcher {
                     warnings.add("Failed to fetch: $url")
                     null
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 EventLog.error(TAG, "Fetch failed", "URL: $url\n${e.message}", correlationId = correlationId)
                 warnings.add("Failed to fetch: $url")

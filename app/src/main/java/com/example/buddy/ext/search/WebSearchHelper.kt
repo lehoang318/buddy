@@ -4,6 +4,7 @@ import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
 import com.example.buddy.data.Summary
 import com.example.buddy.ext.llm.LlmClient
+import kotlinx.coroutines.CancellationException
 
 private const val TAG = "WebSearch"
 
@@ -51,6 +52,8 @@ class WebSearchHelper(
             } else {
                 WebSearchOutcome(rawResults = results, resultsText = resultsText)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             EventLog.error(TAG, "Search failed", e.message, correlationId = correlationId)
             WebSearchOutcome(errorMessage = e.message)
