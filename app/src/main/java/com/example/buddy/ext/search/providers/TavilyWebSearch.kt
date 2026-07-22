@@ -7,9 +7,12 @@ import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.ConnectionPool
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -66,10 +69,13 @@ class TavilyWebSearch(
 
             var lastException: Exception? = null
             val maxRetries = 2
+            var currentCall: Call? = null
+            coroutineContext[Job]?.invokeOnCompletion { currentCall?.cancel() }
             
             for (attempt in 0..maxRetries) {
                 try {
-                    client.newCall(request).execute().use { response ->
+                    currentCall = client.newCall(request)
+                    currentCall!!.execute().use { response ->
                         if (!response.isSuccessful) {
                             val errorBody = response.body?.string() ?: ""
                             val errorMsg = when (response.code) {
@@ -92,6 +98,8 @@ class TavilyWebSearch(
                             )
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: SocketTimeoutException) {
                     lastException = e
                     EventLog.warning(TAG, "Timeout (attempt ${attempt + 1}/$maxRetries)", "Query: $query\nAttempt: ${attempt + 1}/$maxRetries\nException: SocketTimeoutException")

@@ -1,6 +1,7 @@
 package com.example.buddy.ext.fetch
 
 import com.example.buddy.data.EventLog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -32,6 +33,8 @@ class JsoupUrlFetcher : UrlFetcher {
 
                 if (bodyText.isBlank()) return@withContext null
                 return@withContext "[$title]\n$bodyText"
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 if (attempt < maxRetries) {
                     delay(500L * (attempt + 1))  // Exponential backoff

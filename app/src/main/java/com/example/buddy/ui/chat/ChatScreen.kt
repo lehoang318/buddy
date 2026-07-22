@@ -173,6 +173,7 @@ fun ChatScreen(
                 fileTooLargeError = state.fileTooLargeError,
                 isOffline = state.isOffline,
                 isProcessing = state.isLoading || state.isStreaming || state.urlFetchInProgress,
+                isCancelling = state.isCancelling,
                 reasoningEffort = state.generationConfig.reasoningEffort,
                 onToggleReasoning = vm::toggleReasoningEffort,
                 onTextChange = vm::onInputChange,
@@ -187,7 +188,8 @@ fun ChatScreen(
                 onSend = {
                     keyboard?.hide()
                     vm.sendMessage()
-                }
+                },
+                onCancel = { vm.cancelRequest() }
             )
         }
     ) { padding ->
@@ -220,6 +222,11 @@ fun ChatScreen(
                 state.webSearchError?.let { error ->
                     item {
                         WebSearchErrorPill(error = error)
+                    }
+                }
+                if (state.webSearchCancelled) {
+                    item {
+                        WebSearchCancelledPill()
                     }
                 }
             }

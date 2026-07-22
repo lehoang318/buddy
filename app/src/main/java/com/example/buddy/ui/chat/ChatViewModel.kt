@@ -24,9 +24,11 @@ import com.example.buddy.ext.search.WebSearch
 import com.example.buddy.ext.search.WebSearchHelper
 import com.example.buddy.service.BuddyForegroundService
 import com.example.buddy.service.ServiceHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -56,10 +58,12 @@ data class ChatUiState(
     val isOffline: Boolean = false,
     val generationConfig: LlmGenerationConfig = LlmGenerationConfig(),
     val webSearchError: String? = null,
+    val webSearchCancelled: Boolean = false,
     val fileTooLargeError: String? = null,
     val urlFetchInProgress: Boolean = false,
     val urlFetchWarnings: List<String> = emptyList(),
     val isStreaming: Boolean = false,
+    val isCancelling: Boolean = false,
     val summaries: List<Summary> = emptyList()
 )
 
@@ -75,6 +79,7 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState
 
     private val processingLock = Mutex()
+    private var currentJob: Job? = null
 
     fun updateClient(client: LlmClient?, web: WebSearch?, fetcher: UrlFetcher?) {
         val clientChanged = llmClient !== client
@@ -140,6 +145,7 @@ class ChatViewModel(
                 pendingFileUri = null,
                 pendingFileName = null,
                 webSearchError = null,
+                webSearchCancelled = false,
                 fileTooLargeError = null,
                 urlFetchWarnings = emptyList(),
                 isLoading = false,
@@ -220,6 +226,12 @@ class ChatViewModel(
         _uiState.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
     }
 
+    fun cancelRequest() {
+        val job = currentJob ?: return
+        _uiState.update { it.copy(isCancelling = true) }
+        job.cancel()
+    }
+
     fun sendMessage() {
         val state = _uiState.value
         val text = state.inputText.trim()
@@ -242,6 +254,7 @@ class ChatViewModel(
 
         _uiState.update { it.copy(
             webSearchError = null,
+            webSearchCancelled = false,
             fileTooLargeError = null
         )}
 
@@ -262,35 +275,51 @@ class ChatViewModel(
             pendingFileName = null
         )}
 
-        viewModelScope.launch {
-            var fetchedUrls: List<FetchedUrl> = emptyList()
-            val fetcher = urlFetcher
-            if (urls.isNotEmpty() && fetcher != null) {
-                _uiState.update { it.copy(urlFetchInProgress = true, urlFetchWarnings = emptyList()) }
-                
-                ServiceHelper.onOperationStart(application)
-                BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.URL_FETCHING, "Fetching URL content...")
-                
-                val result = fetcher.fetchAll(urls, correlationId)
-                fetchedUrls = result.urls
-                _uiState.update { it.copy(urlFetchInProgress = false, urlFetchWarnings = result.warnings) }
-                
-                ServiceHelper.onOperationEnd(application)
-            }
+        currentJob = viewModelScope.launch {
+            try {
+                var fetchedUrls: List<FetchedUrl> = emptyList()
+                val fetcher = urlFetcher
+                if (urls.isNotEmpty() && fetcher != null) {
+                    _uiState.update { it.copy(urlFetchInProgress = true, urlFetchWarnings = emptyList()) }
+                    
+                    ServiceHelper.onOperationStart(application)
+                    BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.URL_FETCHING, "Fetching URL content...")
+                    
+                    try {
+                        val result = fetcher.fetchAll(urls, correlationId)
+                        fetchedUrls = result.urls
+                        _uiState.update { it.copy(urlFetchWarnings = result.warnings) }
+                    } finally {
+                        _uiState.update { it.copy(urlFetchInProgress = false) }
+                        ServiceHelper.onOperationEnd(application)
+                    }
+                }
 
-            val userMsg = UiChatMessage(
-                role = Role.USER,
-                content = text,
-                imageBase64 = savedImageBase64,
-                attachedFileUri = savedFileUri,
-                attachedFileName = savedFileName,
-                attachedFileText = fileText
-            )
+                val userMsg = UiChatMessage(
+                    role = Role.USER,
+                    content = text,
+                    imageBase64 = savedImageBase64,
+                    attachedFileUri = savedFileUri,
+                    attachedFileName = savedFileName,
+                    attachedFileText = fileText
+                )
 
-            _uiState.update { it.copy(messages = it.messages + userMsg, isLoading = true) }
+                _uiState.update { it.copy(messages = it.messages + userMsg, isLoading = true) }
 
-            processingLock.withLock {
-                streamRealResponse(userMsg, fetchedUrls, correlationId)
+                processingLock.withLock {
+                    streamRealResponse(userMsg, fetchedUrls, correlationId)
+                }
+            } finally {
+                currentJob = null
+                _uiState.update {
+                    it.copy(
+                        isCancelling = false,
+                        isLoading = false,
+                        isStreaming = false,
+                        urlFetchInProgress = false
+                    )
+                }
+                BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.IDLE, "")
             }
         }
     }
@@ -309,23 +338,28 @@ class ChatViewModel(
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
             
-            val currentSummaries = _uiState.value.summaries
-            val helper = WebSearchHelper(client, search)
-            val result = helper.search(userMsg.content, currentSummaries, correlationId)
-            
-            searchSkipped = result.skipped
-            searchResults = result.rawResults
-            result.errorMessage?.let { error ->
-                val errorMsg = when {
-                    error.contains("401") || error.contains("403") -> "Invalid web search API key"
-                    error.contains("429") -> "Web search usage limit exceeded"
-                    error == "Web search returned no results" -> error
-                    else -> "Web search failed: $error"
+            try {
+                val currentSummaries = _uiState.value.summaries
+                val helper = WebSearchHelper(client, search)
+                val result = helper.search(userMsg.content, currentSummaries, correlationId)
+                
+                searchSkipped = result.skipped
+                searchResults = result.rawResults
+                result.errorMessage?.let { error ->
+                    val errorMsg = when {
+                        error.contains("401") || error.contains("403") -> "Invalid web search API key"
+                        error.contains("429") -> "Web search usage limit exceeded"
+                        error == "Web search returned no results" -> error
+                        else -> "Web search failed: $error"
+                    }
+                    _uiState.update { it.copy(webSearchError = errorMsg) }
                 }
-                _uiState.update { it.copy(webSearchError = errorMsg) }
+            } catch (e: CancellationException) {
+                _uiState.update { it.copy(webSearchCancelled = true) }
+                throw e
+            } finally {
+                ServiceHelper.onOperationEnd(application)
             }
-            
-            ServiceHelper.onOperationEnd(application)
         }
 
         _uiState.update {
@@ -394,6 +428,17 @@ class ChatViewModel(
                     EventLog.error(TAG, "Failed to generate summary", e.message)
                 }
             }
+        } catch (e: CancellationException) {
+            _uiState.update { s ->
+                s.copy(
+                    messages = s.messages.map { msg ->
+                        if (msg.id == assistantId) msg.copy(isStreaming = false, isComplete = true) else msg
+                    },
+                    isStreaming = false,
+                    isCancelling = false
+                )
+            }
+            throw e
         } catch (e: Exception) {
             _uiState.update { s ->
                 s.copy(
@@ -406,6 +451,8 @@ class ChatViewModel(
         } finally {
             ServiceHelper.onOperationEnd(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.IDLE, "")
+            _uiState.update { it.copy(isCancelling = false) }
+            currentJob = null
         }
     }
 

@@ -9,12 +9,16 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -36,7 +40,7 @@ open class OpenAIClient internal constructor(
     private val normalizedBaseUrl: String
         get() = baseUrl.trimEnd('/')
 
-    private fun executeStreamingRequest(requestBody: JsonObject): String? {
+    private fun executeStreamingRequest(requestBody: JsonObject, cancellationJob: Job? = null): String? {
         requestBody.addProperty("stream", true)
 
         val request = Request.Builder()
@@ -46,7 +50,10 @@ open class OpenAIClient internal constructor(
             .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
             .build()
 
-        return httpClient.newCall(request).execute().use { response ->
+        val call = httpClient.newCall(request)
+        cancellationJob?.invokeOnCompletion { call.cancel() }
+
+        return call.execute().use { response ->
             if (!response.isSuccessful) return@use null
             val source: BufferedSource = response.body!!.source()
             val content = StringBuilder()
@@ -112,10 +119,13 @@ open class OpenAIClient internal constructor(
             .build()
 
         var retryCount = 0
+        var currentCall: Call? = null
+        currentCoroutineContext()[Job]?.invokeOnCompletion { currentCall?.cancel() }
         
         while (true) {
             try {
-                httpClient.newCall(request).execute().use { response ->
+                currentCall = httpClient.newCall(request)
+                currentCall!!.execute().use { response ->
                     if (!response.isSuccessful) {
                         throw Exception("API error ${response.code}: ${response.body?.string()}")
                     }
@@ -143,6 +153,8 @@ open class OpenAIClient internal constructor(
                     }
                 }
                 break
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 retryCount++
                 EventLog.warning(TAG, "Stream error (attempt $retryCount)", e.message)
@@ -311,12 +323,14 @@ open class OpenAIClient internal constructor(
 
                 EventLog.debug(TAG, "Search query request", gson.toJson(requestBody), correlationId = correlationId)
 
-                val content = executeStreamingRequest(requestBody)
+                val content = executeStreamingRequest(requestBody, coroutineContext[Job])
                 if (content == null) {
                     EventLog.warning(TAG, "Failed to generate search query", correlationId = correlationId)
                     return@withContext null
                 }
                 return@withContext content.take(AppResources.search.queryMaxTokens)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate search query", e.message, correlationId = correlationId)
                 null
@@ -356,7 +370,7 @@ open class OpenAIClient internal constructor(
 
                 EventLog.debug(TAG, "Summary generation request", correlationId = null)
 
-                val content = executeStreamingRequest(requestBody)
+                val content = executeStreamingRequest(requestBody, coroutineContext[Job])
                 if (content == null) {
                     EventLog.warning(TAG, "Failed to generate summary")
                     return@withContext Summary(question = userQuestion, points = emptyList())
@@ -419,10 +433,14 @@ open class OpenAIClient internal constructor(
                         "Question: ${userQuestion.take(200)}\nPoints: ${sanitized.size}\n" +
                         sanitized.joinToString("\n") { "${if (it.key) "[KEY] " else ""}${it.text}" })
                     return@withContext Summary(question = userQuestion, points = sanitized)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     EventLog.warning(TAG, "Failed to parse summary JSON", e.message)
                     return@withContext Summary(question = userQuestion, points = emptyList())
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to generate summary", e.message)
                 Summary(question = userQuestion, points = emptyList())
@@ -474,7 +492,7 @@ open class OpenAIClient internal constructor(
 
                 EventLog.debug(TAG, "Summary compression request", "Compressing ${summariesToCompress.size} summaries")
 
-                val content = executeStreamingRequest(requestBody)
+                val content = executeStreamingRequest(requestBody, coroutineContext[Job])
                 if (content == null) {
                     EventLog.warning(TAG, "Failed to compress summaries")
                     return@withContext Summary(question = "Earlier conversation", points = keyPoints)
@@ -537,10 +555,14 @@ open class OpenAIClient internal constructor(
                     EventLog.debug(TAG, "Summary compression completed",
                         "LLM points: ${llmPoints.size}, Key points retained: ${keyPoints.size}, Combined: ${combined.size}")
                     return@withContext Summary(question = "Earlier conversation", points = sanitized)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     EventLog.warning(TAG, "Failed to parse compressed summary JSON", e.message)
                     return@withContext Summary(question = "Earlier conversation", points = keyPoints)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 EventLog.error(TAG, "Failed to compress summaries", e.message)
                 Summary(question = "Earlier conversation", points = emptyList())

@@ -3,4 +3,5 @@
     <string name="web_search_used">Web search used</string>
     <string name="web_search_failed">Web search failed: %s</string>
     <string name="web_search_skipped">Web search skipped</string>
+    <string name="web_search_cancelled">Web search was cancelled</string>
 </resources>
