@@ -42,7 +42,10 @@ class ExaWebSearch(
                 addProperty("numResults", AppResources.search.maxResults)
                 addProperty("type", "auto")
                 add("contents", JsonObject().apply {
-                    addProperty("text", true)
+                    add("text", JsonObject().apply {
+                        addProperty("maxCharacters", AppResources.search.resultContentMaxChars)
+                        addProperty("includeHtmlTags", false)
+                    })
                 })
             }
 
@@ -86,7 +89,8 @@ class ExaWebSearch(
                             SearchResult(
                                 title = obj.get("title")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = content
+                                content = content,
+                                publishedDate = obj.get("publishedDate")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
                     }

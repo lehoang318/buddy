@@ -460,8 +460,11 @@ class ChatViewModel(
         searchResults: List<SearchResult> = emptyList(),
         fetchedUrls: List<FetchedUrl> = emptyList()
     ): List<LlmMessage> {
+        val currentDate = java.time.LocalDate.now()
+            .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US))
+
         val systemParts = mutableListOf<String>()
-        systemParts.add("## Instructions\n" + AppResources.llm.defaultSystemMessage)
+        systemParts.add("## Instructions\n" + AppResources.llm.defaultSystemMessage + "\n\nCurrent date: $currentDate")
 
         val summaries = _uiState.value.summaries
         if (summaries.isNotEmpty()) {
@@ -471,6 +474,7 @@ class ChatViewModel(
         if (fetchedUrls.isNotEmpty() || searchResults.isNotEmpty()) {
             val webParts = mutableListOf<String>()
             webParts.add(AppResources.summaries.webDataHeader)
+            webParts.add(AppResources.search.webDataInstructions)
 
             if (fetchedUrls.isNotEmpty()) {
                 webParts.add("### Fetched URL")
@@ -484,6 +488,7 @@ class ChatViewModel(
                 webParts.add("### Web Search")
                 for (sr in searchResults) {
                     webParts.add("#### ${sr.title}")
+                    webParts.add("Source: ${sr.url}" + (sr.publishedDate?.let { " (Published: $it)" } ?: ""))
                     webParts.add(sr.content)
                 }
             }

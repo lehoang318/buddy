@@ -20,6 +20,8 @@ You are a search query generator. Your job is to convert user questions into con
 - "who are you?" → NO_QUERY
 - "What time is it in Tokyo?" → Tokyo current time]]></string>
 
+    <string name="web_data_instructions"><![CDATA[The results below were retrieved just now for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources by their URL, note explicitly when sources conflict, and say so plainly if the results don't actually answer the question rather than guessing.]]></string>
+
     <string name="summarizer_system_prompt"><![CDATA[You are a summarizer. Given a user/assistant exchange, you must produce a JSON object with %1$d-%2$d points summarizing the key information discussed.
 
 Each point in the "points" array must have:

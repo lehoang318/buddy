@@ -58,7 +58,8 @@ class TavilyWebSearch(
                 addProperty("query", query)
                 addProperty("api_key", tavilyKey)
                 addProperty("max_results", AppResources.search.maxResults)
-                addProperty("search_depth", "basic")
+                addProperty("search_depth", "advanced")
+                addProperty("chunks_per_source", 3)
             }
 
             val request = Request.Builder()
@@ -94,7 +95,8 @@ class TavilyWebSearch(
                             SearchResult(
                                 title = obj.get("title")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = obj.get("content")?.asString ?: ""
+                                content = obj.get("content")?.asString ?: "",
+                                publishedDate = obj.get("published_date")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
                     }

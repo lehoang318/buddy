@@ -41,17 +41,21 @@ object AppResources {
             get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 150
 
         val maxResults: Int
-            get() = res?.getInteger(R.integer.search_max_results) ?: 5
-
-        val queryFallbackLength: Int
-            get() = res?.getInteger(R.integer.search_query_fallback_length) ?: 50
+            get() = res?.getInteger(R.integer.search_max_results) ?: 6
 
         val logPreviewMaxChars: Int
             get() = res?.getInteger(R.integer.log_preview_max_chars) ?: 1024
 
+        val resultContentMaxChars: Int
+            get() = res?.getInteger(R.integer.search_result_content_max_chars) ?: 2000
+
         val queryPrompt: String
             get() = res?.getString(R.string.search_query_prompt)
                 ?: "You are a search query generator. Based on the user's message, generate a focused web search query. Return ONLY the query text, no quotes, no explanation."
+
+        val webDataInstructions: String
+            get() = res?.getString(R.string.web_data_instructions)
+                ?: "The web results below were retrieved for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources using their URLs, note when results conflict, and say explicitly if they don't answer the question rather than guessing."
     }
 
     object summaries {

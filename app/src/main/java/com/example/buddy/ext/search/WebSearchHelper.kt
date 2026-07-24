@@ -35,9 +35,11 @@ class WebSearchHelper(
             }
             EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(AppResources.search.logPreviewMaxChars)}", correlationId = correlationId)
 
-            val results = webSearch.search(searchQuery)
+            val results = cleanResults(webSearch.search(searchQuery))
             val resultsText = results.joinToString("\n\n") { result ->
-                "Source: ${result.title}\nURL: ${result.url}\n${result.content}"
+                "Source: ${result.title}\nURL: ${result.url}" +
+                    (result.publishedDate?.let { "\nDate: $it" } ?: "") +
+                    "\n${result.content}"
             }
             EventLog.info(
                 TAG,
@@ -58,5 +60,25 @@ class WebSearchHelper(
             EventLog.error(TAG, "Search failed", e.message, correlationId = correlationId)
             WebSearchOutcome(errorMessage = e.message)
         }
+    }
+
+    // Drops blank/duplicate (same domain+title) results and caps content length before it reaches the model.
+    private fun cleanResults(results: List<SearchResult>): List<SearchResult> {
+        val maxChars = AppResources.search.resultContentMaxChars
+        val seen = mutableSetOf<String>()
+        val cleaned = mutableListOf<SearchResult>()
+        for (result in results) {
+            val trimmedContent = result.content.trim()
+            if (trimmedContent.isBlank()) continue
+            val host = try {
+                java.net.URI(result.url).host?.removePrefix("www.") ?: result.url
+            } catch (_: Exception) {
+                result.url
+            }
+            val dedupeKey = "$host|${result.title.trim().lowercase()}"
+            if (!seen.add(dedupeKey)) continue
+            cleaned.add(result.copy(content = trimmedContent.take(maxChars)))
+        }
+        return cleaned
     }
 }

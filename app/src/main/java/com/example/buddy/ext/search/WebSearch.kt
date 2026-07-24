@@ -5,7 +5,8 @@ private const val TAG = "WebSearch"
 data class SearchResult(
     val title: String,
     val url: String,
-    val content: String
+    val content: String,
+    val publishedDate: String? = null
 )
 
 interface WebSearch {

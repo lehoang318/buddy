@@ -24,23 +24,27 @@ interface LlmClient {
         EventLog.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(AppResources.search.logPreviewMaxChars)}\nModel: $activeModel", correlationId = correlationId)
         val raw = generateSearchQueryRaw(input, summaries, correlationId)
 
-        if (raw != null && raw.trim().equals("NO_QUERY", ignoreCase = true)) {
+        // Some hybrid-reasoning models leak <think> blocks even when instructed to be terse;
+        // strip complete and dangling (truncated) blocks before inspecting the result.
+        val cleaned = raw
+            ?.replace(Regex("(?is)<think>.*?</think>"), "")
+            ?.replace(Regex("(?is)<think>.*"), "")
+            ?.trim()
+
+        if (cleaned != null && cleaned.equals("NO_QUERY", ignoreCase = true)) {
             EventLog.info(TAG_LLM, "Search query skipped (NO_QUERY)",
                 "LLM indicated no web search is needed for this input", correlationId = correlationId)
             return null
         }
 
-        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${raw?.take(AppResources.search.logPreviewMaxChars) ?: "<null>"}", correlationId = correlationId)
+        EventLog.debug(TAG_LLM, "Search query raw response", "Raw: ${cleaned?.take(AppResources.search.logPreviewMaxChars) ?: "<null>"}", correlationId = correlationId)
 
-        if (!raw.isNullOrBlank()) return raw.trim()
+        if (!cleaned.isNullOrBlank()) return cleaned
 
-        val fallbackLen = AppResources.search.queryFallbackLength
-        val fallback = userMessage.take(fallbackLen)
-        val reason = "API call returned null or blank (network error or no response)"
-        EventLog.warning(TAG_LLM, "Search query fallback used",
-            "Reason: $reason\nRaw: ${raw?.take(AppResources.search.logPreviewMaxChars)}\nFallback (${fallback.length} chars): $fallback",
+        EventLog.warning(TAG_LLM, "Search query generation failed",
+            "API call returned null or blank (network error or no response). Raw: ${raw?.take(AppResources.search.logPreviewMaxChars)}",
             correlationId = correlationId)
-        return fallback
+        throw Exception("Unable to generate search query")
     }
 
     val defaultModel: String
