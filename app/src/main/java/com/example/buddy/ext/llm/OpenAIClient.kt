@@ -33,13 +33,6 @@ private const val TAG = "LLM"
 private fun currentDateString(): String =
     LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US))
 
-private fun truncateAtWordBoundary(text: String, maxChars: Int): String {
-    if (text.length <= maxChars) return text.trim()
-    val cut = text.take(maxChars)
-    val lastSpace = cut.lastIndexOf(' ')
-    return if (lastSpace > maxChars / 2) cut.take(lastSpace).trim() else cut.trim()
-}
-
 open class OpenAIClient internal constructor(
     protected val baseUrl: String,
     override val defaultModel: String,
@@ -318,7 +311,7 @@ open class OpenAIClient internal constructor(
                     addProperty("model", activeModel)
                     add("messages", JsonArray().apply {
                         val dateNote = "Current date: ${currentDateString()}.\n\n"
-                        val limitNote = "\n\nYour response must be under ${AppResources.search.queryMaxTokens} characters."
+                        val limitNote = "\n\nEach query must be under ${AppResources.search.queryMaxChars} characters."
                         val systemContent = if (summaries.isNotEmpty()) {
                             dateNote + AppResources.search.queryPrompt + limitNote + "\n\n" + AppResources.summaries.formatSummariesContext(summaries)
                         } else {
@@ -342,7 +335,7 @@ open class OpenAIClient internal constructor(
                     EventLog.warning(TAG, "Failed to generate search query", correlationId = correlationId)
                     return@withContext null
                 }
-                return@withContext truncateAtWordBoundary(content, AppResources.search.queryMaxTokens)
+                return@withContext content
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

@@ -37,11 +37,14 @@ object AppResources {
         val queryTemperature: Float
             get() = res?.let { ResourcesCompat.getFloat(it, R.dimen.search_query_temperature) } ?: 0.2f
 
-        val queryMaxTokens: Int
-            get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 150
+        val queryMaxChars: Int
+            get() = res?.getInteger(R.integer.search_query_max_chars) ?: 150
 
         val maxResults: Int
             get() = res?.getInteger(R.integer.search_max_results) ?: 6
+
+        val totalMaxResults: Int
+            get() = res?.getInteger(R.integer.search_total_max_results) ?: 10
 
         val logPreviewMaxChars: Int
             get() = res?.getInteger(R.integer.log_preview_max_chars) ?: 1024
@@ -51,7 +54,7 @@ object AppResources {
 
         val queryPrompt: String
             get() = res?.getString(R.string.search_query_prompt)
-                ?: "You are a search query generator. Based on the user's message, generate a focused web search query. Return ONLY the query text, no quotes, no explanation."
+                ?: "You are a search query generator. Based on the user's message, respond with ONLY a JSON object {\"queries\": [\"...\"], \"recency\": \"day|week|month|any\"}, or exactly NO_QUERY if no search is needed."
 
         val webDataInstructions: String
             get() = res?.getString(R.string.web_data_instructions)

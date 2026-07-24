@@ -3,9 +3,11 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchRecency
 import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
+import com.example.buddy.ext.search.sinceDateOrNull
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.CancellationException
@@ -36,7 +38,7 @@ class ExaWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): SearchResponse {
+    override suspend fun search(query: String, recency: SearchRecency): SearchResponse {
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
@@ -48,6 +50,7 @@ class ExaWebSearch(
                         addProperty("includeHtmlTags", false)
                     })
                 })
+                recency.sinceDateOrNull()?.let { addProperty("startPublishedDate", it) }
             }
 
             val request = Request.Builder()

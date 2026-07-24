@@ -3,6 +3,7 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchRecency
 import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
@@ -49,7 +50,7 @@ class TavilyWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): SearchResponse {
+    override suspend fun search(query: String, recency: SearchRecency): SearchResponse {
         return withContext(Dispatchers.IO) {
             val keyBytes = keyCache.getKey(providerId) ?: throw Exception("No API key for Tavily")
             val tavilyKey = String(keyBytes, Charsets.UTF_8)
@@ -62,6 +63,9 @@ class TavilyWebSearch(
                 addProperty("search_depth", "advanced")
                 addProperty("chunks_per_source", 3)
                 addProperty("include_answer", "advanced")
+                if (recency != SearchRecency.ANY) {
+                    addProperty("time_range", recency.name.lowercase())
+                }
             }
 
             val request = Request.Builder()
