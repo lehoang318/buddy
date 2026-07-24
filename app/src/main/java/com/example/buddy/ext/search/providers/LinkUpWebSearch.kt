@@ -2,6 +2,7 @@ package com.example.buddy.ext.search.providers
 
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
+import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
@@ -34,12 +35,12 @@ class LinkUpWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): List<SearchResult> {
+    override suspend fun search(query: String): SearchResponse {
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
                 addProperty("q", query)
                 addProperty("depth", "standard")
-                addProperty("outputType", "searchResults")
+                addProperty("outputType", "sourcedAnswer")
             }
 
             val request = Request.Builder()
@@ -69,16 +70,18 @@ class LinkUpWebSearch(
                         }
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
-                        val searchResults = json.getAsJsonArray("results")
-                            ?: throw Exception("Missing 'results' array in response")
-                        return@withContext searchResults.map { resultObj ->
-                            val obj = resultObj.asJsonObject
+                        val sources = json.getAsJsonArray("sources")
+                            ?: throw Exception("Missing 'sources' array in response")
+                        val searchResults = sources.map { sourceObj ->
+                            val obj = sourceObj.asJsonObject
                             SearchResult(
                                 title = obj.get("name")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = obj.get("content")?.asString ?: ""
+                                content = obj.get("snippet")?.asString ?: ""
                             )
                         }
+                        val answer = json.get("answer")?.takeIf { !it.isJsonNull }?.asString?.trim()?.ifBlank { null }
+                        return@withContext SearchResponse(searchResults, answer)
                     }
                 } catch (e: CancellationException) {
                     throw e

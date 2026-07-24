@@ -55,7 +55,7 @@ object AppResources {
 
         val webDataInstructions: String
             get() = res?.getString(R.string.web_data_instructions)
-                ?: "The web results below were retrieved for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources using their URLs, note when results conflict, and say explicitly if they don't answer the question rather than guessing."
+                ?: "The web results below were retrieved for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources using their URLs, note when results conflict, and say explicitly if they don't answer the question rather than guessing. If a \"Search Engine Summary\" is present, it was machine-synthesized from the sources below it — treat it as a helpful starting point, not ground truth, and verify its claims against the individual sources before citing them."
     }
 
     object summaries {

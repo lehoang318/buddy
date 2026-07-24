@@ -3,6 +3,7 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
@@ -48,7 +49,7 @@ class TavilyWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): List<SearchResult> {
+    override suspend fun search(query: String): SearchResponse {
         return withContext(Dispatchers.IO) {
             val keyBytes = keyCache.getKey(providerId) ?: throw Exception("No API key for Tavily")
             val tavilyKey = String(keyBytes, Charsets.UTF_8)
@@ -60,6 +61,7 @@ class TavilyWebSearch(
                 addProperty("max_results", AppResources.search.maxResults)
                 addProperty("search_depth", "advanced")
                 addProperty("chunks_per_source", 3)
+                addProperty("include_answer", "advanced")
             }
 
             val request = Request.Builder()
@@ -90,7 +92,7 @@ class TavilyWebSearch(
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val results = json.getAsJsonArray("results")
-                        return@withContext results.map { resultObj ->
+                        val searchResults = results.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             SearchResult(
                                 title = obj.get("title")?.asString ?: "",
@@ -99,6 +101,8 @@ class TavilyWebSearch(
                                 publishedDate = obj.get("published_date")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
+                        val answer = json.get("answer")?.takeIf { !it.isJsonNull }?.asString?.trim()?.ifBlank { null }
+                        return@withContext SearchResponse(searchResults, answer)
                     }
                 } catch (e: CancellationException) {
                     throw e

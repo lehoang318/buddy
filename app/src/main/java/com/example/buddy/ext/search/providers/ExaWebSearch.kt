@@ -3,6 +3,7 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
@@ -35,7 +36,7 @@ class ExaWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): List<SearchResult> {
+    override suspend fun search(query: String): SearchResponse {
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
@@ -78,7 +79,7 @@ class ExaWebSearch(
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val results = json.getAsJsonArray("results")
                             ?: throw Exception("Missing 'results' array in response")
-                        return@withContext results.map { resultObj ->
+                        val searchResults = results.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             val textElement = obj.get("text")
                             val content = when {
@@ -93,6 +94,7 @@ class ExaWebSearch(
                                 publishedDate = obj.get("publishedDate")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
+                        return@withContext SearchResponse(searchResults)
                     }
                 } catch (e: CancellationException) {
                     throw e

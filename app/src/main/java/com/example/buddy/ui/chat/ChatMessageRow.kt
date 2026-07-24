@@ -91,7 +91,7 @@ fun MessageRow(message: ChatMessage) {
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            if (message.webSearchUsed) WebSearchPill()
+            if (message.webSearchUsed) WebSearchPill(message.webSearchQuery)
             if (message.webSearchSkipped) WebSearchSkippedPill()
 
             message.imageBase64?.let { base64 ->

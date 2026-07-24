@@ -16,6 +16,8 @@ class WebSearchHelper(
     data class WebSearchOutcome(
         val rawResults: List<SearchResult> = emptyList(),
         val resultsText: String? = null,
+        val answer: String? = null,
+        val query: String? = null,
         val errorMessage: String? = null,
         val skipped: Boolean = false
     )
@@ -35,7 +37,9 @@ class WebSearchHelper(
             }
             EventLog.info(TAG, "Query generated", "Query: `$searchQuery`\nFrom: ${cleanInput.take(AppResources.search.logPreviewMaxChars)}", correlationId = correlationId)
 
-            val results = cleanResults(webSearch.search(searchQuery))
+            val response = webSearch.search(searchQuery)
+            val results = cleanResults(response.results)
+            val answer = response.answer?.trim()?.ifBlank { null }
             val resultsText = results.joinToString("\n\n") { result ->
                 "Source: ${result.title}\nURL: ${result.url}" +
                     (result.publishedDate?.let { "\nDate: $it" } ?: "") +
@@ -44,15 +48,15 @@ class WebSearchHelper(
             EventLog.info(
                 TAG,
                 "Search completed",
-                "Results: ${results.size}\nPreview: ${resultsText.take(AppResources.search.logPreviewMaxChars)}${if (resultsText.length > AppResources.search.logPreviewMaxChars) "..." else ""}",
+                "Results: ${results.size}\nAnswer: ${answer?.take(AppResources.search.logPreviewMaxChars) ?: "<none>"}\nPreview: ${resultsText.take(AppResources.search.logPreviewMaxChars)}${if (resultsText.length > AppResources.search.logPreviewMaxChars) "..." else ""}",
                 correlationId = correlationId
             )
 
             if (results.isEmpty()) {
                 EventLog.warning(TAG, "Search returned no results", "Query: $searchQuery")
-                WebSearchOutcome(errorMessage = "Web search returned no results")
+                WebSearchOutcome(query = searchQuery, errorMessage = "Web search returned no results")
             } else {
-                WebSearchOutcome(rawResults = results, resultsText = resultsText)
+                WebSearchOutcome(rawResults = results, resultsText = resultsText, answer = answer, query = searchQuery)
             }
         } catch (e: CancellationException) {
             throw e

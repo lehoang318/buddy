@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
 import com.example.buddy.ui.theme.Outline
@@ -28,7 +29,7 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 
 @Composable
-fun WebSearchPill() {
+fun WebSearchPill(query: String? = null) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = SurfaceVariant,
@@ -40,7 +41,13 @@ fun WebSearchPill() {
             horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Icon(Icons.Default.Search, null, tint = SendButton, modifier = Modifier.size(11.dp))
-            Text(stringResource(R.string.web_search_used), color = SendButton, style = MaterialTheme.typography.labelSmall)
+            Text(
+                text = if (!query.isNullOrBlank()) stringResource(R.string.web_search_used_query, query) else stringResource(R.string.web_search_used),
+                color = SendButton,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
     Spacer(Modifier.height(6.dp))

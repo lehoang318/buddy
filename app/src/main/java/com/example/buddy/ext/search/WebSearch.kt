@@ -9,7 +9,12 @@ data class SearchResult(
     val publishedDate: String? = null
 )
 
+data class SearchResponse(
+    val results: List<SearchResult>,
+    val answer: String? = null
+)
+
 interface WebSearch {
-    suspend fun search(query: String): List<SearchResult>
+    suspend fun search(query: String): SearchResponse
     fun isAvailable(): Boolean
 }

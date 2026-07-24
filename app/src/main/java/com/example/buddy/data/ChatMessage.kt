@@ -14,5 +14,6 @@ data class ChatMessage(
     val isComplete: Boolean = false,
     val webSearchUsed: Boolean = false,
     val webSearchSkipped: Boolean = false,
+    val webSearchQuery: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )

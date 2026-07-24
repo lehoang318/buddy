@@ -332,19 +332,23 @@ class ChatViewModel(
         val shouldSearch = state.webSearchEnabled && search != null && userMsg.content.isNotBlank()
 
         var searchResults: List<SearchResult> = emptyList()
+        var searchAnswer: String? = null
+        var searchQuery: String? = null
         var searchSkipped = false
 
         if (shouldSearch) {
             ServiceHelper.onOperationStart(application)
             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
-            
+
             try {
                 val currentSummaries = _uiState.value.summaries
                 val helper = WebSearchHelper(client, search)
                 val result = helper.search(userMsg.content, currentSummaries, correlationId)
-                
+
                 searchSkipped = result.skipped
                 searchResults = result.rawResults
+                searchAnswer = result.answer
+                searchQuery = result.query
                 result.errorMessage?.let { error ->
                     val errorMsg = when {
                         error.contains("401") || error.contains("403") -> "Invalid web search API key"
@@ -370,14 +374,15 @@ class ChatViewModel(
                     content = "",
                     isStreaming = true,
                     webSearchUsed = searchResults.isNotEmpty(),
-                    webSearchSkipped = searchSkipped
+                    webSearchSkipped = searchSkipped,
+                    webSearchQuery = searchQuery
                 ),
                 isLoading = false,
                 isStreaming = true
             )
         }
 
-        val messages = buildLlmMessages(searchResults, fetchedUrls)
+        val messages = buildLlmMessages(searchResults, fetchedUrls, searchAnswer)
         val model = client.activeModel
         val config = _uiState.value.generationConfig
 
@@ -458,7 +463,8 @@ class ChatViewModel(
 
     private fun buildLlmMessages(
         searchResults: List<SearchResult> = emptyList(),
-        fetchedUrls: List<FetchedUrl> = emptyList()
+        fetchedUrls: List<FetchedUrl> = emptyList(),
+        searchAnswer: String? = null
     ): List<LlmMessage> {
         val currentDate = java.time.LocalDate.now()
             .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US))
@@ -482,6 +488,11 @@ class ChatViewModel(
                     webParts.add("#### ${fu.url}")
                     webParts.add(fu.content)
                 }
+            }
+
+            if (!searchAnswer.isNullOrBlank()) {
+                webParts.add("### Search Engine Summary")
+                webParts.add(searchAnswer)
             }
 
             if (searchResults.isNotEmpty()) {
