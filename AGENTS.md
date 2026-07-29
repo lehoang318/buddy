@@ -1,7 +1,9 @@
 # Repository Notes
 
 ## Build & Verify
-- Build: `./gradlew app:compileDebugKotlin`
+- Kotlin-only changes: `./gradlew app:compileDebugKotlin`
+- Any `res/values/*.xml` change: also run `./gradlew assembleDebug` (or `mergeDebugResources`) — `compileDebugKotlin` skips AAPT2's resource-flattening pass entirely, so it will not catch a broken string resource
+- String resource escaping: literal `'` and `"` must be escaped as `\'`/`\"` even inside `<![CDATA[...]]>` blocks — CDATA does not exempt Android's own escape-processing pass. AAPT2 error messages can misattribute the failure to the wrong resource name; bisect by blanking suspect strings if the reported one looks unrelated
 - No CI, no test suite, no lint/format config — manual verification only
 - Gradle version catalog at `gradle/libs.versions.toml`
 
@@ -15,14 +17,14 @@
 
 ### Dependency Injection
 - No Hilt/Koin — uses `CompositionLocalProvider` with three globals:
-  - `LocalLlmClient` — `LlmClient?` (`MainActivity.kt:39`)
-  - `LocalWebSearch` — `WebSearch?` (`MainActivity.kt:40`)
-  - `LocalUrlFetcher` — `UrlFetcher?` (`MainActivity.kt:41`)
+  - `LocalLlmClient` — `LlmClient?` (`MainActivity.kt:46`)
+  - `LocalWebSearch` — `WebSearch?` (`MainActivity.kt:47`)
+  - `LocalUrlFetcher` — `UrlFetcher?` (`MainActivity.kt:48`)
 
 ### LLM Client Architecture
-- Single client implementation: `OpenAiCompatibleLlmClient` handles all providers
+- Single client implementation: `OpenAIClient` (`ext/llm/OpenAIClient.kt`) handles all providers
 - No per-provider client code — everything goes through OpenAI-compatible `/chat/completions` and `/models` endpoints
-- `LlmClientFactory` (`ext/LlmClient.kt:134`) creates clients; `getModels()` creates a temp client to fetch models
+- `LlmClientFactory` (`ext/llm/LlmClientFactory.kt:15`) creates clients; `getModels()` creates a temp client to fetch models
 
 ### Providers
 - Built-in providers loaded from `res/values/providers.xml` string arrays:
@@ -60,7 +62,7 @@
 - Summaries compressed when exceeding `maxSummaries` (20): oldest half are merged into 1 summary by LLM, key points preserved mechanically
 - **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
-- Search query generation receives summaries context for pronoun/reference resolution
+- Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
 - See `docs/context-management.md` for full details
 
 ## Conventions
@@ -73,6 +75,7 @@
 - `docs/providers.md` — provider reference (URLs, privacy, status)
 - `docs/dependencies.md` — external library catalog
 - `docs/context-management.md` — history summarization, compression, and Web Data architecture
+- `docs/web-search.md` — web search workflow: query-plan generation, lenient parsing for small models, parallel fan-out, merge, recency mapping
 - `docs/use-cases.md` — step-by-step user guides
 - `docs/limitations.md` — known technical constraints
 - `docs/seq_chat.md` — chat sequence diagrams

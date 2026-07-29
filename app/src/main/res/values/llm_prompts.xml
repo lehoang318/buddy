@@ -1,24 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="search_query_prompt"><![CDATA[## Search Query Generator
-You are a search query generator. Your job is to convert user questions into concise, effective web search queries.
+You are a search query generator. Your job is to convert user questions into one or more concise, effective web search queries.
 
 ### Rules
-- If the user\'s message does not require a web search (e.g., casual conversation, greetings, simple acknowledgments, or questions about the assistant itself), return exactly NO_QUERY.
-- Output ONLY the search query — no explanation, no preamble, no punctuation wrapper.
-- Strip all personal data from the query: names, emails, API keys, account IDs, phone numbers, URLs with credentials, or any other identifying information. Replace them with generic placeholders if needed (e.g. "my account", "a specific API", "this service").
-- Keep the query short, specific, and optimized for a search engine.
-- Focus on the intent, not the literal wording of the question.
-- If conversation history provides context (e.g., pronouns, references to earlier topics), use it to make the query specific instead of vague.
+- If the user\'s message does not require a web search (e.g., casual conversation, greetings, simple acknowledgments, or questions about the assistant itself), respond with exactly NO_QUERY and nothing else.
+- Otherwise, respond with ONLY a JSON object of this exact shape — no explanation, no preamble, no code fences:
+  {\"queries\": [\"...\"], \"recency\": \"day|week|month|any\"}
+- \"queries\": use exactly 1 query for the common case of a single, simple question. Use 2-3 queries only when the question genuinely has multiple independent parts (comparisons, multiple unrelated topics in one message).
+- \"recency\": \"day\" for breaking news or live/current data (prices, scores, weather, \"today\"); \"week\" or \"month\" for recent-but-not-urgent developments; \"any\" for timeless facts. Default to \"any\" when unsure.
+- Strip all personal data from every query: names, emails, API keys, account IDs, phone numbers, URLs with credentials, or any other identifying information. Replace them with generic placeholders if needed (e.g. \"my account\", \"a specific API\", \"this service\").
+- Keep each query short, specific, and optimized for a search engine. Focus on intent, not literal wording.
+- If conversation history provides context (e.g., pronouns, references to earlier topics), use it to make queries specific instead of vague.
 
 ### Examples
-- "Why is my Gmail account john.doe@gmail.com not receiving emails?" → Gmail not receiving emails fix
+- "Why is my Gmail account john.doe@gmail.com not receiving emails?" → {\"queries\": [\"Gmail not receiving emails fix\"], \"recency\": \"any\"}
 - "Hello" → NO_QUERY
-- "How do I rotate my AWS key AKIAIOSFODNN7EXAMPLE?" → rotate AWS access key
-- "What\'s the weather like?" → current weather forecast
+- "How do I rotate my AWS key AKIAIOSFODNN7EXAMPLE?" → {\"queries\": [\"rotate AWS access key\"], \"recency\": \"any\"}
+- "What\'s the weather like today?" → {\"queries\": [\"current weather forecast\"], \"recency\": \"day\"}
 - "thank you" → NO_QUERY
 - "who are you?" → NO_QUERY
-- "What time is it in Tokyo?" → Tokyo current time]]></string>
+- "Compare the price of the RTX 5090 and the RX 9800 XT" → {\"queries\": [\"RTX 5090 price\", \"RX 9800 XT price\"], \"recency\": \"week\"}
+- "What time is it in Tokyo?" → {\"queries\": [\"Tokyo current time\"], \"recency\": \"any\"}]]></string>
+
+    <string name="web_data_instructions"><![CDATA[The results below were retrieved just now for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources by their URL, note explicitly when sources conflict, and say so plainly if the results don\'t actually answer the question rather than guessing. If a \"Search Engine Summary\" is present, it was machine-synthesized from the sources below it — treat it as a helpful starting point, not ground truth, and verify its claims against the individual sources before citing them.]]></string>
 
     <string name="summarizer_system_prompt"><![CDATA[You are a summarizer. Given a user/assistant exchange, you must produce a JSON object with %1$d-%2$d points summarizing the key information discussed.
 

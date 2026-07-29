@@ -3,6 +3,8 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchRecency
+import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
 import com.google.gson.Gson
@@ -48,7 +50,7 @@ class TavilyWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): List<SearchResult> {
+    override suspend fun search(query: String, recency: SearchRecency): SearchResponse {
         return withContext(Dispatchers.IO) {
             val keyBytes = keyCache.getKey(providerId) ?: throw Exception("No API key for Tavily")
             val tavilyKey = String(keyBytes, Charsets.UTF_8)
@@ -58,7 +60,12 @@ class TavilyWebSearch(
                 addProperty("query", query)
                 addProperty("api_key", tavilyKey)
                 addProperty("max_results", AppResources.search.maxResults)
-                addProperty("search_depth", "basic")
+                addProperty("search_depth", "advanced")
+                addProperty("chunks_per_source", 3)
+                addProperty("include_answer", "advanced")
+                if (recency != SearchRecency.ANY) {
+                    addProperty("time_range", recency.name.lowercase())
+                }
             }
 
             val request = Request.Builder()
@@ -89,14 +96,17 @@ class TavilyWebSearch(
                         val bodyString = response.body?.string() ?: ""
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val results = json.getAsJsonArray("results")
-                        return@withContext results.map { resultObj ->
+                        val searchResults = results.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             SearchResult(
                                 title = obj.get("title")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = obj.get("content")?.asString ?: ""
+                                content = obj.get("content")?.asString ?: "",
+                                publishedDate = obj.get("published_date")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
+                        val answer = json.get("answer")?.takeIf { !it.isJsonNull }?.asString?.trim()?.ifBlank { null }
+                        return@withContext SearchResponse(searchResults, answer)
                     }
                 } catch (e: CancellationException) {
                     throw e

@@ -37,21 +37,28 @@ object AppResources {
         val queryTemperature: Float
             get() = res?.let { ResourcesCompat.getFloat(it, R.dimen.search_query_temperature) } ?: 0.2f
 
-        val queryMaxTokens: Int
-            get() = res?.getInteger(R.integer.search_query_max_tokens) ?: 150
+        val queryMaxChars: Int
+            get() = res?.getInteger(R.integer.search_query_max_chars) ?: 150
 
         val maxResults: Int
-            get() = res?.getInteger(R.integer.search_max_results) ?: 5
+            get() = res?.getInteger(R.integer.search_max_results) ?: 6
 
-        val queryFallbackLength: Int
-            get() = res?.getInteger(R.integer.search_query_fallback_length) ?: 50
+        val totalMaxResults: Int
+            get() = res?.getInteger(R.integer.search_total_max_results) ?: 10
 
         val logPreviewMaxChars: Int
             get() = res?.getInteger(R.integer.log_preview_max_chars) ?: 1024
 
+        val resultContentMaxChars: Int
+            get() = res?.getInteger(R.integer.search_result_content_max_chars) ?: 2000
+
         val queryPrompt: String
             get() = res?.getString(R.string.search_query_prompt)
-                ?: "You are a search query generator. Based on the user's message, generate a focused web search query. Return ONLY the query text, no quotes, no explanation."
+                ?: "You are a search query generator. Based on the user's message, respond with ONLY a JSON object {\"queries\": [\"...\"], \"recency\": \"day|week|month|any\"}, or exactly NO_QUERY if no search is needed."
+
+        val webDataInstructions: String
+            get() = res?.getString(R.string.web_data_instructions)
+                ?: "The web results below were retrieved for this specific question and may be more current than your training data. Prefer them for time-sensitive or factual claims, cite sources using their URLs, note when results conflict, and say explicitly if they don't answer the question rather than guessing. If a \"Search Engine Summary\" is present, it was machine-synthesized from the sources below it — treat it as a helpful starting point, not ground truth, and verify its claims against the individual sources before citing them."
     }
 
     object summaries {

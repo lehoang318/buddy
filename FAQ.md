@@ -174,6 +174,8 @@ You can ask Buddy almost anything! Here are some examples:
 2. Ask questions about current events, weather, or recent information
 3. Buddy will search the web and provide up-to-date answers
 
+Buddy decides per message whether a search is actually needed — casual messages ("hello", "thank you") skip the search entirely. For questions with multiple parts (e.g. "compare the price of X and Y"), Buddy may run up to 3 searches at once and combine the results. A pill under the response shows exactly what was searched.
+
 **Note:** Web search requires a separate API key from Tavily or another provider.
 </details>
 

@@ -3,8 +3,11 @@ package com.example.buddy.ext.search.providers
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.AppResources
+import com.example.buddy.ext.search.SearchRecency
+import com.example.buddy.ext.search.SearchResponse
 import com.example.buddy.ext.search.SearchResult
 import com.example.buddy.ext.search.WebSearch
+import com.example.buddy.ext.search.sinceDateOrNull
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.CancellationException
@@ -35,15 +38,19 @@ class ExaWebSearch(
         return true
     }
 
-    override suspend fun search(query: String): List<SearchResult> {
+    override suspend fun search(query: String, recency: SearchRecency): SearchResponse {
         return withContext(Dispatchers.IO) {
             val requestBody = JsonObject().apply {
                 addProperty("query", query)
                 addProperty("numResults", AppResources.search.maxResults)
                 addProperty("type", "auto")
                 add("contents", JsonObject().apply {
-                    addProperty("text", true)
+                    add("text", JsonObject().apply {
+                        addProperty("maxCharacters", AppResources.search.resultContentMaxChars)
+                        addProperty("includeHtmlTags", false)
+                    })
                 })
+                recency.sinceDateOrNull()?.let { addProperty("startPublishedDate", it) }
             }
 
             val request = Request.Builder()
@@ -75,7 +82,7 @@ class ExaWebSearch(
                         val json = gson.fromJson(bodyString, JsonObject::class.java)
                         val results = json.getAsJsonArray("results")
                             ?: throw Exception("Missing 'results' array in response")
-                        return@withContext results.map { resultObj ->
+                        val searchResults = results.map { resultObj ->
                             val obj = resultObj.asJsonObject
                             val textElement = obj.get("text")
                             val content = when {
@@ -86,9 +93,11 @@ class ExaWebSearch(
                             SearchResult(
                                 title = obj.get("title")?.asString ?: "",
                                 url = obj.get("url")?.asString ?: "",
-                                content = content
+                                content = content,
+                                publishedDate = obj.get("publishedDate")?.takeIf { !it.isJsonNull }?.asString
                             )
                         }
+                        return@withContext SearchResponse(searchResults)
                     }
                 } catch (e: CancellationException) {
                     throw e

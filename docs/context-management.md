@@ -86,7 +86,9 @@ Fetched URLs and web search results share a single `## Web Data` system message:
 - Both sections are omitted entirely when neither has data
 - Each section is independently optional — you can have search results without fetched URLs and vice versa
 
-Search query generation receives summaries context so the LLM can resolve pronouns and references in follow-up questions.
+Search query generation receives summaries context so the LLM can resolve pronouns and references in follow-up questions. As of the multi-query update, query generation returns a plan of 1-3 queries plus a recency hint (`day`/`week`/`month`/`any`), fanned out in parallel and merged before injection — see [web-search.md](./web-search.md) for the full workflow, including how small (~9B) models' malformed responses degrade gracefully instead of failing.
+
+When a provider returns a native synthesized answer (Tavily, LinkUp), it's injected as a `### Search Engine Summary` section above the raw `### Web Search` results, guided by the `web_data_instructions` resource (prefer fresh results for time-sensitive claims, cite URLs, flag conflicting sources, treat the summary as a starting point rather than ground truth). Each raw result also carries its source URL and publish date (when the provider supplies one) alongside its content. The current date is injected into both the system prompt and the query-generation prompt so "latest"/"current" questions aren't reasoned about purely from training-data assumptions.
 
 ## Mutex Queue
 
@@ -113,6 +115,6 @@ The user message is added to the UI immediately (with loading state), but actual
 |------|---------|
 | `res/values/llm_prompts.xml` | Prompts: `search_query_prompt`, `summarizer_system_prompt`, `summarizer_user_template`, `compress_summaries_prompt` |
 | `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
-| `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, system_message |
+| `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, system_message, search tuning (see [web-search.md](./web-search.md)) |
 | `data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points)` |
-| `data/LlmDefaults.kt` | Accessors: `maxSummaries`, `maxQaPairs`, `formatSummariesContext()`, `sanitizeSummaryPoints()`, etc. |
+| `data/AppResources.kt` | Accessors: `summaries.maxSummaries`, `summaries.maxQaPairs`, `summaries.formatSummariesContext()`, `summaries.sanitizeSummaryPoints()`, `search.*`, etc. |
