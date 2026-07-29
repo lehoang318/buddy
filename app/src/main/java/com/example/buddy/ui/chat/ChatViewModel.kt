@@ -333,7 +333,7 @@ class ChatViewModel(
 
         var searchResults: List<SearchResult> = emptyList()
         var searchAnswer: String? = null
-        var searchQuery: String? = null
+        var searchQueries: List<String> = emptyList()
         var searchSkipped = false
 
         if (shouldSearch) {
@@ -348,7 +348,7 @@ class ChatViewModel(
                 searchSkipped = result.skipped
                 searchResults = result.rawResults
                 searchAnswer = result.answer
-                searchQuery = result.query
+                searchQueries = result.queries
                 result.errorMessage?.let { error ->
                     val errorMsg = when {
                         error.contains("401") || error.contains("403") -> "Invalid web search API key"
@@ -375,7 +375,7 @@ class ChatViewModel(
                     isStreaming = true,
                     webSearchUsed = searchResults.isNotEmpty(),
                     webSearchSkipped = searchSkipped,
-                    webSearchQuery = searchQuery
+                    webSearchQueries = searchQueries
                 ),
                 isLoading = false,
                 isStreaming = true

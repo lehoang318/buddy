@@ -429,6 +429,7 @@ Toggle web search on or off to control whether Buddy searches the internet for a
 #### Web Search Costs
 - **API Usage**: Each web search uses your web search API quota
 - **Per Request**: Typically charged per search or per result
+- **Multi-part questions**: Comparisons or multi-topic messages can trigger up to 3 search API calls at once instead of 1
 - **Monthly Limits**: Some providers have monthly usage limits
 
 #### When to Disable Web Search

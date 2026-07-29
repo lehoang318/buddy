@@ -39,9 +39,9 @@
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome), [Exa](https://exa.ai/), or [LinkUp](https://www.linkup.so/)
 
 3. **Download the APK**
-  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.5)
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.6)
 
-4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 1V - Android 15).
+4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 10 VII - Android 16).
 
 5. **Open the app** and grant camera permissions if you want to use photo capture feature.
 
@@ -62,6 +62,7 @@
 | [Supported Providers](./docs/providers.md) | LLM & Web Search provider details |
 | [Use Cases](./docs/use-cases.md) | Step-by-step configuration guides |
 | [Context Management](./docs/context-management.md) | History summarization, compression, and Web Data architecture |
+| [Web Search Workflow](./docs/web-search.md) | Query-plan generation, lenient parsing for small models, parallel fan-out, recency mapping |
 | [Technical Limitations](./docs/limitations.md) | Known constraints and limitations |
 | [Dependencies](./docs/dependencies.md) | External library reference |
 | [Sequence Diagrams](./docs/seq_chat.md) | Chat flow sequence diagrams |

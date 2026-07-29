@@ -131,10 +131,10 @@ This document outlines the current technical limitations and constraints of the 
 |-----------|--------|
 | System prompt | ~50 |
 | Summaries (20 compressed) | ~800 |
-| Web Data (URLs + search) | ~600 |
+| Web Data (URLs + search, up to `search_total_max_results` × `search_result_content_max_chars`) | ~600–5,000 (higher with multi-query fan-out) |
 | Last 2 Q&A pairs | Variable |
 | Current message | Variable |
-| **Total base (before current turn)** | **~1,500** |
+| **Total base (before current turn)** | **~1,500–5,900** |
 
 ### Known Limitations
 
@@ -144,6 +144,20 @@ This document outlines the current technical limitations and constraints of the 
 - **No persistent storage**: summaries exist only in-memory during a session; clearing chat or restarting the app loses all summaries
 - **Mutex serialization**: while one message is being summarized, the next message must wait behind the lock — fast follow-up messages may see slight processing delays
 - **No token counting**: the system does not count tokens before sending; though the architecture keeps the base small, unusually long file attachments or search results could still push past a model's context limit
+
+---
+
+## Web Search
+
+See [web-search.md](./web-search.md) for the full workflow. Known constraints:
+
+| Aspect | Limitation |
+|--------|------------|
+| **Query quality depends on the query-gen model** | Small (~9B) models frequently deviate from the requested JSON format; parsing degrades gracefully (worst case: whole response treated as one plain query) rather than failing, but a poor query still produces poor results |
+| **Multi-query API cost** | A single message can trigger up to 3 parallel search-provider calls (comparisons, multi-part questions), multiplying web-search API usage for that message |
+| **Tavily has no publish dates** | `published_date` is only populated by Tavily when `topic: "news"` is set, which the app doesn't send — Tavily results never carry a visible date, even though `time_range` still filters server-side |
+| **Exa recency may exclude undated pages** | When a recency hint is present, Exa's `startPublishedDate` filter can exclude pages that don't have a detectable publish date |
+| **No cross-query semantic dedup** | Deduplication is by `domain + title` string match; two queries returning the same underlying story from different URLs/titles won't be merged |
 
 ---
 

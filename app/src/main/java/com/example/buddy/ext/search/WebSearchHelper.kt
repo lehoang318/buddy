@@ -20,7 +20,7 @@ class WebSearchHelper(
         val rawResults: List<SearchResult> = emptyList(),
         val resultsText: String? = null,
         val answer: String? = null,
-        val query: String? = null,
+        val queries: List<String> = emptyList(),
         val errorMessage: String? = null,
         val skipped: Boolean = false
     )
@@ -76,7 +76,7 @@ class WebSearchHelper(
                 }.joinToString("\n\n").ifBlank { null }
             }
 
-            val queryLabel = perQuery.joinToString(" · ") { it.first }
+            val queries = perQuery.map { it.first }
             val resultsText = results.joinToString("\n\n") { result ->
                 "Source: ${result.title}\nURL: ${result.url}" +
                     (result.publishedDate?.let { "\nDate: $it" } ?: "") +
@@ -90,10 +90,10 @@ class WebSearchHelper(
             )
 
             if (results.isEmpty()) {
-                EventLog.warning(TAG, "Search returned no results", "Queries: $queryLabel")
-                WebSearchOutcome(query = queryLabel, errorMessage = "Web search returned no results")
+                EventLog.warning(TAG, "Search returned no results", "Queries: ${queries.joinToString(" · ")}")
+                WebSearchOutcome(queries = queries, errorMessage = "Web search returned no results")
             } else {
-                WebSearchOutcome(rawResults = results, resultsText = resultsText, answer = answer, query = queryLabel)
+                WebSearchOutcome(rawResults = results, resultsText = resultsText, answer = answer, queries = queries)
             }
         } catch (e: CancellationException) {
             throw e

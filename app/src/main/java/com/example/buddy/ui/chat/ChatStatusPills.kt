@@ -2,6 +2,7 @@ package com.example.buddy.ui.chat
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -29,7 +30,20 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 
 @Composable
-fun WebSearchPill(query: String? = null) {
+fun WebSearchPills(queries: List<String>) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        queries.forEachIndexed { index, query ->
+            WebSearchQueryPill(query)
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+}
+
+@Composable
+private fun WebSearchQueryPill(text: String) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = SurfaceVariant,
@@ -42,7 +56,7 @@ fun WebSearchPill(query: String? = null) {
         ) {
             Icon(Icons.Default.Search, null, tint = SendButton, modifier = Modifier.size(11.dp))
             Text(
-                text = if (!query.isNullOrBlank()) stringResource(R.string.web_search_used_query, query) else stringResource(R.string.web_search_used),
+                text = text,
                 color = SendButton,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
@@ -50,7 +64,6 @@ fun WebSearchPill(query: String? = null) {
             )
         }
     }
-    Spacer(Modifier.height(6.dp))
 }
 
 @Composable

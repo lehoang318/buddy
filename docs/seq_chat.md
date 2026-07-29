@@ -53,24 +53,33 @@ sequenceDiagram
     ViewModel->>WebSearchHelper: search(message, summaries)
     WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
     Note over WebSearchHelper: Summaries injected as system context
-    LLMClient-->>WebSearchHelper: Return search query
-    WebSearchHelper->>WebSearch: search(query)
-    WebSearch->>WebSearch: Query web search provider
-    WebSearch-->>WebSearchHelper: Return search results
-    WebSearchHelper-->>ViewModel: Raw search results
-    ViewModel->>ViewModel: buildLlmMessages() with Web Data system message
-    ViewModel->>LLMClient: streamCompletion(messages with ## Web Data)
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate and display
-    ViewModel->>ChatScreen: Update UI streaming
-    ChatScreen-->>User: Display partial response
+    LLMClient-->>WebSearchHelper: Return query plan (1-3 queries + recency) or null
+    alt plan is null (NO_QUERY)
+        WebSearchHelper-->>ViewModel: WebSearchOutcome(skipped = true)
+    else plan parsed
+        par one search per query
+            WebSearchHelper->>WebSearch: search(query1, recency)
+            WebSearchHelper->>WebSearch: search(query2, recency)
+        end
+        WebSearch-->>WebSearchHelper: SearchResponse per query
+        WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap results; compose answers
+        WebSearchHelper-->>ViewModel: Merged results + answer + query label
+        ViewModel->>ViewModel: buildLlmMessages() with Web Data system message
+        ViewModel->>LLMClient: streamCompletion(messages with ## Web Data)
+        LLMClient-->>ViewModel: Stream response tokens
+        ViewModel->>ViewModel: Accumulate and display
+        ViewModel->>ChatScreen: Update UI streaming
+        ChatScreen-->>User: Display partial response
+    end
     ViewModel->>LLMClient: generateSummary(question, response)
     LLMClient-->>ViewModel: Summary JSON
     ViewModel->>ViewModel: Append to summaries list
     ViewModel->>ViewModel: Release mutex
     ViewModel->>ChatScreen: Update UI with response
-    ChatScreen-->>User: Display final response
+    ChatScreen-->>User: Display final response (with one "Searched" pill per query)
 ```
+
+See [web-search.md](./web-search.md) for the full query-plan parsing, fan-out, and merge details.
 
 ### 3. Chat with URL Context
 
@@ -179,13 +188,14 @@ sequenceDiagram
     UrlFetcher-->>ViewModel: Return List<FetchedUrl>
     ViewModel->>WebSearchHelper: search(message, summaries)
     WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
-    LLMClient-->>WebSearchHelper: Return search query
-    WebSearchHelper->>WebSearch: search(query)
+    LLMClient-->>WebSearchHelper: Return query plan (1-3 queries + recency)
+    WebSearchHelper->>WebSearch: search(query, recency) — one call per query, in parallel
     WebSearch->>WebSearch: Query web search provider
-    WebSearch-->>WebSearchHelper: Return search results
-    WebSearchHelper-->>ViewModel: Raw search results
+    WebSearch-->>WebSearchHelper: Return search results per query
+    WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap; compose answers
+    WebSearchHelper-->>ViewModel: Merged search results
     ViewModel->>ViewModel: buildLlmMessages() with ## Web Data
-    Note over ViewModel: Web Data includes ### Fetched URL + ### Web Search
+    Note over ViewModel: Web Data includes ### Fetched URL + ### Search Engine Summary + ### Web Search
     ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens
     ViewModel->>ViewModel: Accumulate response
@@ -237,13 +247,23 @@ sequenceDiagram
     ViewModel->>ViewModel: Validate, lock mutex
     ViewModel->>WebSearchHelper: search(message, summaries)
     WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
-    LLMClient-->>WebSearchHelper: Return search query
-    WebSearchHelper->>WebSearch: search(query)
-    Note over WebSearch: Invalid API key or network error
-    WebSearch-->>WebSearchHelper: Return error
-    WebSearchHelper-->>ViewModel: Error message, no results
-    ViewModel->>ViewModel: Set webSearchError in uiState
-    ViewModel->>ViewModel: buildLlmMessages() without ## Web Search
+    LLMClient-->>WebSearchHelper: Return query plan (e.g. 2 queries)
+    par one search per query
+        WebSearchHelper->>WebSearch: search(query1, recency)
+        WebSearchHelper->>WebSearch: search(query2, recency)
+    end
+    alt all queries fail (e.g. invalid API key)
+        Note over WebSearch: Invalid API key or network error
+        WebSearch-->>WebSearchHelper: Return error for every query
+        WebSearchHelper-->>ViewModel: Error message, no results
+        ViewModel->>ViewModel: Set webSearchError in uiState
+        ViewModel->>ViewModel: buildLlmMessages() without ## Web Search
+    else some queries fail, others succeed
+        WebSearch-->>WebSearchHelper: Mixed results/errors
+        Note over WebSearchHelper: Warning logged; search proceeds with the successful subset
+        WebSearchHelper-->>ViewModel: Partial results (no error pill)
+        ViewModel->>ViewModel: buildLlmMessages() with ## Web Data from partial results
+    end
     ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens
     ViewModel->>ViewModel: Accumulate response
@@ -252,8 +272,8 @@ sequenceDiagram
     ViewModel->>LLMClient: generateSummary(question, response)
     LLMClient-->>ViewModel: Summary JSON
     ViewModel->>ViewModel: Append to summaries, release mutex
-    ViewModel->>ChatScreen: Update UI with response + error pill
-    ChatScreen-->>User: Display response with error notification
+    ViewModel->>ChatScreen: Update UI with response (+ error pill only if all queries failed)
+    ChatScreen-->>User: Display response
 ```
 
 ### 9. Chat with Invalid API Key
