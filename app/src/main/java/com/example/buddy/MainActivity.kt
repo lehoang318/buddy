@@ -17,17 +17,19 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.buddy.crypto.SessionKeyCache
+import com.example.buddy.config.AndroidAppConfig
+import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.AppResources
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
-import com.example.buddy.ext.fetch.JsoupUrlFetcher
-import com.example.buddy.ext.fetch.UrlFetcher
-import com.example.buddy.ext.llm.LlmClient
-import com.example.buddy.ext.llm.LlmClientFactory
-import com.example.buddy.ext.search.WebSearch
-import com.example.buddy.ext.search.WebSearchFactory
+import com.example.buddy.fetch.JsoupUrlFetcher
+import com.example.buddy.fetch.UrlFetcher
+import com.example.buddy.llm.LlmClient
+import com.example.buddy.llm.LlmClientFactory
+import com.example.buddy.search.WebSearch
+import com.example.buddy.search.WebSearchFactory
+import com.example.buddy.logging.Log
 import com.example.buddy.service.BackgroundScheduler
 import com.example.buddy.ui.about.AboutScreen
 import com.example.buddy.ui.chat.ChatScreen
@@ -75,7 +77,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppResources.init(this)
+        AppConfigProvider.current = AndroidAppConfig(this)
+        Log.logger = EventLog
         settingsRepository = SettingsRepository(this)
         keyCache = SessionKeyCache(this)
 

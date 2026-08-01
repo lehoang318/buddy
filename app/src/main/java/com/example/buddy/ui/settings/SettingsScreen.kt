@@ -54,8 +54,8 @@ import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmProvider
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
-import com.example.buddy.ext.llm.LlmClientFactory
-import com.example.buddy.ext.llm.LlmModel
+import com.example.buddy.llm.LlmClientFactory
+import com.example.buddy.llm.LlmModel
 import com.example.buddy.ui.components.SliderWithLabel
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline

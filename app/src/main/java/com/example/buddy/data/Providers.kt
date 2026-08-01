@@ -1,44 +1,9 @@
 package com.example.buddy.data
 
 import android.content.Context
-import androidx.annotation.Keep
 import com.example.buddy.R
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-
-sealed class BaseProvider(
-    open val id: String,
-    open val name: String,
-    open val baseUrl: String,
-    open val apiKey: String = ""
-)
-
-data class LlmProvider(
-    override val id: String,
-    override val name: String,
-    override val baseUrl: String,
-    override val apiKey: String = "",
-) : BaseProvider(id, name, baseUrl, apiKey)
-
-data class WebSearchProvider(
-    override val id: String,
-    override val name: String,
-    override val baseUrl: String,
-    override val apiKey: String = ""
-) : BaseProvider(id, name, baseUrl, apiKey)
-
-@Keep
-data class ProviderData(
-    val id: String,
-    val name: String,
-    val baseUrl: String,
-    val apiKey: String
-)
-
-fun LlmProvider.toProviderData() = ProviderData(id, name, baseUrl, apiKey)
-fun LlmProvider.toProviderDataWithoutKey() = ProviderData(id, name, baseUrl, apiKey = "")
-fun ProviderData.toLlmProvider() = LlmProvider(id, name, baseUrl, apiKey)
-fun ProviderData.toWebSearchProvider() = WebSearchProvider(id, name, baseUrl, apiKey)
 
 object BuiltInProviders {
     private val gson = Gson()

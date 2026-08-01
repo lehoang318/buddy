@@ -1,11 +1,12 @@
 # Repository Notes
 
 ## Build & Verify
-- Kotlin-only changes: `./gradlew app:compileDebugKotlin`
+- Kotlin-only changes: `./gradlew :common:test :app:compileDebugKotlin`
 - Any `res/values/*.xml` change: also run `./gradlew assembleDebug` (or `mergeDebugResources`) — `compileDebugKotlin` skips AAPT2's resource-flattening pass entirely, so it will not catch a broken string resource
 - String resource escaping: literal `'` and `"` must be escaped as `\'`/`\"` even inside `<![CDATA[...]]>` blocks — CDATA does not exempt Android's own escape-processing pass. AAPT2 error messages can misattribute the failure to the wrong resource name; bisect by blanking suspect strings if the reported one looks unrelated
 - No CI, no test suite, no lint/format config — manual verification only
 - Gradle version catalog at `gradle/libs.versions.toml`
+- `:common` is a pure Kotlin/JVM module and is tested with `./gradlew :common:test`
 
 ## Architecture
 
@@ -22,9 +23,15 @@
   - `LocalUrlFetcher` — `UrlFetcher?` (`MainActivity.kt:48`)
 
 ### LLM Client Architecture
-- Single client implementation: `OpenAIClient` (`ext/llm/OpenAIClient.kt`) handles all providers
+- Single client implementation: `OpenAIClient` (`common/.../llm/OpenAIClient.kt`) handles all providers
 - No per-provider client code — everything goes through OpenAI-compatible `/chat/completions` and `/models` endpoints
-- `LlmClientFactory` (`ext/llm/LlmClientFactory.kt:15`) creates clients; `getModels()` creates a temp client to fetch models
+- `LlmClientFactory` (`common/.../llm/LlmClientFactory.kt:15`) creates clients; `getModels()` creates a temp client to fetch models
+
+### Common Module Seams
+- Common networking and provider logic lives under `com.example.buddy.llm`, `com.example.buddy.search`, and `com.example.buddy.fetch`
+- `AppConfigProvider` supplies fine-grained configuration interfaces; Android installs `AndroidAppConfig` at startup and desktop tests use `DefaultAppConfig`
+- `Log` delegates common logging to the Phase-1 `Logger`; Android installs `EventLog` at startup
+- `KeyProvider` abstracts API-key access; Android `SessionKeyCache` remains the encrypted implementation
 
 ### Providers
 - Built-in providers loaded from `res/values/providers.xml` string arrays:

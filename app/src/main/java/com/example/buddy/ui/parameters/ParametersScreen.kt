@@ -33,7 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.AppResources
+import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.ui.components.SliderWithLabel
@@ -59,9 +59,9 @@ fun ParametersScreen(
     val savedSettings by settingsRepository.settings.collectAsState(initial = initialSettings ?: LlmSettings())
     val effectiveInitial = initialSettings ?: savedSettings
 
-    val initialTemperature = effectiveInitial.temperature.takeIf { it > 0f } ?: AppResources.llm.temperature
-    val initialTopP = effectiveInitial.topP.takeIf { it > 0f } ?: AppResources.llm.topP
-    val initialTopK = effectiveInitial.topK.takeIf { it > 0 } ?: AppResources.llm.topK
+    val initialTemperature = effectiveInitial.temperature.takeIf { it > 0f } ?: AppConfigProvider.current.llm.temperature
+    val initialTopP = effectiveInitial.topP.takeIf { it > 0f } ?: AppConfigProvider.current.llm.topP
+    val initialTopK = effectiveInitial.topK.takeIf { it > 0 } ?: AppConfigProvider.current.llm.topK
 
     var temperature by remember(initialTemperature) { mutableFloatStateOf(initialTemperature) }
     var topP by remember(initialTopP) { mutableFloatStateOf(initialTopP) }
@@ -69,9 +69,9 @@ fun ParametersScreen(
     var systemMessage by remember(effectiveInitial.systemMessage) { mutableStateOf(effectiveInitial.systemMessage) }
 
     fun resetToDefaults() {
-        temperature = AppResources.llm.temperature
-        topP = AppResources.llm.topP
-        topK = AppResources.llm.topK
+        temperature = AppConfigProvider.current.llm.temperature
+        topP = AppConfigProvider.current.llm.topP
+        topK = AppConfigProvider.current.llm.topK
     }
 
     Scaffold(

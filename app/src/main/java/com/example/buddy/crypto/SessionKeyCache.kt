@@ -12,7 +12,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-class SessionKeyCache(context: Context) {
+class SessionKeyCache(context: Context) : KeyProvider {
 
     private val prefs: SharedPreferences = try {
         EncryptedSharedPreferences.create(
@@ -45,7 +45,7 @@ class SessionKeyCache(context: Context) {
         }.toSet()
     }
 
-    fun getKey(providerId: String): ByteArray? {
+    override fun getKey(providerId: String): ByteArray? {
         lock.read {
             cache[providerId]?.let { return it.copyOf() }
         }

@@ -9,19 +9,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.buddy.data.EventLog
-import com.example.buddy.data.AppResources
+import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Role
 import com.example.buddy.data.Summary
 import com.example.buddy.data.SummaryPoint
-import com.example.buddy.ext.fetch.FetchedUrl
-import com.example.buddy.ext.fetch.UrlFetcher
-import com.example.buddy.ext.llm.LlmClient
-import com.example.buddy.ext.llm.LlmGenerationConfig
-import com.example.buddy.ext.llm.LlmMessage
-import com.example.buddy.ext.llm.LlmModel
-import com.example.buddy.ext.search.SearchResult
-import com.example.buddy.ext.search.WebSearch
-import com.example.buddy.ext.search.WebSearchHelper
+import com.example.buddy.fetch.FetchedUrl
+import com.example.buddy.fetch.UrlFetcher
+import com.example.buddy.llm.LlmClient
+import com.example.buddy.llm.LlmGenerationConfig
+import com.example.buddy.llm.LlmMessage
+import com.example.buddy.llm.LlmModel
+import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.search.SearchResult
+import com.example.buddy.search.WebSearch
+import com.example.buddy.search.WebSearchHelper
 import com.example.buddy.service.BuddyForegroundService
 import com.example.buddy.service.ServiceHelper
 import kotlinx.coroutines.CancellationException
@@ -119,7 +120,7 @@ class ChatViewModel(
 
     fun toggleReasoningEffort() {
         val current = _uiState.value.generationConfig.reasoningEffort
-        val next = llmClient?.toggleReasoning(current) ?: AppResources.ReasoningEffort.HIGH
+        val next = llmClient?.toggleReasoning(current) ?: ReasoningEffort.HIGH
         _uiState.update {
             it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
         }
@@ -414,8 +415,8 @@ class ChatViewModel(
                     val summary = client.generateSummary(userMsg.content, fullAssistantContent, model = model)
                     _uiState.update { state ->
                         val newSummaries = state.summaries + summary
-                        if (newSummaries.size > AppResources.summaries.maxSummaries) {
-                            val nCompress = AppResources.summaries.maxSummaries / 2
+                        if (newSummaries.size > AppConfigProvider.current.summaries.maxSummaries) {
+                            val nCompress = AppConfigProvider.current.summaries.maxSummaries / 2
                             val batch = newSummaries.take(nCompress)
                             try {
                                 val compressed = client.compressSummaries(batch, model = model)
@@ -470,17 +471,17 @@ class ChatViewModel(
             .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US))
 
         val systemParts = mutableListOf<String>()
-        systemParts.add("## Instructions\n" + AppResources.llm.defaultSystemMessage + "\n\nCurrent date: $currentDate")
+        systemParts.add("## Instructions\n" + AppConfigProvider.current.llm.defaultSystemMessage + "\n\nCurrent date: $currentDate")
 
         val summaries = _uiState.value.summaries
         if (summaries.isNotEmpty()) {
-            systemParts.add(AppResources.summaries.formatSummariesContext(summaries))
+            systemParts.add(AppConfigProvider.current.summaries.formatSummariesContext(summaries))
         }
 
         if (fetchedUrls.isNotEmpty() || searchResults.isNotEmpty()) {
             val webParts = mutableListOf<String>()
-            webParts.add(AppResources.summaries.webDataHeader)
-            webParts.add(AppResources.search.webDataInstructions)
+            webParts.add(AppConfigProvider.current.summaries.webDataHeader)
+            webParts.add(AppConfigProvider.current.search.webDataInstructions)
 
             if (fetchedUrls.isNotEmpty()) {
                 webParts.add("### Fetched URL")
@@ -507,7 +508,7 @@ class ChatViewModel(
             systemParts.add(webParts.joinToString("\n"))
         }
 
-        systemParts.add("## Output Limit\nYour response may not exceed ${AppResources.llm.maxTokens} tokens.")
+        systemParts.add("## Output Limit\nYour response may not exceed ${AppConfigProvider.current.llm.maxTokens} tokens.")
 
         val result = mutableListOf(
             LlmMessage(role = Role.SYSTEM, content = systemParts.joinToString("\n\n"))
@@ -531,7 +532,7 @@ class ChatViewModel(
             }
         }
 
-        val recentPairs = pairs.takeLast(AppResources.summaries.maxQaPairs)
+        val recentPairs = pairs.takeLast(AppConfigProvider.current.summaries.maxQaPairs)
         for (pair in recentPairs) {
             result.add(LlmMessage(role = Role.USER, content = pair.first.content))
             result.add(LlmMessage(role = Role.ASSISTANT, content = pair.second.content))

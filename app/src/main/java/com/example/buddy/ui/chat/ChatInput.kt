@@ -46,7 +46,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import com.example.buddy.data.AppResources
+import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SecondaryIcons
@@ -65,7 +65,7 @@ fun InputBar(
     isOffline: Boolean,
     isProcessing: Boolean,
     isCancelling: Boolean,
-    reasoningEffort: AppResources.ReasoningEffort?,
+    reasoningEffort: ReasoningEffort?,
     onToggleReasoning: () -> Unit,
     onTextChange: (String) -> Unit,
     onClearImage: () -> Unit,
@@ -203,7 +203,7 @@ fun InputBar(
                         contentDescription = "Toggle Reasoning",
                         tint = when {
                             isOffline -> OnSurfaceVariant
-                            reasoningEffort == AppResources.ReasoningEffort.HIGH -> SendButton
+                            reasoningEffort == ReasoningEffort.HIGH -> SendButton
                             else -> SecondaryIcons
                         }
                     )

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.example.buddy.config.AppConfigProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -34,20 +35,6 @@ object SettingsKeys {
     val CUSTOM_WEBSEARCH_PROVIDERS = stringPreferencesKey("custom_websearch_providers")
 }
 
-data class LlmSettings(
-    val provider: String = "",
-    val model: String = "",
-    val temperature: Float = 0f,
-    val topP: Float = 0f,
-    val topK: Int = 0,
-    val maxTokens: Int = 0,
-    val reasoningEffort: String = "",
-    val systemMessage: String = "",
-    val webSearchProvider: String = "",
-    val customLlmProvidersJson: String = "",
-    val customWebSearchProvidersJson: String = ""
-)
-
 class SettingsRepository(private val context: Context) {
     private val dataStore = context.dataStore
 
@@ -55,12 +42,12 @@ class SettingsRepository(private val context: Context) {
         LlmSettings(
             provider = prefs[SettingsKeys.PROVIDER] ?: "",
             model = prefs[SettingsKeys.MODEL] ?: "",
-            temperature = prefs[SettingsKeys.TEMPERATURE] ?: AppResources.llm.temperature,
-            topP = prefs[SettingsKeys.TOP_P] ?: AppResources.llm.topP,
-            topK = prefs[SettingsKeys.TOP_K] ?: AppResources.llm.topK,
-            maxTokens = prefs[SettingsKeys.MAX_TOKENS] ?: AppResources.llm.maxTokens,
+            temperature = prefs[SettingsKeys.TEMPERATURE] ?: AppConfigProvider.current.llm.temperature,
+            topP = prefs[SettingsKeys.TOP_P] ?: AppConfigProvider.current.llm.topP,
+            topK = prefs[SettingsKeys.TOP_K] ?: AppConfigProvider.current.llm.topK,
+            maxTokens = prefs[SettingsKeys.MAX_TOKENS] ?: AppConfigProvider.current.llm.maxTokens,
             reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
-            systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: AppResources.llm.defaultSystemMessage,
+            systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: AppConfigProvider.current.llm.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
             customLlmProvidersJson = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: "",
             customWebSearchProvidersJson = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
@@ -70,12 +57,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun updateAll(
         provider: String,
         model: String,
-        temperature: Float = AppResources.llm.temperature,
-        topP: Float = AppResources.llm.topP,
-        topK: Int = AppResources.llm.topK,
-        maxTokens: Int = AppResources.llm.maxTokens,
+        temperature: Float = AppConfigProvider.current.llm.temperature,
+        topP: Float = AppConfigProvider.current.llm.topP,
+        topK: Int = AppConfigProvider.current.llm.topK,
+        maxTokens: Int = AppConfigProvider.current.llm.maxTokens,
         reasoningEffort: String = "",
-        systemMessage: String = AppResources.llm.defaultSystemMessage,
+        systemMessage: String = AppConfigProvider.current.llm.defaultSystemMessage,
         webSearchProvider: String = ""
     ) {
         dataStore.edit {

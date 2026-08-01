@@ -50,7 +50,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
-import com.example.buddy.ext.llm.LlmModel
+import com.example.buddy.llm.LlmModel
 import com.example.buddy.ui.settings.ModelSelectionDialog
 import com.example.buddy.ui.theme.Dimens
 

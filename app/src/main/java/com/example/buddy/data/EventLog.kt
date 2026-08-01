@@ -1,27 +1,11 @@
 package com.example.buddy.data
 
-import com.example.buddy.BuildConfig
+import com.example.buddy.config.AppConfigProvider
+import com.example.buddy.logging.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-enum class EventLevel {
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR
-}
-
-data class AppEvent(
-    val level: EventLevel,
-    val tag: String,
-    val timestamp: Long,
-    val text: String,
-    val data: String? = null,
-    val correlationId: String? = null,
-    val durationMs: Long? = null
-)
-
-object EventLog {
+object EventLog : Logger {
     private val _events = MutableStateFlow<List<AppEvent>>(emptyList())
     val events: StateFlow<List<AppEvent>> = _events
 
@@ -33,14 +17,23 @@ object EventLog {
         correlationId: String? = null,
         durationMs: Long? = null
     ) {
-        if (!BuildConfig.DEBUG && (level == EventLevel.DEBUG || level == EventLevel.INFO)) return
-        val cappedData = data?.take(AppResources.events.maxDataLength)
+        if (!AppConfigProvider.current.debugLogging && (level == EventLevel.DEBUG || level == EventLevel.INFO)) return
+        val cappedData = data?.take(AppConfigProvider.current.events.maxDataLength)
         val event = AppEvent(level, tag, System.currentTimeMillis(), text, cappedData, correlationId, durationMs)
         val current = _events.value.toMutableList()
         current.add(0, event)
-        if (current.size > AppResources.events.maxEntries) current.removeAt(AppResources.events.maxEntries)
+        if (current.size > AppConfigProvider.current.events.maxEntries) current.removeAt(AppConfigProvider.current.events.maxEntries)
         _events.value = current
     }
+
+    override fun log(
+        level: EventLevel,
+        tag: String,
+        text: String,
+        data: String?,
+        correlationId: String?,
+        durationMs: Long?
+    ) = add(level, tag, text, data, correlationId, durationMs)
 
     fun debug(tag: String, text: String, data: String? = null, correlationId: String? = null, durationMs: Long? = null) =
         add(EventLevel.DEBUG, tag, text, data, correlationId, durationMs)
