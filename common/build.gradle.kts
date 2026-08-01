@@ -19,6 +19,7 @@ dependencies {
 
 tasks.test {
     useJUnit()
+    inputs.dir("$rootDir/app/src/main/res/values")
     doFirst {
         layout.projectDirectory.dir("logs").asFile.mkdirs()
     }
