@@ -39,7 +39,7 @@ Example JSON response from the LLM:
 }
 ```
 
-The summary is appended to `ChatUiState.summaries`. If generation fails (network error, parse failure), the summary is silently skipped — the conversation continues with older context.
+The summary is appended to `ConversationEngine.summaries`. If generation fails (network error, parse failure), the summary is silently skipped — the conversation continues with older context.
 
 ## Compression — Preventing Unbounded Growth
 
@@ -54,7 +54,7 @@ When `summaries.size > maxSummaries` (20), compression triggers:
 
 Key decisions are never lost during compression — they are preserved programmatically, not subject to LLM summarization quality.
 
-## Context Assembly (`buildLlmMessages`)
+## Context Assembly (`MessageBuilder`)
 
 ```
 [0] SYSTEM  — system prompt ("You are a helpful assistant.")
@@ -92,10 +92,10 @@ When a provider returns a native synthesized answer (Tavily, LinkUp), it's injec
 
 ## Mutex Queue
 
-A `Mutex` serializes message processing. If the user sends a follow-up message before summary generation completes for the previous turn, the new request waits:
+A `Mutex` in `ConversationEngine` serializes message processing. If the user sends a follow-up message before summary generation completes for the previous turn, the new request waits:
 
 ```
-sendMessage()
+ConversationEngine.send()
   └── coroutine {
         fetch URLs              ← outside lock, parallelizable
         mutex.withLock {
@@ -107,7 +107,7 @@ sendMessage()
       }
 ```
 
-The user message is added to the UI immediately (with loading state), but actual LLM processing waits behind the lock.
+The user message is accepted after URL fetching, while actual LLM processing waits behind the lock. Android renders the resulting engine events; the CLI prints them.
 
 ## Resource Configuration
 
@@ -116,5 +116,7 @@ The user message is added to the UI immediately (with loading state), but actual
 | `res/values/llm_prompts.xml` | Prompts: `search_query_prompt`, `summarizer_system_prompt`, `summarizer_user_template`, `compress_summaries_prompt` |
 | `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
 | `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, system_message, search tuning (see [web-search.md](./web-search.md)) |
-| `data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points)` |
-| `data/AppResources.kt` | Accessors: `summaries.maxSummaries`, `summaries.maxQaPairs`, `summaries.formatSummariesContext()`, `summaries.sanitizeSummaryPoints()`, `search.*`, etc. |
+| `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points)` |
+| `src/common/.../chat/ConversationEngine.kt` | Turn queue, URL/search orchestration, streaming, summary generation, compression |
+| `src/common/.../chat/ConversationEngine.kt` | `MessageBuilder` assembles system prompts, summaries, Web Data, history, and attachments |
+| `src/common/.../config/AppConfig.kt` | Accessors: `summaries.maxSummaries`, `summaries.maxQaPairs`, `summaries.formatSummariesContext()`, `summaries.sanitizeSummaryPoints()`, `search.*`, etc. |

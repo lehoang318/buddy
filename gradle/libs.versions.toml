@@ -18,6 +18,7 @@ workRuntimeKtx = "2.11.2"
 slf4j = "2.0.17"
 logback = "1.5.18"
 coroutines = "1.10.2"
+jline = "3.25.1"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
@@ -45,6 +46,7 @@ androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+jline = { module = "org.jline:jline", version.ref = "jline" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -24,4 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Buddy"
 include(":app")
-include(":common")
+include(":cli")
+
+project(":app").projectDir = file("android")
+project(":cli").projectDir = file("desktop")

@@ -12,6 +12,7 @@ This document provides a concise overview of the external libraries used in the 
 | `com.squareup.okhttp3:okhttp` | Networking | 5.3.2 | HTTP client for LLM API calls |
 | `com.google.code.gson:gson` | Data | 2.13.2 | JSON serialization/deserialization |
 | `org.jsoup:jsoup` | Data | 1.22.1 | HTML parsing for URL content fetching |
+| `org.jline:jline` | CLI | 3.25.1 | Raw terminal input for the standalone desktop CLI application |
 | `io.coil-kt:coil-compose` | Images | 2.7.0 | Image loading and caching |
 | `io.noties.markwon:*` | Text | 4.6.2 | Markdown rendering with tables, strikethrough, task lists, HTML, linkify, Coil images |
 | `androidx.security:security-crypto` | Security | 1.1.0-alpha06 | EncryptedSharedPreferences for API key storage |
