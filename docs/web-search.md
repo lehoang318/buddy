@@ -6,17 +6,17 @@ How Buddy decides whether to search, generates queries, fans them out across pro
 
 ```mermaid
 sequenceDiagram
-    participant VM as ChatViewModel
+    participant Engine as ConversationEngine
     participant Helper as WebSearchHelper
     participant LLM as LlmClient
     participant Search as WebSearch (provider)
 
-    VM->>Helper: search(userMessage, summaries)
+    Engine->>Helper: search(userMessage, summaries)
     Helper->>LLM: generateSearchQuery(cleanInput, summaries)
     LLM->>LLM: strip <think> blocks, parse query plan
     alt NO_QUERY (no search needed)
         LLM-->>Helper: null
-        Helper-->>VM: WebSearchOutcome(skipped = true)
+        Helper-->>Engine: WebSearchOutcome(skipped = true)
     else Plan parsed (1-3 queries + recency)
         LLM-->>Helper: SearchQueryPlan(queries, recency)
         par one search per query
@@ -26,16 +26,16 @@ sequenceDiagram
         Search-->>Helper: SearchResponse per query (or failure)
         Helper->>Helper: interleave results, dedupe, cap at totalMaxResults
         Helper->>Helper: compose per-query answers into one string
-        Helper-->>VM: WebSearchOutcome(results, answer, query label)
+        Helper-->>Engine: WebSearchOutcome(results, answer, query label)
     end
-    VM->>VM: buildLlmMessages() injects ## Web Data
+    Engine->>Engine: MessageBuilder injects ## Web Data
 ```
 
-Entry point: `WebSearchHelper.search()` (`app/src/main/java/com/example/buddy/ext/search/WebSearchHelper.kt`). Called from `ChatViewModel` before `buildLlmMessages()`, inside the same mutex-guarded turn described in [context-management.md](./context-management.md).
+Entry point: `WebSearchHelper.search()` (`src/common/main/kotlin/com/example/buddy/search/WebSearchHelper.kt`). Called from `ConversationEngine` before `MessageBuilder`, inside the same mutex-guarded turn described in [context-management.md](./context-management.md). Android and CLI consumers render the resulting engine events.
 
 ## Step 1 — Query Plan Generation
 
-`LlmClient.generateSearchQuery()` (`ext/llm/LlmClient.kt`) asks the active model to convert the user's message into a plan:
+`LlmClient.generateSearchQuery()` (`src/common/main/kotlin/com/example/buddy/llm/LlmClient.kt`) asks the active model to convert the user's message into a plan:
 
 ```json
 {"queries": ["query 1", "query 2"], "recency": "day|week|month|any"}

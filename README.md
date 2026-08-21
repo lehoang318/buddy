@@ -54,6 +54,24 @@
 
 7. **Enjoy!**
 
+### Desktop CLI
+
+The desktop CLI is a standalone JVM application. It uses provider API keys from environment variables. Run it with:
+
+```bash
+./gradlew :cli:run
+```
+
+Or build an executable distribution with:
+
+```bash
+./gradlew :cli:installDist
+```
+
+The CLI first requires an LLM provider and model selection, then offers optional web-search provider setup before accepting chat messages. It supports `/help`, `/provider`, `/web`, `/attach <file path>`, `/exit`, and `/quit`; Ctrl+D and double Esc also exit.
+
+The CLI reads these environment variables: `FIREWORKS_AI_API_KEY`, `OLLAMA_CLOUD_API_KEY`, `OPEN_ROUTER_API_KEY`, `SILICON_FLOW_API_KEY`, `TOGETHER_AI_API_KEY`, `EXA_API_KEY`, `LINKUP_API_KEY`, and `TAVILY_API_KEY`.
+
 ## Documentation
 
 | Document | Description |

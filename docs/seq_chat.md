@@ -15,7 +15,7 @@ sequenceDiagram
     ChatScreen->>ViewModel: onInputChange(message)
     ViewModel->>ViewModel: Validate message, add to uiState
     ViewModel->>ViewModel: processingLock.withLock {
-    ViewModel->>ViewModel: buildLlmMessages() with summaries context
+    ConversationEngine->>MessageBuilder: build messages with summaries context
     ViewModel->>LLMClient: streamCompletion(messages, model, config)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
@@ -64,7 +64,7 @@ sequenceDiagram
         WebSearch-->>WebSearchHelper: SearchResponse per query
         WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap results; compose answers
         WebSearchHelper-->>ViewModel: Merged results + answer + query label
-        ViewModel->>ViewModel: buildLlmMessages() with Web Data system message
+        ConversationEngine->>MessageBuilder: build messages with Web Data system message
         ViewModel->>LLMClient: streamCompletion(messages with ## Web Data)
         LLMClient-->>ViewModel: Stream response tokens
         ViewModel->>ViewModel: Accumulate and display
@@ -97,7 +97,7 @@ sequenceDiagram
     ViewModel->>UrlFetcher: fetchAll(urls)
     UrlFetcher->>UrlFetcher: Fetch each URL
     UrlFetcher-->>ViewModel: List<FetchedUrl>
-    ViewModel->>ViewModel: buildLlmMessages() with ## Web Data > Fetched URL
+    ConversationEngine->>MessageBuilder: build messages with ## Web Data > Fetched URL
     ViewModel->>LLMClient: streamCompletion(messages with Web Data)
     LLMClient->>LLMClient: Prepare API request
     LLMClient->>LLMClient: Send to provider
@@ -194,7 +194,7 @@ sequenceDiagram
     WebSearch-->>WebSearchHelper: Return search results per query
     WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap; compose answers
     WebSearchHelper-->>ViewModel: Merged search results
-    ViewModel->>ViewModel: buildLlmMessages() with ## Web Data
+    ConversationEngine->>MessageBuilder: build messages with ## Web Data
     Note over ViewModel: Web Data includes ### Fetched URL + ### Search Engine Summary + ### Web Search
     ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens
@@ -257,12 +257,12 @@ sequenceDiagram
         WebSearch-->>WebSearchHelper: Return error for every query
         WebSearchHelper-->>ViewModel: Error message, no results
         ViewModel->>ViewModel: Set webSearchError in uiState
-        ViewModel->>ViewModel: buildLlmMessages() without ## Web Search
+        ConversationEngine->>MessageBuilder: build messages without ## Web Search
     else some queries fail, others succeed
         WebSearch-->>WebSearchHelper: Mixed results/errors
         Note over WebSearchHelper: Warning logged; search proceeds with the successful subset
         WebSearchHelper-->>ViewModel: Partial results (no error pill)
-        ViewModel->>ViewModel: buildLlmMessages() with ## Web Data from partial results
+        ConversationEngine->>MessageBuilder: build messages with ## Web Data from partial results
     end
     ViewModel->>LLMClient: streamCompletion(messages)
     LLMClient-->>ViewModel: Stream response tokens

@@ -1,0 +1,566 @@
+package com.example.buddy.ui.settings
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.example.buddy.crypto.SessionKeyCache
+import com.example.buddy.data.BuiltInProviders
+import com.example.buddy.data.EventLog
+import com.example.buddy.data.LlmProvider
+import com.example.buddy.data.LlmSettings
+import com.example.buddy.data.SettingsRepository
+import com.example.buddy.llm.LlmClientFactory
+import com.example.buddy.llm.LlmModel
+import com.example.buddy.ui.components.SliderWithLabel
+import com.example.buddy.ui.theme.OnSurfaceVariant
+import com.example.buddy.ui.theme.Outline
+import com.example.buddy.ui.theme.SendButton
+import com.example.buddy.ui.theme.SurfaceVariant
+import com.example.buddy.ui.theme.TextColor
+import kotlinx.coroutines.launch
+
+private const val TAG = "Settings"
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    onBack: () -> Unit,
+    initialSettings: LlmSettings? = null,
+    settingsRepository: SettingsRepository? = null,
+    keyCache: SessionKeyCache? = null,
+    onSaveModelSettings: (LlmSettings) -> Unit = {}
+) {
+    val context = LocalContext.current
+    val repo = settingsRepository ?: remember { SettingsRepository(context) }
+    val cache = keyCache ?: remember { SessionKeyCache(context) }
+    val coroutineScope = rememberCoroutineScope()
+
+    val savedSettings by repo.settings.collectAsState(initial = initialSettings ?: LlmSettings())
+    val allLlmProviders by repo.allLlmProviders.collectAsState(initial = BuiltInProviders.loadLlmProviders(context))
+    val allWebSearchProviders by repo.allWebSearchProviders.collectAsState(initial = BuiltInProviders.loadWebSearchProviders(context))
+    val effectiveInitial = initialSettings ?: savedSettings
+
+    val resolvedInitialLlmKey = remember {
+        cache.getKey(effectiveInitial.provider)?.let { bytes ->
+            String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+        } ?: ""
+    }
+    val resolvedInitialWsKey = remember {
+        cache.getKey("ws_${effectiveInitial.webSearchProvider}")?.let { bytes ->
+            String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+        } ?: ""
+    }
+
+    var selectedProvider by remember(effectiveInitial.provider) { mutableStateOf(effectiveInitial.provider) }
+    var apiKey by remember { mutableStateOf(resolvedInitialLlmKey) }
+    var selectedModel by remember(effectiveInitial.model) { mutableStateOf(effectiveInitial.model) }
+
+    var selectedWebSearchProvider by remember(effectiveInitial.webSearchProvider) { mutableStateOf(effectiveInitial.webSearchProvider) }
+    var webSearchApiKey by remember { mutableStateOf(resolvedInitialWsKey) }
+
+    var availableModels by remember { mutableStateOf<List<LlmModel>>(emptyList()) }
+    var showModelSelection by remember { mutableStateOf(false) }
+    var providerDropdownExpanded by remember { mutableStateOf(false) }
+    var webSearchProviderDropdownExpanded by remember { mutableStateOf(false) }
+    var isConnecting by remember { mutableStateOf(false) }
+    var connectError by remember { mutableStateOf<String?>(null) }
+    var showAddProviderDialog by remember { mutableStateOf(false) }
+    var showLlmApiKeyDialog by remember { mutableStateOf(false) }
+    var showWsApiKeyDialog by remember { mutableStateOf(false) }
+    var showRemoveProviderConfirm by remember { mutableStateOf<LlmProvider?>(null) }
+
+    val builtInProviderIds = remember { BuiltInProviders.loadLlmProviders(context).map { it.id }.toSet() }
+
+    val currentProvider = allLlmProviders.find { it.id == selectedProvider }
+    val currentWsProvider = allWebSearchProviders.find { it.id == selectedWebSearchProvider }
+
+    fun handleConnect(provider: LlmProvider, key: String, onComplete: (success: Boolean) -> Unit) {
+        connectError = null
+        isConnecting = true
+        coroutineScope.launch {
+            try {
+                cache.saveKey(provider.id, key)
+
+                val testClient = LlmClientFactory.createTempForModels(provider, cache)
+                testClient.fold(
+                    onSuccess = { client ->
+                        val models = client.getModels()
+                        if (models.isEmpty()) {
+                            connectError = "No models available. Please check your API Key."
+                        } else {
+                            availableModels = models
+                            selectedModel = models.first().id
+
+                            val connected = client.testConnection()
+                            if (connected) {
+                                apiKey = key
+                                selectedProvider = provider.id
+                                repo.updateAll(
+                                    provider = provider.id,
+                                    model = selectedModel,
+                                    webSearchProvider = selectedWebSearchProvider
+                                )
+                                EventLog.info(TAG, "Settings connected", "provider=${provider.id}, model=$selectedModel, webSearch=$selectedWebSearchProvider")
+                            } else {
+                                connectError = "Connection failed. Please check your API Key."
+                            }
+                        }
+                    },
+                    onFailure = { e ->
+                        connectError = "Connection failed: ${e.message}"
+                    }
+                )
+            } catch (e: Exception) {
+                connectError = "Error: ${e.message}"
+            } finally {
+                isConnecting = false
+                onComplete(connectError == null)
+            }
+        }
+    }
+
+    fun handleWsSave(key: String, onComplete: () -> Unit) {
+        coroutineScope.launch {
+            webSearchApiKey = key
+            cache.saveKey("ws_$selectedWebSearchProvider", key)
+            repo.updateAll(
+                provider = selectedProvider,
+                model = selectedModel,
+                webSearchProvider = selectedWebSearchProvider
+            )
+            EventLog.info(TAG, "Web search settings saved", "provider=$selectedWebSearchProvider")
+            onComplete()
+        }
+    }
+
+    if (showAddProviderDialog) {
+        AddProviderDialog(
+            onDismiss = { showAddProviderDialog = false },
+            isConnecting = isConnecting,
+            error = connectError,
+            onConnect = { provider ->
+                coroutineScope.launch {
+                    cache.saveKey(provider.id, provider.apiKey)
+                    repo.addCustomLlmProvider(provider)
+                    selectedProvider = provider.id
+                    apiKey = provider.apiKey
+                    handleConnect(provider, provider.apiKey) { success ->
+                        if (success) {
+                            showAddProviderDialog = false
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    if (showLlmApiKeyDialog && currentProvider != null) {
+        ApiKeyConnectDialog(
+            title = "Connect to ${currentProvider.name}",
+            initialApiKey = apiKey,
+            isConnecting = isConnecting,
+            error = connectError,
+            onDismiss = {
+                showLlmApiKeyDialog = false
+                connectError = null
+            },
+            onConnect = { key ->
+                handleConnect(currentProvider, key) { success ->
+                    if (success) {
+                        showLlmApiKeyDialog = false
+                    }
+                }
+            }
+        )
+    }
+
+    if (showWsApiKeyDialog && currentWsProvider != null) {
+        ApiKeyConnectDialog(
+            title = "Connect to ${currentWsProvider.name}",
+            initialApiKey = webSearchApiKey,
+            isConnecting = isConnecting,
+            error = null,
+            onDismiss = { showWsApiKeyDialog = false },
+            onConnect = { key ->
+                handleWsSave(key) {
+                    showWsApiKeyDialog = false
+                }
+            }
+        )
+    }
+
+    showRemoveProviderConfirm?.let { providerToRemove ->
+        if (providerToRemove.id == selectedProvider) {
+            AlertDialog(
+                onDismissRequest = { showRemoveProviderConfirm = null },
+                title = { Text("Cannot Remove Active Provider", color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Please switch to a different provider before removing this one.", color = MaterialTheme.colorScheme.onSurface) },
+                confirmButton = {
+                    TextButton(onClick = { showRemoveProviderConfirm = null }) {
+                        Text("OK")
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { showRemoveProviderConfirm = null },
+                title = { Text("Remove Provider", color = MaterialTheme.colorScheme.onSurface) },
+                text = { Text("Remove ${providerToRemove.name}?", color = MaterialTheme.colorScheme.onSurface) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            cache.removeKey(providerToRemove.id)
+                            coroutineScope.launch {
+                                repo.removeCustomLlmProvider(providerToRemove.id)
+                            }
+                            showRemoveProviderConfirm = null
+                        }
+                    ) {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRemoveProviderConfirm = null }) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                textContentColor = MaterialTheme.colorScheme.onSurface
+            )
+        }
+    }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                navigationIcon = {
+                    IconButton(onClick = {
+                        onSaveModelSettings(
+                            LlmSettings(
+                                provider = effectiveInitial.provider,
+                                model = selectedModel,
+                                webSearchProvider = selectedWebSearchProvider
+                            )
+                        )
+                        onBack()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                },
+                title = {
+                    Text("Settings", color = MaterialTheme.colorScheme.onSurface)
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("LLM Provider", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = providerDropdownExpanded,
+                    onExpandedChange = { providerDropdownExpanded = it },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    OutlinedTextField(
+                        value = allLlmProviders.find { it.id == selectedProvider }?.name
+                            ?: selectedProvider.ifBlank { "" },
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("Provider") },
+                        placeholder = { Text("Select a provider") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerDropdownExpanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextColor,
+                            unfocusedTextColor = TextColor,
+                            focusedContainerColor = SurfaceVariant,
+                            unfocusedContainerColor = SurfaceVariant,
+                            focusedBorderColor = SendButton,
+                            unfocusedBorderColor = Outline,
+                            focusedLabelColor = SendButton,
+                            unfocusedLabelColor = OnSurfaceVariant
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = providerDropdownExpanded,
+                        onDismissRequest = { providerDropdownExpanded = false }
+                    ) {
+                        allLlmProviders.forEach { provider ->
+                            val isBuiltIn = provider.id in builtInProviderIds
+                            val shieldTint = when (provider.id) {
+                                "fireworks", "together" -> SendButton
+                                "ollama" -> OnSurfaceVariant
+                                else -> null
+                            }
+                            DropdownMenuItem(
+                                text = { Text(provider.name, color = MaterialTheme.colorScheme.onSurface) },
+                                leadingIcon = {
+                                    if (shieldTint != null) {
+                                        Icon(Icons.Default.Security, null, tint = shieldTint)
+                                    }
+                                },
+                                trailingIcon = if (!isBuiltIn) {
+                                    {
+                                        IconButton(
+                                            onClick = {
+                                                showRemoveProviderConfirm = provider
+                                                providerDropdownExpanded = false
+                                            }
+                                        ) {
+                                            Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                } else null,
+                                onClick = {
+                                    selectedProvider = provider.id
+                                    val savedKey = cache.getKey(provider.id)?.let { bytes ->
+                                        String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+                                    } ?: ""
+                                    apiKey = savedKey
+                                    providerDropdownExpanded = false
+                                }
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("Add Provider...", color = MaterialTheme.colorScheme.primary) },
+                            leadingIcon = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) },
+                            onClick = {
+                                providerDropdownExpanded = false
+                                connectError = null
+                                showAddProviderDialog = true
+                            }
+                        )
+                    }
+                }
+                val isLlmConnected = selectedProvider.isNotBlank() && cache.hasKey(selectedProvider) && selectedModel.isNotBlank() && !isConnecting
+                IconButton(
+                    onClick = {
+                        connectError = null
+                        showLlmApiKeyDialog = true
+                    },
+                    enabled = selectedProvider.isNotBlank() && !isConnecting
+                ) {
+                    if (isConnecting && showLlmApiKeyDialog) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = SendButton,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            if (isLlmConnected) Icons.Default.CheckCircle else Icons.Default.SwapHoriz,
+                            contentDescription = "Connect to provider",
+                            tint = if (isLlmConnected) SendButton else if (selectedProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (currentProvider != null) {
+                Text(
+                    "Base URL: ${currentProvider.baseUrl}",
+                    color = OnSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            val modelDisplayName = availableModels.find { it.id == selectedModel }?.name
+                ?: selectedModel.ifBlank { "" }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = modelDisplayName,
+                    onValueChange = { },
+                    readOnly = true,
+                    label = { Text("Default Model") },
+                    placeholder = { Text(if (availableModels.isEmpty()) "Connect to fetch models" else "Tap to select model") },
+                    trailingIcon = {
+                        if (availableModels.isNotEmpty()) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextColor,
+                        unfocusedTextColor = TextColor,
+                        focusedContainerColor = SurfaceVariant,
+                        unfocusedContainerColor = SurfaceVariant,
+                        focusedBorderColor = SendButton,
+                        unfocusedBorderColor = Outline,
+                        focusedLabelColor = SendButton,
+                        unfocusedLabelColor = OnSurfaceVariant
+                    )
+                )
+                if (availableModels.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable { showModelSelection = true }
+                    )
+                }
+            }
+
+            if (showModelSelection && availableModels.isNotEmpty()) {
+                ModelSelectionDialog(
+                    availableModels = availableModels,
+                    currentModelId = selectedModel,
+                    onModelSelected = { modelId ->
+                        selectedModel = modelId
+                        showModelSelection = false
+                    },
+                    onDismiss = { showModelSelection = false }
+                )
+            }
+
+            HorizontalDivider(color = Outline)
+
+            Text("Web Search Provider", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = webSearchProviderDropdownExpanded,
+                    onExpandedChange = { webSearchProviderDropdownExpanded = it },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    OutlinedTextField(
+                        value = allWebSearchProviders.find { it.id == selectedWebSearchProvider }?.name
+                            ?: selectedWebSearchProvider.ifBlank { "" },
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("Provider") },
+                        placeholder = { Text("Select a web search provider") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = webSearchProviderDropdownExpanded)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextColor,
+                            unfocusedTextColor = TextColor,
+                            focusedContainerColor = SurfaceVariant,
+                            unfocusedContainerColor = SurfaceVariant,
+                            focusedBorderColor = SendButton,
+                            unfocusedBorderColor = Outline,
+                            focusedLabelColor = SendButton,
+                            unfocusedLabelColor = OnSurfaceVariant
+                        )
+                    )
+                    ExposedDropdownMenu(
+                        expanded = webSearchProviderDropdownExpanded,
+                        onDismissRequest = { webSearchProviderDropdownExpanded = false }
+                    ) {
+                        allWebSearchProviders.forEach { provider ->
+                            DropdownMenuItem(
+                                text = { Text(provider.name, color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    selectedWebSearchProvider = provider.id
+                                    val savedKey = cache.getKey("ws_${provider.id}")?.let { bytes ->
+                                        String(bytes, Charsets.UTF_8).also { bytes.fill(0) }
+                                    } ?: ""
+                                    webSearchApiKey = savedKey
+                                    webSearchProviderDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                val isWsConnected = selectedWebSearchProvider.isNotBlank() && cache.hasKey("ws_$selectedWebSearchProvider")
+                IconButton(
+                    onClick = { showWsApiKeyDialog = true },
+                    enabled = selectedWebSearchProvider.isNotBlank() && !isConnecting
+                ) {
+                    if (isConnecting && showWsApiKeyDialog) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = SendButton,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            if (isWsConnected) Icons.Default.CheckCircle else Icons.Default.SwapHoriz,
+                            contentDescription = "Connect to web search provider",
+                            tint = if (isWsConnected) SendButton else if (selectedWebSearchProvider.isNotBlank()) MaterialTheme.colorScheme.onSurface else OnSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

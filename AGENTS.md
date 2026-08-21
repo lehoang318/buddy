@@ -1,11 +1,12 @@
 # Repository Notes
 
 ## Build & Verify
-- Kotlin-only changes: `./gradlew app:compileDebugKotlin`
-- Any `res/values/*.xml` change: also run `./gradlew assembleDebug` (or `mergeDebugResources`) — `compileDebugKotlin` skips AAPT2's resource-flattening pass entirely, so it will not catch a broken string resource
+- Kotlin-only changes: `./gradlew :cli:test :app:compileDebugKotlin :cli:installDist`
+- Any `src/android/main/res/values/*.xml` change: also run `./gradlew assembleDebug` (or `mergeDebugResources`) — `compileDebugKotlin` skips AAPT2's resource-flattening pass entirely, so it will not catch a broken string resource
 - String resource escaping: literal `'` and `"` must be escaped as `\'`/`\"` even inside `<![CDATA[...]]>` blocks — CDATA does not exempt Android's own escape-processing pass. AAPT2 error messages can misattribute the failure to the wrong resource name; bisect by blanking suspect strings if the reported one looks unrelated
-- No CI, no test suite, no lint/format config — manual verification only
+- No CI, no lint/format config — the desktop-JVM unit tests (`:cli:test`) are the only automated tests
 - Gradle version catalog at `gradle/libs.versions.toml`
+- Desktop JVM unit tests run with `./gradlew :cli:test`
 
 ## Architecture
 
@@ -22,9 +23,18 @@
   - `LocalUrlFetcher` — `UrlFetcher?` (`MainActivity.kt:48`)
 
 ### LLM Client Architecture
-- Single client implementation: `OpenAIClient` (`ext/llm/OpenAIClient.kt`) handles all providers
+- Single client implementation: `OpenAIClient` (`src/common/.../llm/OpenAIClient.kt`) handles all providers
 - No per-provider client code — everything goes through OpenAI-compatible `/chat/completions` and `/models` endpoints
-- `LlmClientFactory` (`ext/llm/LlmClientFactory.kt:15`) creates clients; `getModels()` creates a temp client to fetch models
+- `LlmClientFactory` (`src/common/.../llm/LlmClientFactory.kt:15`) creates clients; `getModels()` creates a temp client to fetch models
+
+### Common Sources (`src/common`)
+- Shared networking, provider, and conversation logic lives in `src/common/main/kotlin/com/example/buddy/{llm,search,fetch,chat}` and is compiled into both the `:app` (Android) and `:cli` (desktop) modules
+- `ConversationEngine` owns URL detection/fetch orchestration, web search, message assembly, streaming, summaries, and compression; Android `ChatViewModel` and the `:cli` application consume its events
+- `AppConfigProvider` supplies fine-grained configuration interfaces; Android installs `AndroidAppConfig` at startup and desktop tests use `DefaultAppConfig`
+- `DefaultAppConfig` mirrors Android `res/values` configuration; `AndroidResourcesParityTest` enforces parity
+- `Log` delegates common logging to the Phase-1 `Logger`; Android installs `EventLog` at startup
+- `KeyProvider` abstracts API-key access; Android `SessionKeyCache` remains the encrypted implementation
+- `EnvKeyProvider` maps desktop provider IDs to environment variables for the standalone `:cli` desktop application
 
 ### Providers
 - Built-in providers loaded from `res/values/providers.xml` string arrays:
@@ -52,6 +62,7 @@
 | AboutScreen | `ui/about/AboutScreen.kt` | Version, build date, author links |
 
 ### ChatViewModel
+- `ChatViewModel` retains Android UI, URI, bitmap, ContentResolver, and foreground-service concerns; reusable conversation processing is implemented by `src/common/main/kotlin/.../chat/ConversationEngine.kt`
 - `ChatViewModel.updateClient()` sets `client.activeModel = client.defaultModel` when client changes
 - File attachments: max 100KB, supported extensions: `.txt`, `.md`, `.log`, `.rst`, `.adoc`, `.asciidoc`, `.rtf`, `.json`, `.xml`, `.html`, `.py`, `.js`
 - Image processing: max dimension 1440px, converted to JPEG at 85% quality, Base64-encoded
@@ -64,6 +75,12 @@
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
 - Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
 - See `docs/context-management.md` for full details
+
+### Desktop CLI Application
+- `:cli` is a standalone JVM desktop application, separate from the offline unit-test suite
+- Run with `./gradlew :cli:run` or build an executable distribution with `./gradlew :cli:installDist`
+- API keys are read from provider-specific environment variables; normal `:cli:test` never requires them
+- Startup requires an LLM provider and model; web-search provider setup is optional
 
 ## Conventions
 - No comments added to code
