@@ -13,7 +13,7 @@
 ### Single Activity, State-Based Navigation
 - `MainActivity` is the only Activity — no Jetpack Navigation, no Fragments
 - Navigation is conditional rendering in `MainContent` (`MainActivity.kt:157`):
-  `if (showParameters) ... else if (showEvents) ... else if (showAbout) ... else if (showSettings) ... else ChatScreen`
+  `if (showParameters) ... else if (showEvents) ... else if (showAbout) ... else if (showProviders) ... else ChatScreen`
 - Each screen sets its corresponding boolean state to `false` on back
 
 ### Dependency Injection
@@ -41,7 +41,7 @@
   - LLM: Fireworks AI, Together AI, Ollama Cloud, OpenRouter, SiliconFlow
   - Web Search: Exa, LinkUp, Tavily
 - Provider IDs must match exactly when wiring web search: `"exa"`, `"linkup"`, `"tavily"`
-- Custom providers added via Settings screen, persisted as Gson JSON in DataStore under `SettingsKeys.CUSTOM_LLM_PROVIDERS`
+- Custom providers added via the Providers screen, persisted as Gson JSON in DataStore under `SettingsKeys.CUSTOM_LLM_PROVIDERS`
 - API keys stored per-provider as JSON `Map<String, String>` in DataStore (`SettingsKeys.LLM_API_KEYS`) — autoloaded on provider switch
 
 ### Settings Repository
@@ -55,8 +55,9 @@
 | Screen | File | Notes |
 |--------|------|-------|
 | ChatScreen | `ui/chat/ChatScreen.kt` | Top bar has model selector (clickable name opens ModelSelectionDialog), web search toggle, Buddy logo menu |
-| SettingsScreen | `ui/settings/SettingsScreen.kt` | Default Model is readOnly OutlinedTextField; clicking opens ModelSelectionDialog (AlertDialog) |
-| ModelSelectionScreen | `ui/settings/ModelSelectionScreen.kt` | Two variants: full-screen `ModelSelectionScreen` + `ModelSelectionDialog` (AlertDialog); both use LazyColumn + real-time search |
+| ProvidersScreen | `ui/providers/ProvidersScreen.kt` | Default Model is readOnly OutlinedTextField; clicking opens ModelSelectionDialog (AlertDialog) |
+| ModelSelectionScreen | `ui/providers/ModelSelectionScreen.kt` | Two variants: full-screen `ModelSelectionScreen` + `ModelSelectionDialog` (AlertDialog); both use LazyColumn + real-time search |
+| HistoryScreen | `ui/history/HistoryScreen.kt` | Saved chat sessions; filter chips (All/7/30 days), auto-delete toggle + confirmation dialog, bulk delete |
 | ParametersScreen | `ui/parameters/ParametersScreen.kt` | Temperature/Top-p/Top-k sliders; system message field |
 | EventsScreen | `ui/events/EventsScreen.kt` | Event log viewer; filter by level (Error/Warning/Info/Debug) and tag |
 | AboutScreen | `ui/about/AboutScreen.kt` | Version, build date, author links |
@@ -74,6 +75,7 @@
 - **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
 - Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
+- **Chat sessions** (`SessionRepository`): the active chat is auto-saved after every finished turn and on navigation (New Chat / resume), capped at `MAX_SESSIONS` (100). The most recent session is resumed on launch. `SavedSession.createdAt` is immutable; `updatedAt` drives History filters, ordering, and the 30-day auto-delete. See `docs/sessions.md`
 - See `docs/context-management.md` for full details
 
 ### Desktop CLI Application
@@ -93,6 +95,7 @@
 - `docs/dependencies.md` — external library catalog
 - `docs/context-management.md` — history summarization, compression, and Web Data architecture
 - `docs/web-search.md` — web search workflow: query-plan generation, lenient parsing for small models, parallel fan-out, merge, recency mapping
+- `docs/sessions.md` — chat session persistence, auto-save/resume, History screen, and 30-day auto-delete
 - `docs/use-cases.md` — step-by-step user guides
 - `docs/limitations.md` — known technical constraints
 - `docs/seq_chat.md` — chat sequence diagrams

@@ -23,18 +23,13 @@ object SessionKeys {
 class SessionRepository(private val context: Context) {
     companion object {
         const val AUTO_DELETE_AGE_MILLIS = 30L * 24L * 60L * 60L * 1000L
+        const val MAX_SESSIONS = 100
     }
     private val dataStore = context.sessionDataStore
     private val gson = Gson()
 
     val sessions: Flow<List<SavedSession>> = dataStore.data.map { prefs ->
-        val json = prefs[SessionKeys.SESSIONS] ?: ""
-        if (json.isBlank()) emptyList()
-        else try {
-            gson.fromJson<List<SavedSession>>(json, object : TypeToken<List<SavedSession>>() {}.type) ?: emptyList()
-        } catch (_: Exception) {
-            emptyList()
-        }
+        deserialize(prefs[SessionKeys.SESSIONS] ?: "")
     }
 
     val autoDeleteOld: Flow<Boolean> = dataStore.data.map { prefs ->
@@ -43,10 +38,10 @@ class SessionRepository(private val context: Context) {
 
     suspend fun addSession(session: SavedSession) {
         dataStore.edit { prefs ->
-            val current = prefs[SessionKeys.SESSIONS] ?: ""
-            val list = deserialize(current).toMutableList()
+            val list = deserialize(prefs[SessionKeys.SESSIONS] ?: "").toMutableList()
             list.removeAll { it.id == session.id }
             list.add(0, session)
+            while (list.size > MAX_SESSIONS) list.removeAt(list.size - 1)
             prefs[SessionKeys.SESSIONS] = serialize(list)
         }
     }
@@ -63,7 +58,7 @@ class SessionRepository(private val context: Context) {
         dataStore.edit { prefs ->
             val cutoff = System.currentTimeMillis() - ageMillis
             val list = deserialize(prefs[SessionKeys.SESSIONS] ?: "").toMutableList()
-            list.removeAll { it.createdAt < cutoff }
+            list.removeAll { it.updatedAt < cutoff }
             prefs[SessionKeys.SESSIONS] = serialize(list)
         }
     }
@@ -79,7 +74,8 @@ class SessionRepository(private val context: Context) {
     private fun deserialize(json: String): List<SavedSession> =
         if (json.isBlank()) emptyList()
         else try {
-            gson.fromJson<List<SavedSession>>(json, object : TypeToken<List<SavedSession>>() {}.type) ?: emptyList()
+            val sessions = gson.fromJson<List<SavedSession>>(json, object : TypeToken<List<SavedSession>>() {}.type) ?: emptyList()
+            sessions.map { it.copy(updatedAt = if (it.updatedAt > 0) it.updatedAt else it.createdAt) }
         } catch (_: Exception) {
             emptyList()
         }

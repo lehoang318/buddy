@@ -85,7 +85,7 @@ fun HistoryScreen(
 
     val now = System.currentTimeMillis()
     val filtered = sessions.filter { s ->
-        filter.millis == null || s.createdAt >= now - filter.millis!!
+        filter.millis == null || s.updatedAt >= now - filter.millis!!
     }
     val selectedCount = selectedIds.values.count { it }
 
@@ -169,7 +169,7 @@ fun HistoryScreen(
                             checked = autoDeleteOld,
                             onCheckedChange = { enabled ->
                                 scaffoldScope.launch { repository.setAutoDeleteOld(enabled) }
-                                if (enabled && sessions.any { it.createdAt < now - SessionRepository.AUTO_DELETE_AGE_MILLIS }) {
+                                if (enabled && sessions.any { it.updatedAt < now - SessionRepository.AUTO_DELETE_AGE_MILLIS }) {
                                     showPurgeConfirm = true
                                 }
                             }
@@ -217,7 +217,7 @@ fun HistoryScreen(
                                 )
                                 Spacer(Modifier.height(2.dp))
                                 Text(
-                                    text = dateFormat.format(Date(session.createdAt)),
+                                    text = dateFormat.format(Date(session.updatedAt)),
                                     color = OnSurfaceVariant,
                                     style = MaterialTheme.typography.labelSmall
                                 )

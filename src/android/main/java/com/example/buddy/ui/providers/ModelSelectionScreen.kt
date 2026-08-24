@@ -1,4 +1,4 @@
-package com.example.buddy.ui.settings
+package com.example.buddy.ui.providers
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable

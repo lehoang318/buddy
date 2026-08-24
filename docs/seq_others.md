@@ -2,13 +2,13 @@
 
 ## Other Scenarios
 
-### 1. Settings - Initial Configuration (Happy Path)
+### 1. Providers - Initial Configuration (Happy Path)
 
 ```mermaid
 sequenceDiagram
     participant User
     participant MainActivity
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
@@ -22,180 +22,180 @@ sequenceDiagram
 
     User->>MainActivity: Tap Buddy logo
     MainActivity->>MainActivity: Show menu dropdown
-    MainActivity->>MainActivity: User selects Settings
+    MainActivity->>MainActivity: User selects Providers
 
-    User->>SettingsScreen: Settings screen opens
-    SettingsScreen->>SettingsRepository: getSettings()
-    SettingsRepository-->>SettingsScreen: Return saved settings
+    User->>ProvidersScreen: Providers screen opens
+    ProvidersScreen->>SettingsRepository: getSettings()
+    SettingsRepository-->>ProvidersScreen: Return saved settings
 
-    User->>SettingsScreen: Select provider from dropdown
-    SettingsScreen->>SettingsScreen: Update selected provider
+    User->>ProvidersScreen: Select provider from dropdown
+    ProvidersScreen->>ProvidersScreen: Update selected provider
 
-    User->>SettingsScreen: Tap connect button
-    SettingsScreen->>SettingsScreen: Show ApiKeyConnectDialog
-    User->>SettingsScreen: Enter API key and tap Connect
-    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
-    SettingsScreen->>LlmClientFactory: getModels(provider)
+    User->>ProvidersScreen: Tap connect button
+    ProvidersScreen->>ProvidersScreen: Show ApiKeyConnectDialog
+    User->>ProvidersScreen: Enter API key and tap Connect
+    ProvidersScreen->>SessionKeyCache: saveKey(providerId, key)
+    ProvidersScreen->>LlmClientFactory: getModels(provider)
     LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
-    LlmClientFactory-->>SettingsScreen: Return list of models
+    LlmClientFactory-->>ProvidersScreen: Return list of models
 
-    Note over SettingsScreen: Auto-select first model: selectedModel = models.first().id
+    Note over ProvidersScreen: Auto-select first model: selectedModel = models.first().id
 
-    SettingsScreen->>LlmClientFactory: createWithProvider(provider, selectedModel)
+    ProvidersScreen->>LlmClientFactory: createWithProvider(provider, selectedModel)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
-    LLMClient-->>SettingsScreen: Connection successful
+    LLMClient-->>ProvidersScreen: Connection successful
 
-    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
+    ProvidersScreen->>SettingsRepository: updateAll(provider, model, ...)
     SettingsRepository->>SettingsRepository: Save non-sensitive settings
-    SettingsRepository-->>SettingsScreen: Settings saved
+    SettingsRepository-->>ProvidersScreen: Settings saved
 
-    User->>SettingsScreen: Tap back button
-    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
-    SettingsScreen->>MainActivity: onBack()
+    User->>ProvidersScreen: Tap back button
+    ProvidersScreen->>ProvidersScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
+    ProvidersScreen->>MainActivity: onBack()
     MainActivity-->>User: Return to chat screen
 ```
 
-### 2. Settings - Add Custom Provider
+### 2. Providers - Add Custom Provider
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
 
-    User->>SettingsScreen: Open settings
-    SettingsScreen->>SettingsScreen: Display current settings
+    User->>ProvidersScreen: Open providers
+    ProvidersScreen->>ProvidersScreen: Display current settings
 
-    User->>SettingsScreen: Tap LLM provider dropdown
-    SettingsScreen->>SettingsScreen: Show provider list
-    User->>SettingsScreen: Tap "Add Provider..."
-    SettingsScreen->>SettingsScreen: Show AddProviderDialog
+    User->>ProvidersScreen: Tap LLM provider dropdown
+    ProvidersScreen->>ProvidersScreen: Show provider list
+    User->>ProvidersScreen: Tap "Add Provider..."
+    ProvidersScreen->>ProvidersScreen: Show AddProviderDialog
 
-    User->>SettingsScreen: Enter name, base URL, API key
-    SettingsScreen->>SettingsScreen: Tap "Add"
-    SettingsScreen->>SessionKeyCache: saveKey(providerId, apiKey)
-    SettingsScreen->>SettingsRepository: addCustomLlmProvider(provider config without key)
+    User->>ProvidersScreen: Enter name, base URL, API key
+    ProvidersScreen->>ProvidersScreen: Tap "Add"
+    ProvidersScreen->>SessionKeyCache: saveKey(providerId, apiKey)
+    ProvidersScreen->>SettingsRepository: addCustomLlmProvider(provider config without key)
     SettingsRepository->>SettingsRepository: Save to DataStore (key stripped)
-    SettingsRepository-->>SettingsScreen: Provider saved
+    SettingsRepository-->>ProvidersScreen: Provider saved
 
-    SettingsScreen->>SettingsScreen: Select new provider from dropdown
-    SettingsScreen->>SettingsScreen: handleConnect()
-    SettingsScreen->>LlmClientFactory: getModels(provider)
+    ProvidersScreen->>ProvidersScreen: Select new provider from dropdown
+    ProvidersScreen->>ProvidersScreen: handleConnect()
+    ProvidersScreen->>LlmClientFactory: getModels(provider)
     LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
-    LlmClientFactory-->>SettingsScreen: Return list of models
+    LlmClientFactory-->>ProvidersScreen: Return list of models
 
-    Note over SettingsScreen: Auto-select first model
+    Note over ProvidersScreen: Auto-select first model
 
-    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
+    ProvidersScreen->>SettingsRepository: updateAll(provider, model, ...)
     SettingsRepository->>SettingsRepository: Save non-sensitive settings (no apiKey)
-    SettingsRepository-->>SettingsScreen: Settings saved
+    SettingsRepository-->>ProvidersScreen: Settings saved
 
-    SettingsScreen-->>User: Return to chat screen
+    ProvidersScreen-->>User: Return to chat screen
 ```
 
-### 3. Settings - Change Model
+### 3. Providers - Change Model
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SettingsRepository
     participant MainActivity
 
-    User->>SettingsScreen: Open settings
-    SettingsScreen->>SettingsScreen: Display current settings
+    User->>ProvidersScreen: Open providers
+    ProvidersScreen->>ProvidersScreen: Display current settings
 
-    User->>SettingsScreen: Tap sync button to refresh models
-    SettingsScreen->>SettingsScreen: Fetch available models
-    SettingsScreen-->>User: Show model list
+    User->>ProvidersScreen: Tap sync button to refresh models
+    ProvidersScreen->>ProvidersScreen: Fetch available models
+    ProvidersScreen-->>User: Show model list
 
-    User->>SettingsScreen: Tap "Default Model" field
-    SettingsScreen->>SettingsScreen: Show ModelSelectionDialog
-    User->>SettingsScreen: Select new model from dialog
-    SettingsScreen->>SettingsScreen: Update selected model
+    User->>ProvidersScreen: Tap "Default Model" field
+    ProvidersScreen->>ProvidersScreen: Show ModelSelectionDialog
+    User->>ProvidersScreen: Select new model from dialog
+    ProvidersScreen->>ProvidersScreen: Update selected model
 
-    User->>SettingsScreen: Tap back button
-    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
-    SettingsScreen->>MainActivity: onBack()
+    User->>ProvidersScreen: Tap back button
+    ProvidersScreen->>ProvidersScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
+    ProvidersScreen->>MainActivity: onBack()
     MainActivity->>MainActivity: Update LLM client with new model
     MainActivity-->>User: Return to chat screen
 ```
 
-### 4. Settings - Change Web Search Provider
+### 4. Providers - Change Web Search Provider
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SessionKeyCache
     participant SettingsRepository
     participant MainActivity
     participant WebSearch
 
-    User->>SettingsScreen: Open settings
-    SettingsScreen->>SettingsScreen: Display current settings
+    User->>ProvidersScreen: Open providers
+    ProvidersScreen->>ProvidersScreen: Display current settings
 
-    User->>SettingsScreen: Select web search provider from dropdown
-    SettingsScreen->>SettingsScreen: Update selected provider
+    User->>ProvidersScreen: Select web search provider from dropdown
+    ProvidersScreen->>ProvidersScreen: Update selected provider
 
-    User->>SettingsScreen: Tap connect button
-    SettingsScreen->>SettingsScreen: Show ApiKeyConnectDialog
-    User->>SettingsScreen: Enter API key and tap Connect
-    SettingsScreen->>SessionKeyCache: saveKey("ws_${providerId}", key)
-    SettingsScreen->>SettingsRepository: updateAll(provider, model, webSearchProvider)
+    User->>ProvidersScreen: Tap connect button
+    ProvidersScreen->>ProvidersScreen: Show ApiKeyConnectDialog
+    User->>ProvidersScreen: Enter API key and tap Connect
+    ProvidersScreen->>SessionKeyCache: saveKey("ws_${providerId}", key)
+    ProvidersScreen->>SettingsRepository: updateAll(provider, model, webSearchProvider)
     SettingsRepository->>SettingsRepository: Save settings (no key)
-    SettingsRepository-->>SettingsScreen: Settings saved
+    SettingsRepository-->>ProvidersScreen: Settings saved
 
-    SettingsScreen->>MainActivity: onBack()
+    ProvidersScreen->>MainActivity: onBack()
     MainActivity->>MainActivity: keyCache.keyIds flow triggers combine
     MainActivity->>MainActivity: Create WebSearch instance with ApiKeyInterceptor
     MainActivity-->>User: Return to chat screen
 ```
 
-### 5. Settings - Connection Error Handling
+### 5. Providers - Connection Error Handling
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SessionKeyCache
     participant LlmClientFactory
     participant LLMClient
 
-    User->>SettingsScreen: Enter API key in dialog and tap Connect
-    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
-    SettingsScreen->>LlmClientFactory: getModels(provider)
+    User->>ProvidersScreen: Enter API key in dialog and tap Connect
+    ProvidersScreen->>SessionKeyCache: saveKey(providerId, key)
+    ProvidersScreen->>LlmClientFactory: getModels(provider)
     LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
     Note over LlmClientFactory: Invalid API key
-    LlmClientFactory-->>SettingsScreen: Return error
+    LlmClientFactory-->>ProvidersScreen: Return error
 
-    SettingsScreen->>SettingsScreen: Show error message
-    SettingsScreen-->>User: Display "Invalid API key" message
+    ProvidersScreen->>ProvidersScreen: Show error message
+    ProvidersScreen-->>User: Display "Invalid API key" message
 
-    User->>SettingsScreen: Dismiss error dialog
-    SettingsScreen->>SettingsScreen: Clear error state
+    User->>ProvidersScreen: Dismiss error dialog
+    ProvidersScreen->>ProvidersScreen: Clear error state
 
-    User->>SettingsScreen: Enter correct API key and tap Connect
-    SettingsScreen->>SessionKeyCache: saveKey(providerId, key)
-    SettingsScreen->>LlmClientFactory: getModels(provider)
+    User->>ProvidersScreen: Enter correct API key and tap Connect
+    ProvidersScreen->>SessionKeyCache: saveKey(providerId, key)
+    ProvidersScreen->>LlmClientFactory: getModels(provider)
     LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
-    LlmClientFactory-->>SettingsScreen: Return list of models
+    LlmClientFactory-->>ProvidersScreen: Return list of models
 
-    User->>SettingsScreen: Select model
-    SettingsScreen->>LlmClientFactory: createWithProvider(provider, model)
+    User->>ProvidersScreen: Select model
+    ProvidersScreen->>LlmClientFactory: createWithProvider(provider, model)
     LlmClientFactory->>LlmClientFactory: Create LLM client instance
     LLMClient->>LLMClient: testConnection()
-    LLMClient-->>SettingsScreen: Connection successful
+    LLMClient-->>ProvidersScreen: Connection successful
 
-    SettingsScreen->>SettingsScreen: Save settings
-    SettingsScreen-->>User: Return to chat screen
+    ProvidersScreen->>ProvidersScreen: Save settings
+    ProvidersScreen-->>User: Return to chat screen
 ```
 
 ### 6. Events Screen - View Event Log
@@ -329,14 +329,14 @@ sequenceDiagram
     Browser-->>User: Display LinkedIn profile
 ```
 
-### 10. Settings - Menu Navigation Flow
+### 10. Providers - Menu Navigation Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant MainActivity
     participant ChatScreen
-    participant SettingsScreen
+    participant ProvidersScreen
     participant EventsScreen
     participant AboutScreen
 
@@ -346,12 +346,12 @@ sequenceDiagram
     User->>MainActivity: Tap Buddy logo
     MainActivity->>MainActivity: Show menu dropdown
 
-    User->>MainActivity: Select Settings
-    MainActivity->>SettingsScreen: Navigate to settings
-    SettingsScreen-->>User: Show settings screen
+    User->>MainActivity: Select Providers
+    MainActivity->>ProvidersScreen: Navigate to providers
+    ProvidersScreen-->>User: Show providers screen
 
-    User->>SettingsScreen: Tap back button
-    SettingsScreen->>MainActivity: Return to chat
+    User->>ProvidersScreen: Tap back button
+    ProvidersScreen->>MainActivity: Return to chat
     MainActivity->>ChatScreen: Resume chat screen
 
     User->>MainActivity: Tap Buddy logo again
@@ -378,42 +378,42 @@ sequenceDiagram
     MainActivity->>ChatScreen: Resume chat screen
 ```
 
-### 11. Settings - Model Refresh
+### 11. Providers - Model Refresh
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant SettingsScreen
+    participant ProvidersScreen
     participant SessionKeyCache
     participant SettingsRepository
     participant LlmClientFactory
 
-    User->>SettingsScreen: Open settings
-    SettingsScreen->>SettingsScreen: Display current settings
+    User->>ProvidersScreen: Open providers
+    ProvidersScreen->>ProvidersScreen: Display current settings
 
-    User->>SettingsScreen: Tap connect button to refresh models
-    SettingsScreen->>SettingsScreen: handleConnect()
-    SettingsScreen->>SessionKeyCache: saveKey(providerId, key) (if new)
-    SettingsScreen->>LlmClientFactory: getModels(provider)
+    User->>ProvidersScreen: Tap connect button to refresh models
+    ProvidersScreen->>ProvidersScreen: handleConnect()
+    ProvidersScreen->>SessionKeyCache: saveKey(providerId, key) (if new)
+    ProvidersScreen->>LlmClientFactory: getModels(provider)
     LlmClientFactory->>LlmClientFactory: ApiKeyInterceptor reads key from SessionKeyCache
     LlmClientFactory->>LlmClientFactory: Call provider API
-    LlmClientFactory-->>SettingsScreen: Return updated model list
+    LlmClientFactory-->>ProvidersScreen: Return updated model list
 
-    Note over SettingsScreen: Auto-select first model
+    Note over ProvidersScreen: Auto-select first model
 
-    SettingsScreen->>SettingsScreen: Show new available models in dialog
+    ProvidersScreen->>ProvidersScreen: Show new available models in dialog
 
-    User->>SettingsScreen: Select newly available model
-    SettingsScreen->>SettingsScreen: Update selected model via ModelSelectionDialog
+    User->>ProvidersScreen: Select newly available model
+    ProvidersScreen->>ProvidersScreen: Update selected model via ModelSelectionDialog
 
-    User->>SettingsScreen: Tap back to save
-    SettingsScreen->>SettingsScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
-    SettingsScreen->>SettingsRepository: updateAll(provider, model, ...)
-    SettingsRepository-->>SettingsScreen: Settings saved
+    User->>ProvidersScreen: Tap back to save
+    ProvidersScreen->>ProvidersScreen: onSaveModelSettings(LlmSettings(model=selectedModel, ...))
+    ProvidersScreen->>SettingsRepository: updateAll(provider, model, ...)
+    SettingsRepository-->>ProvidersScreen: Settings saved
 
-    SettingsScreen-->>User: Return to chat screen
+    ProvidersScreen-->>User: Return to chat screen
 ```
 
 ---
 
-**Note**: These diagrams represent high-level happy path scenarios for settings, events, and about functionality. Detailed error handling and edge cases are not shown for clarity.
+**Note**: These diagrams represent high-level happy path scenarios for providers, events, and about functionality. Detailed error handling and edge cases are not shown for clarity.

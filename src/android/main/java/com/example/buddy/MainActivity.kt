@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +42,12 @@ import com.example.buddy.ui.chat.ChatViewModelFactory
 import com.example.buddy.ui.events.EventsScreen
 import com.example.buddy.ui.history.HistoryScreen
 import com.example.buddy.ui.parameters.ParametersScreen
-import com.example.buddy.ui.settings.SettingsScreen
+import com.example.buddy.ui.providers.ProvidersScreen
 import com.example.buddy.ui.theme.BuddyTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 
@@ -187,16 +189,24 @@ fun MainContent(
     val urlFetcher by urlFetcherFlow.collectAsStateWithLifecycle()
     val currentSettings by currentSettingsFlow.collectAsStateWithLifecycle()
 
-    var showSettings by remember { mutableStateOf(false) }
+    var showProviders by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
     var showEvents by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
+    val application = LocalContext.current.applicationContext as android.app.Application
+
     val chatViewModel: ChatViewModel = viewModel(
-        factory = ChatViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+        factory = ChatViewModelFactory(application)
     )
+
+    val resumeRepository = remember { SessionRepository(application) }
+    LaunchedEffect(Unit) {
+        val last = resumeRepository.sessions.first().firstOrNull()
+        if (last != null) chatViewModel.resumeSession(last)
+    }
 
     if (showParameters) {
         ParametersScreen(
@@ -228,9 +238,9 @@ fun MainContent(
                 showHistory = false
             }
         )
-    } else if (showSettings) {
-        SettingsScreen(
-            onBack = { showSettings = false },
+    } else if (showProviders) {
+        ProvidersScreen(
+            onBack = { showProviders = false },
             initialSettings = currentSettings,
             settingsRepository = settingsRepository,
             keyCache = keyCache,
@@ -254,7 +264,7 @@ fun MainContent(
                 ProvideLlmClient(llmClient!!) {
                     ProvideWebSearch(webSearch) {
                         ChatScreen(
-                            onNavigateToSettings = { showSettings = true },
+                            onNavigateToProviders = { showProviders = true },
                             onNavigateToParameters = { showParameters = true },
                             onNavigateToEvents = { showEvents = true },
                             onNavigateToAbout = { showAbout = true },
@@ -265,7 +275,7 @@ fun MainContent(
             } else {
                 ProvideWebSearch(webSearch) {
                     ChatScreen(
-                        onNavigateToSettings = { showSettings = true },
+                        onNavigateToProviders = { showProviders = true },
                         onNavigateToParameters = { showParameters = true },
                         onNavigateToEvents = { showEvents = true },
                         onNavigateToAbout = { showAbout = true },

@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
 import com.example.buddy.llm.LlmModel
-import com.example.buddy.ui.settings.ModelSelectionDialog
+import com.example.buddy.ui.providers.ModelSelectionDialog
 import com.example.buddy.ui.theme.Dimens
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +65,7 @@ fun BuddyChatTopBar(
     webSearchAvailable: Boolean,
     onModelSelect: (String) -> Unit,
     onToggleWeb: () -> Unit,
-    onSettings: () -> Unit,
+    onProviders: () -> Unit,
     onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
     onAbout: () -> Unit = {},
@@ -125,11 +125,11 @@ fun BuddyChatTopBar(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Default.Dns, null, tint = MaterialTheme.colorScheme.onSurface) },
-                        text = { Text("Providers", color = MaterialTheme.colorScheme.onSurface) },
+                        leadingIcon = { Icon(Icons.Default.NoteAdd, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("New Chat", color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             menuExpanded = false
-                            onSettings()
+                            onClearChat()
                         }
                     )
                     DropdownMenuItem(
@@ -149,11 +149,11 @@ fun BuddyChatTopBar(
                         }
                     )
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Default.NoteAdd, null, tint = MaterialTheme.colorScheme.onSurface) },
-                        text = { Text("New Chat", color = MaterialTheme.colorScheme.onSurface) },
+                        leadingIcon = { Icon(Icons.Default.Dns, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("Providers", color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             menuExpanded = false
-                            onClearChat()
+                            onProviders()
                         }
                     )
                     HorizontalDivider()
@@ -221,7 +221,7 @@ fun BuddyChatTopBar(
                 }
             } else {
                 Surface(
-                    onClick = { onSettings() },
+                    onClick = { onProviders() },
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.padding(start = 12.dp)
@@ -247,7 +247,7 @@ fun BuddyChatTopBar(
             }
             Spacer(Modifier.width(8.dp))
             IconButton(
-                onClick = if (webSearchAvailable) onToggleWeb else onSettings
+                onClick = if (webSearchAvailable) onToggleWeb else onProviders
             ) {
                 Icon(
                     Icons.Default.Language,

@@ -51,7 +51,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    onNavigateToSettings: () -> Unit,
+    onNavigateToProviders: () -> Unit,
     onNavigateToParameters: () -> Unit = {},
     onNavigateToEvents: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
@@ -156,7 +156,7 @@ fun ChatScreen(
                 webSearchAvailable = webSearch != null,
                 onModelSelect = vm::selectModel,
                 onToggleWeb = vm::toggleWebSearch,
-                onSettings = onNavigateToSettings,
+                onProviders = onNavigateToProviders,
                 onParameters = onNavigateToParameters,
                 onEvents = onNavigateToEvents,
                 onAbout = onNavigateToAbout,

@@ -73,6 +73,7 @@ class ChatViewModel(
     private val sessionRepository = SessionRepository(application)
 
     private var activeSessionId: String? = null
+    private var activeSessionCreatedAt: Long = 0
     private var dirty = false
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -170,6 +171,9 @@ class ChatViewModel(
                 imageBase64 = m.imageBase64,
                 attachedFileName = m.attachedFileName,
                 attachedFileText = m.attachedFileText,
+                webSearchUsed = m.webSearchUsed,
+                webSearchSkipped = m.webSearchSkipped,
+                webSearchQueries = m.webSearchQueries,
                 timestamp = m.timestamp
             )
         }
@@ -180,13 +184,15 @@ class ChatViewModel(
         return if (activeId != null) {
             SavedSession(
                 id = activeId,
-                createdAt = System.currentTimeMillis(),
+                createdAt = activeSessionCreatedAt,
+                updatedAt = System.currentTimeMillis(),
                 title = title,
                 raw = raw,
                 summaries = state.summaries
             )
         } else {
             SavedSession(
+                createdAt = System.currentTimeMillis(),
                 title = title,
                 raw = raw,
                 summaries = state.summaries
@@ -194,12 +200,20 @@ class ChatViewModel(
         }
     }
 
+    private suspend fun saveCurrentSession() {
+        val toSave = buildCurrentSession() ?: return
+        sessionRepository.addSession(toSave)
+        activeSessionId = toSave.id
+        activeSessionCreatedAt = toSave.createdAt
+        dirty = false
+    }
+
     fun startNewChat() {
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
-            val toSave = buildCurrentSession()
-            toSave?.let { sessionRepository.addSession(it) }
+            saveCurrentSession()
             activeSessionId = null
+            activeSessionCreatedAt = 0
             dirty = false
             clearChat()
         }
@@ -208,8 +222,7 @@ class ChatViewModel(
     fun resumeSession(session: SavedSession) {
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
-            val toSave = buildCurrentSession()
-            toSave?.let { sessionRepository.addSession(it) }
+            saveCurrentSession()
             withRestoredSession(session)
         }
     }
@@ -222,6 +235,9 @@ class ChatViewModel(
                 imageBase64 = m.imageBase64,
                 attachedFileName = m.attachedFileName,
                 attachedFileText = m.attachedFileText,
+                webSearchUsed = m.webSearchUsed,
+                webSearchSkipped = m.webSearchSkipped,
+                webSearchQueries = m.webSearchQueries,
                 timestamp = m.timestamp,
                 isStreaming = false,
                 isComplete = true
@@ -254,6 +270,7 @@ class ChatViewModel(
             )
         }
         activeSessionId = session.id
+        activeSessionCreatedAt = session.createdAt
         dirty = false
     }
 
@@ -475,6 +492,7 @@ class ChatViewModel(
                         }
                     }
                 }
+                saveCurrentSession()
             } catch (e: CancellationException) {
                 _uiState.update { current ->
                     current.copy(
