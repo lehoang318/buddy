@@ -13,7 +13,11 @@ import com.example.buddy.chat.ConversationEngine
 import com.example.buddy.chat.ConversationEvent
 import com.example.buddy.chat.TextAttachment
 import com.example.buddy.chat.TextAttachmentRules
+import com.example.buddy.chat.ConversationMessage
 import com.example.buddy.data.Role
+import com.example.buddy.data.SavedSession
+import com.example.buddy.data.SessionMessage
+import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.Summary
 import com.example.buddy.fetch.UrlFetcher
 import com.example.buddy.llm.LlmClient
@@ -29,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import com.example.buddy.data.ChatMessage as UiChatMessage
@@ -64,6 +69,11 @@ class ChatViewModel(
 ) : ViewModel() {
 
     private var llmClient: LlmClient? = null
+
+    private val sessionRepository = SessionRepository(application)
+
+    private var activeSessionId: String? = null
+    private var dirty = false
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -146,6 +156,107 @@ class ChatViewModel(
         }
     }
 
+    private fun buildCurrentSession(): SavedSession? {
+        val state = _uiState.value
+        val hasRealMessage = state.messages.any { it.role == Role.USER }
+        if (!hasRealMessage) return null
+
+        val title = state.messages.firstOrNull { it.role == Role.USER }
+            ?.content?.trim()?.take(50)?.ifBlank { "Untitled" } ?: "Untitled"
+        val raw = state.messages.map { m ->
+            SessionMessage(
+                role = m.role,
+                content = m.content,
+                imageBase64 = m.imageBase64,
+                attachedFileName = m.attachedFileName,
+                attachedFileText = m.attachedFileText,
+                timestamp = m.timestamp
+            )
+        }
+
+        val activeId = activeSessionId
+        if (activeId != null && !dirty) return null
+
+        return if (activeId != null) {
+            SavedSession(
+                id = activeId,
+                createdAt = System.currentTimeMillis(),
+                title = title,
+                raw = raw,
+                summaries = state.summaries
+            )
+        } else {
+            SavedSession(
+                title = title,
+                raw = raw,
+                summaries = state.summaries
+            )
+        }
+    }
+
+    fun startNewChat() {
+        viewModelScope.launch {
+            currentJob?.cancelAndJoin()
+            val toSave = buildCurrentSession()
+            toSave?.let { sessionRepository.addSession(it) }
+            activeSessionId = null
+            dirty = false
+            clearChat()
+        }
+    }
+
+    fun resumeSession(session: SavedSession) {
+        viewModelScope.launch {
+            currentJob?.cancelAndJoin()
+            val toSave = buildCurrentSession()
+            toSave?.let { sessionRepository.addSession(it) }
+            withRestoredSession(session)
+        }
+    }
+
+    private fun withRestoredSession(session: SavedSession) {
+        val raw = session.raw.map { m ->
+            UiChatMessage(
+                role = m.role,
+                content = m.content,
+                imageBase64 = m.imageBase64,
+                attachedFileName = m.attachedFileName,
+                attachedFileText = m.attachedFileText,
+                timestamp = m.timestamp,
+                isStreaming = false,
+                isComplete = true
+            )
+        }
+        val engineHistory = session.raw.map { m ->
+            ConversationMessage(
+                role = m.role,
+                content = m.content,
+                imageBase64 = m.imageBase64,
+                attachment = m.attachedFileText?.let { TextAttachment(m.attachedFileName ?: "attachment", it) }
+            )
+        }
+        conversationEngine.restore(engineHistory, session.summaries)
+        _uiState.update { state ->
+            state.copy(
+                messages = raw,
+                inputText = "",
+                pendingImageBase64 = null,
+                pendingFileUri = null,
+                pendingFileName = null,
+                webSearchError = null,
+                webSearchCancelled = false,
+                fileTooLargeError = null,
+                urlFetchWarnings = emptyList(),
+                isLoading = false,
+                isStreaming = false,
+                urlFetchInProgress = false,
+                summaries = session.summaries
+            )
+        }
+        activeSessionId = session.id
+        dirty = false
+    }
+
     private fun loadAvailableModels() {
         val client = llmClient ?: return
         viewModelScope.launch {
@@ -221,6 +332,8 @@ class ChatViewModel(
         val state = _uiState.value
         val text = state.inputText.trim()
         if (text.isBlank()) return
+
+        dirty = true
 
         val correlationId = java.util.UUID.randomUUID().toString()
         EventLog.info(TAG, "User input: ${text.length} chars", correlationId = correlationId)

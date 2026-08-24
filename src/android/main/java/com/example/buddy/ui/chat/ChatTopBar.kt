@@ -15,12 +15,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +69,7 @@ fun BuddyChatTopBar(
     onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
     onAbout: () -> Unit = {},
+    onHistory: () -> Unit = {},
     onClearChat: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -123,11 +125,19 @@ fun BuddyChatTopBar(
                     onDismissRequest = { menuExpanded = false }
                 ) {
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.onSurface) },
-                        text = { Text("Settings", color = MaterialTheme.colorScheme.onSurface) },
+                        leadingIcon = { Icon(Icons.Default.Dns, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("Providers", color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             menuExpanded = false
                             onSettings()
+                        }
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = { Icon(Icons.Default.History, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("History", color = MaterialTheme.colorScheme.onSurface) },
+                        onClick = {
+                            menuExpanded = false
+                            onHistory()
                         }
                     )
                     DropdownMenuItem(
@@ -139,8 +149,8 @@ fun BuddyChatTopBar(
                         }
                     )
                     DropdownMenuItem(
-                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
-                        text = { Text("Clear Chat", color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Default.NoteAdd, null, tint = MaterialTheme.colorScheme.onSurface) },
+                        text = { Text("New Chat", color = MaterialTheme.colorScheme.onSurface) },
                         onClick = {
                             menuExpanded = false
                             onClearChat()

@@ -76,6 +76,12 @@ class ConversationEngine(
         _summaries.value = emptyList()
     }
 
+    fun restore(messages: List<ConversationMessage>, summaries: List<Summary>) {
+        history.clear()
+        history.addAll(messages)
+        _summaries.value = summaries
+    }
+
     fun send(
         userText: String,
         attachment: TextAttachment? = null,
