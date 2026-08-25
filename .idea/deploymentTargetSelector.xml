@@ -15,10 +15,10 @@
       </SelectionState>
       <SelectionState runConfigName="android.Buddy.app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-06-09T17:38:16.841602234Z">
+        <DropdownSelection timestamp="2026-08-24T16:15:54.045486302Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=QV7711J1J4" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=HQ65AU0B81" />
             </handle>
           </Target>
         </DropdownSelection>

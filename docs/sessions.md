@@ -15,14 +15,15 @@ Chat sessions are persisted locally so you can leave a conversation and resume i
 
 | Aspect | Detail |
 |--------|--------|
-| Storage | Jetpack DataStore (`DataStore<Preferences>`, file `sessions`) |
-| Format | A JSON array of `SavedSession` (Gson) stored in the `sessions_list` preference key |
+| Storage | Backed by a `SessionStorage` strategy; Android uses Jetpack DataStore (`DataStore<Preferences>`, file `sessions`) |
+| Format | A JSON array of `SavedSession` (Gson) in the `sessions_list` preference key (Android) |
 | SavedSession | `id`, `title`, `createdAt`, `updatedAt`, `raw` (list of `SessionMessage`), `summaries` |
 | Cap | At most `SessionRepository.MAX_SESSIONS` (100) sessions are kept; the oldest are trimmed |
-| Repository | `SessionRepository` in `src/android/main/java/com/example/buddy/data/` |
+| Repository | `SessionRepository` + `SessionStorage` in `src/common/.../data/`; Android impl `DataStoreSessionStorage` in `src/android/.../data/` |
+| Manager | `ChatSessionManager` in `src/common/.../chat/` (id/createdAt/dirty bookkeeping, save/reset/bind) |
 | UI | `HistoryScreen` in `src/android/main/java/com/example/buddy/ui/history/` |
 
-`createdAt` is set once when a session is first saved and never changes. `updatedAt` is refreshed on **every** save (including auto-saves after each turn), so a session you revisit always moves back to the top of the list and is re-aged for filtering and auto-deletion. Loaded sessions missing `updatedAt` (from before this field existed) are normalized to fall back to `createdAt`.
+`createdAt` is set once when a session is first saved and never changes. `updatedAt` is refreshed on **every** save (including auto-saves after each turn), so a session you revisit always moves back to the top of the list and is re-aged for filtering and auto-deletion. Loaded sessions missing `updatedAt` (from before this field existed) are normalized to fall back to `createdAt`; likewise, messages missing `webSearchQueries` (from before that field existed) are normalized to an empty list. Gson deserializes via `Unsafe` and bypasses Kotlin default values, so these can surface as `null`.
 
 ## Save & Resume Flow
 
@@ -115,7 +116,11 @@ Behavioral notes:
 
 ## Related Files
 
-- `src/android/main/java/com/example/buddy/data/SessionRepository.kt` — session persistence, auto-delete flag, purge logic
+- `src/common/main/kotlin/com/example/buddy/data/Sessions.kt` — `SavedSession` / `SessionMessage` data classes
+- `src/common/main/kotlin/com/example/buddy/data/SessionRepository.kt` — session persistence logic, auto-delete flag, purge logic, cap
+- `src/common/main/kotlin/com/example/buddy/data/SessionStorage.kt` — `SessionStorage` persistence interface
+- `src/common/main/kotlin/com/example/buddy/chat/ChatSessionManager.kt` — id/createdAt/dirty bookkeeping, save/reset/bind
+- `src/android/main/java/com/example/buddy/data/DataStoreSessionStorage.kt` — Android DataStore-backed `SessionStorage` implementation
 - `src/android/main/java/com/example/buddy/ui/history/HistoryScreen.kt` — History screen, filters, toggle + confirmation dialog
 - `src/android/main/java/com/example/buddy/ui/chat/ChatViewModel.kt` — save/resume orchestration and streaming cancellation
 - `src/android/main/java/com/example/buddy/MainActivity.kt` — startup purge trigger

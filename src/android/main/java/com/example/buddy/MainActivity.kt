@@ -47,7 +47,6 @@ import com.example.buddy.ui.theme.BuddyTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 
@@ -204,7 +203,7 @@ fun MainContent(
 
     val resumeRepository = remember { SessionRepository(application) }
     LaunchedEffect(Unit) {
-        val last = resumeRepository.sessions.first().firstOrNull()
+        val last = resumeRepository.latestSession()
         if (last != null) chatViewModel.resumeSession(last)
     }
 

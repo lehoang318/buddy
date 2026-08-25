@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.buddy.data.EventLog
 import com.example.buddy.chat.ConversationEngine
 import com.example.buddy.chat.ConversationEvent
+import com.example.buddy.chat.ChatSessionManager
 import com.example.buddy.chat.TextAttachment
 import com.example.buddy.chat.TextAttachmentRules
 import com.example.buddy.chat.ConversationMessage
@@ -70,11 +71,7 @@ class ChatViewModel(
 
     private var llmClient: LlmClient? = null
 
-    private val sessionRepository = SessionRepository(application)
-
-    private var activeSessionId: String? = null
-    private var activeSessionCreatedAt: Long = 0
-    private var dirty = false
+    private val sessionManager = ChatSessionManager(SessionRepository(application))
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -157,14 +154,8 @@ class ChatViewModel(
         }
     }
 
-    private fun buildCurrentSession(): SavedSession? {
-        val state = _uiState.value
-        val hasRealMessage = state.messages.any { it.role == Role.USER }
-        if (!hasRealMessage) return null
-
-        val title = state.messages.firstOrNull { it.role == Role.USER }
-            ?.content?.trim()?.take(50)?.ifBlank { "Untitled" } ?: "Untitled"
-        val raw = state.messages.map { m ->
+    private fun toSessionMessages(state: ChatUiState): List<SessionMessage> =
+        state.messages.map { m ->
             SessionMessage(
                 role = m.role,
                 content = m.content,
@@ -178,43 +169,16 @@ class ChatViewModel(
             )
         }
 
-        val activeId = activeSessionId
-        if (activeId != null && !dirty) return null
-
-        return if (activeId != null) {
-            SavedSession(
-                id = activeId,
-                createdAt = activeSessionCreatedAt,
-                updatedAt = System.currentTimeMillis(),
-                title = title,
-                raw = raw,
-                summaries = state.summaries
-            )
-        } else {
-            SavedSession(
-                createdAt = System.currentTimeMillis(),
-                title = title,
-                raw = raw,
-                summaries = state.summaries
-            )
-        }
-    }
-
     private suspend fun saveCurrentSession() {
-        val toSave = buildCurrentSession() ?: return
-        sessionRepository.addSession(toSave)
-        activeSessionId = toSave.id
-        activeSessionCreatedAt = toSave.createdAt
-        dirty = false
+        val state = _uiState.value
+        sessionManager.save(toSessionMessages(state), state.summaries)
     }
 
     fun startNewChat() {
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
             saveCurrentSession()
-            activeSessionId = null
-            activeSessionCreatedAt = 0
-            dirty = false
+            sessionManager.reset()
             clearChat()
         }
     }
@@ -269,9 +233,7 @@ class ChatViewModel(
                 summaries = session.summaries
             )
         }
-        activeSessionId = session.id
-        activeSessionCreatedAt = session.createdAt
-        dirty = false
+        sessionManager.bind(session)
     }
 
     private fun loadAvailableModels() {
@@ -350,7 +312,7 @@ class ChatViewModel(
         val text = state.inputText.trim()
         if (text.isBlank()) return
 
-        dirty = true
+        sessionManager.markDirty()
 
         val correlationId = java.util.UUID.randomUUID().toString()
         EventLog.info(TAG, "User input: ${text.length} chars", correlationId = correlationId)

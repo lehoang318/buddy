@@ -35,6 +35,8 @@
 - `Log` delegates common logging to the Phase-1 `Logger`; Android installs `EventLog` at startup
 - `KeyProvider` abstracts API-key access; Android `SessionKeyCache` remains the encrypted implementation
 - `EnvKeyProvider` maps desktop provider IDs to environment variables for the standalone `:cli` desktop application
+- Session persistence lives in `src/common/.../data` (`SavedSession`/`SessionMessage`, `SessionRepository`, `SessionStorage`) and `src/common/.../chat/ChatSessionManager`. `SessionStorage` abstraces backing (Android uses `DataStoreSessionStorage` in `src/android`; a desktop file-backed store can be added later). `ChatViewModel` delegates session bookkeeping to `ChatSessionManager`
+- Custom-provider serialization (`serializeProviderData`/`deserializeProviderData`) is in `src/common/.../data/Providers.kt`; only Android's `BuiltInProviders` loads providers from `res/` resources
 
 ### Providers
 - Built-in providers loaded from `res/values/providers.xml` string arrays:
@@ -75,7 +77,7 @@
 - **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
 - Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
-- **Chat sessions** (`SessionRepository`): the active chat is auto-saved after every finished turn and on navigation (New Chat / resume), capped at `MAX_SESSIONS` (100). The most recent session is resumed on launch. `SavedSession.createdAt` is immutable; `updatedAt` drives History filters, ordering, and the 30-day auto-delete. See `docs/sessions.md`
+- **Chat sessions** (`ChatSessionManager` + `SessionRepository`): the active chat is auto-saved after every finished turn and on navigation (New Chat / resume), capped at `MAX_SESSIONS` (100). The most recent session is resumed on launch. `SavedSession.createdAt` is immutable; `updatedAt` drives History filters, ordering, and the 30-day auto-delete. See `docs/sessions.md`
 - See `docs/context-management.md` for full details
 
 ### Desktop CLI Application
