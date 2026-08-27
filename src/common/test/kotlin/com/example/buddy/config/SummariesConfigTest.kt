@@ -13,6 +13,8 @@ class SummariesConfigTest {
             override val maxQaPairs = 2
             override val minPoints = 2
             override val maxPoints = 3
+            override val maxSessionTags = 3
+            override val sessionTags = listOf("Politics", "Business", "World", "Technology", "Science", "Health", "Environment", "Justice", "Entertainment", "Sports")
             override val keyPrefix = "[KEY] "
             override val pointIndent = "  + "
             override val contextHeader = "## Context"

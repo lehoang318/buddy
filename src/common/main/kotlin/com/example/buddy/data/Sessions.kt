@@ -22,5 +22,6 @@ data class SavedSession(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val raw: List<SessionMessage>,
-    val summaries: List<Summary>
+    val summaries: List<Summary>,
+    val tags: List<String> = emptyList()
 )

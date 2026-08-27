@@ -41,5 +41,61 @@ class SessionRepositoryTest {
         assertEquals(1000L, session.updatedAt)
         assertNotNull(session.raw.single().webSearchQueries)
         assertTrue(session.raw.single().webSearchQueries.isEmpty())
+        assertTrue(session.tags.isEmpty())
+    }
+
+    @Test
+    fun `legacy summary missing tags is normalized`() = runBlocking {
+        val legacyJson = """[
+            {
+              "id": "s2",
+              "title": "Legacy summary",
+              "createdAt": 2000,
+              "raw": [
+                {"role": "USER", "content": "q"}
+              ],
+              "summaries": [
+                {"question": "q", "points": [{"text": "p", "key": false}]}
+              ]
+            }
+        ]"""
+
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = legacyJson }
+        val repository = SessionRepository(storage)
+        val summary = repository.sessions.first().single().summaries.single()
+
+        assertNotNull(summary.tags)
+        assertTrue(summary.tags.isEmpty())
+    }
+
+    @Test
+    fun `legacy free-form tags are normalized to fixed categories`() = runBlocking {
+        val legacyJson = """[
+            {
+              "id": "s1",
+              "title": "free-form",
+              "createdAt": 3000,
+              "raw": [
+                {"role": "USER", "content": "q"}
+              ],
+              "tags": ["kotlin", "POLITICS", "technology", "henlo"],
+              "summaries": [
+                {"question": "q", "points": [{"text": "p", "key": false}], "tags": ["World", "unknown", "SCIENCE"]}
+              ]
+            }
+        ]"""
+
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = legacyJson }
+        val repository = SessionRepository(storage)
+        val session = repository.sessions.first().single()
+
+        assertEquals(listOf("Politics", "Technology"), session.tags)
+        assertEquals(listOf("World", "Science"), session.summaries.single().tags)
+    }
+
+    @Test
+    fun `normalize filters unknowns dedups and is case insensitive`() {
+        assertEquals(listOf("Health", "World"), SessionTags.normalize(listOf("health", "HEALTH", "World")))
+        assertEquals(emptyList<String>(), SessionTags.normalize(listOf("henlo", "")))
     }
 }

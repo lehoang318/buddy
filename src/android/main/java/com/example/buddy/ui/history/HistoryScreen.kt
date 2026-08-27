@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionRepository
+import com.example.buddy.data.SessionTags
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
@@ -82,10 +83,14 @@ fun HistoryScreen(
     var filter by remember { mutableStateOf<SessionFilter>(SessionFilter.ALL) }
     var showPurgeConfirm by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateMapOf<String, Boolean>() }
+    var selectedTags by remember { mutableStateOf(setOf<String>()) }
 
+    val allTags = remember(sessions) { sessions.flatMap { it.tags }.distinct().sortedBy { SessionTags.CATEGORIES.indexOf(it) } }
+    val activeTags = selectedTags.intersect(allTags.toSet())
     val now = System.currentTimeMillis()
     val filtered = sessions.filter { s ->
-        filter.millis == null || s.updatedAt >= now - filter.millis!!
+        (filter.millis == null || s.updatedAt >= now - filter.millis!!) &&
+            activeTags.all { it in s.tags }
     }
     val selectedCount = selectedIds.values.count { it }
 
@@ -154,6 +159,26 @@ fun HistoryScreen(
                     }
                 }
 
+                if (allTags.isNotEmpty()) {
+                    item {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            allTags.forEach { tag ->
+                                FilterChip(
+                                    selected = tag in activeTags,
+                                    onClick = {
+                                        selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag
+                                    },
+                                    label = { Text(tag) }
+                                )
+                            }
+                        }
+                    }
+                }
+
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -187,7 +212,7 @@ fun HistoryScreen(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = if (sessions.isEmpty()) "No saved chats yet" else "No chats in this period",
+                                text = if (sessions.isEmpty()) "No saved chats yet" else "No chats match the filters",
                                 color = OnSurfaceVariant
                             )
                         }
@@ -221,6 +246,15 @@ fun HistoryScreen(
                                     color = OnSurfaceVariant,
                                     style = MaterialTheme.typography.labelSmall
                                 )
+                                if (session.tags.isNotEmpty()) {
+                                    Text(
+                                        text = session.tags.joinToString("  ·  "),
+                                        color = OnSurfaceVariant,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }

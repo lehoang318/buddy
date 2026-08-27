@@ -3,6 +3,7 @@
 ## Build & Verify
 - Kotlin-only changes: `./gradlew :cli:test :app:compileDebugKotlin :cli:installDist`
 - Any `src/android/main/res/values/*.xml` change: also run `./gradlew assembleDebug` (or `mergeDebugResources`) — `compileDebugKotlin` skips AAPT2's resource-flattening pass entirely, so it will not catch a broken string resource
+- Desktop picks up `res/values` changes automatically via `copyAndroidValues` → `processResources`; `:cli:test` and `:cli:installDist` rerun the copy when the res files change
 - String resource escaping: literal `'` and `"` must be escaped as `\'`/`\"` even inside `<![CDATA[...]]>` blocks — CDATA does not exempt Android's own escape-processing pass. AAPT2 error messages can misattribute the failure to the wrong resource name; bisect by blanking suspect strings if the reported one looks unrelated
 - No CI, no lint/format config — the desktop-JVM unit tests (`:cli:test`) are the only automated tests
 - Gradle version catalog at `gradle/libs.versions.toml`
@@ -30,8 +31,8 @@
 ### Common Sources (`src/common`)
 - Shared networking, provider, and conversation logic lives in `src/common/main/kotlin/com/example/buddy/{llm,search,fetch,chat}` and is compiled into both the `:app` (Android) and `:cli` (desktop) modules
 - `ConversationEngine` owns URL detection/fetch orchestration, web search, message assembly, streaming, summaries, and compression; Android `ChatViewModel` and the `:cli` application consume its events
-- `AppConfigProvider` supplies fine-grained configuration interfaces; Android installs `AndroidAppConfig` at startup and desktop tests use `DefaultAppConfig`
-- `DefaultAppConfig` mirrors Android `res/values` configuration; `AndroidResourcesParityTest` enforces parity
+- `AppConfigProvider` supplies fine-grained configuration interfaces; Android installs `AndroidAppConfig` (reads `res/` via R) at startup; the `:cli` app and desktop tests read the actual `src/android/main/res/values/*.xml` files
+- Desktop config resolution: `copyAndroidValues` (in `desktop/build.gradle.kts`) copies `src/android/main/res/values/*.xml` into the CLI jar under `values/` at build time; `ResourceValuesLoader.loadFromClasspath()` parses them (`ResourceValues.kt`) and `ResourceAppConfig` (`ResourceAppConfig.kt`) exposes them via the `AppConfig` interfaces. `Main.kt` installs it at startup; `AppConfigProvider` also falls back to the same lazy classpath load when nothing is installed (Android sets it first, so the fallback never fires there). `ResourceConfigLoadTest` guards key coverage
 - `Log` delegates common logging to the Phase-1 `Logger`; Android installs `EventLog` at startup
 - `KeyProvider` abstracts API-key access; Android `SessionKeyCache` remains the encrypted implementation
 - `EnvKeyProvider` maps desktop provider IDs to environment variables for the standalone `:cli` desktop application
@@ -59,7 +60,7 @@
 | ChatScreen | `ui/chat/ChatScreen.kt` | Top bar has model selector (clickable name opens ModelSelectionDialog), web search toggle, Buddy logo menu |
 | ProvidersScreen | `ui/providers/ProvidersScreen.kt` | Default Model is readOnly OutlinedTextField; clicking opens ModelSelectionDialog (AlertDialog) |
 | ModelSelectionScreen | `ui/providers/ModelSelectionScreen.kt` | Two variants: full-screen `ModelSelectionScreen` + `ModelSelectionDialog` (AlertDialog); both use LazyColumn + real-time search |
-| HistoryScreen | `ui/history/HistoryScreen.kt` | Saved chat sessions; filter chips (All/7/30 days), auto-delete toggle + confirmation dialog, bulk delete |
+| HistoryScreen | `ui/history/HistoryScreen.kt` | Saved chat sessions; filter chips (All/7/30 days), tag filter chips (AND), auto-delete toggle + confirmation dialog, bulk delete, tag labels on rows |
 | ParametersScreen | `ui/parameters/ParametersScreen.kt` | Temperature/Top-p/Top-k sliders; system message field |
 | EventsScreen | `ui/events/EventsScreen.kt` | Event log viewer; filter by level (Error/Warning/Info/Debug) and tag |
 | AboutScreen | `ui/about/AboutScreen.kt` | Version, build date, author links |
@@ -73,7 +74,8 @@
 - Context managed via **structured summarization**: each Q&A exchange is summarized into 2–3 points by a separate LLM call after streaming completes. Points have a `key` boolean for critical decisions.
 - Summaries replace full history — only last N Q&A pairs sent as raw messages (default: 2 pairs, configurable via `max_qa_pairs` in `conversation.xml`)
 - **Mutex-based processing queue**: if user sends a follow-up message before summary generation completes, the new request waits behind the lock until the current turn's summary is done
-- Summaries compressed when exceeding `maxSummaries` (20): oldest half are merged into 1 summary by LLM, key points preserved mechanically
+- Summaries compressed when exceeding `maxSummaries` (20): oldest half are merged into 1 summary by LLM, key points and tags preserved mechanically
+- **Session tags**: each summary also carries 1–3 tags chosen from a fixed 10-category list (`summaries.sessionTags`, sourced from the `session_tags` string-array in `res/values/conversation.xml` via `SessionTags.CATEGORIES`), parsed leniently and matched case-insensitively; out-of-set tags are dropped at parse/load. `ChatSessionManager` derives the session's tags mechanically at save: `summaries.flatMap { it.tags }.distinct().takeLast(maxSessionTags)` (default 3). History filters sessions by multi-select tag chips (AND). See `docs/sessions.md`
 - **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
 - Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
@@ -85,6 +87,7 @@
 - Run with `./gradlew :cli:run` or build an executable distribution with `./gradlew :cli:installDist`
 - API keys are read from provider-specific environment variables; normal `:cli:test` never requires them
 - Startup requires an LLM provider and model; web-search provider setup is optional
+- Config is read at startup from the `res/values/*.xml` files bundled into the jar (see `copyAndroidValues` above), so config edits happen in `src/android/main/res/values/` only — never mirror values in code
 
 ## Conventions
 - No comments added to code

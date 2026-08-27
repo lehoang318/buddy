@@ -17,13 +17,25 @@ Chat sessions are persisted locally so you can leave a conversation and resume i
 |--------|--------|
 | Storage | Backed by a `SessionStorage` strategy; Android uses Jetpack DataStore (`DataStore<Preferences>`, file `sessions`) |
 | Format | A JSON array of `SavedSession` (Gson) in the `sessions_list` preference key (Android) |
-| SavedSession | `id`, `title`, `createdAt`, `updatedAt`, `raw` (list of `SessionMessage`), `summaries` |
+| SavedSession | `id`, `title`, `createdAt`, `updatedAt`, `raw` (list of `SessionMessage`), `summaries`, `tags` |
 | Cap | At most `SessionRepository.MAX_SESSIONS` (100) sessions are kept; the oldest are trimmed |
 | Repository | `SessionRepository` + `SessionStorage` in `src/common/.../data/`; Android impl `DataStoreSessionStorage` in `src/android/.../data/` |
 | Manager | `ChatSessionManager` in `src/common/.../chat/` (id/createdAt/dirty bookkeeping, save/reset/bind) |
 | UI | `HistoryScreen` in `src/android/main/java/com/example/buddy/ui/history/` |
 
 `createdAt` is set once when a session is first saved and never changes. `updatedAt` is refreshed on **every** save (including auto-saves after each turn), so a session you revisit always moves back to the top of the list and is re-aged for filtering and auto-deletion. Loaded sessions missing `updatedAt` (from before this field existed) are normalized to fall back to `createdAt`; likewise, messages missing `webSearchQueries` (from before that field existed) are normalized to an empty list. Gson deserializes via `Unsafe` and bypasses Kotlin default values, so these can surface as `null`.
+
+## Tags
+
+Each session is represented by 1–3 tags that summarize its topics, shown in the History screen both as filter chips and as small labels on each row.
+
+- **Generation**: tags are produced **together with each summary** by the summarizer call (same JSON response, no extra LLM round-trip). See `docs/context-management.md`.
+- **Aggregation**: at save time, `ChatSessionManager` derives the session tags mechanically from its summaries — `summaries.flatMap { it.tags }.distinct().takeLast(maxSessionTags)` — so the most recent exchanges win.
+- **Survival under compression**: the merged "Earlier conversation" summary preserves the compressed group's tags mechanically (like key points), so old tags are not lost prematurely.
+- **Cap**: at most `SummariesConfig.maxSessionTags` (default 3) tags are kept (`max_session_tags` in `res/values/conversation.xml`).
+- **Lenient**: small models may omit `"tags"`, in which case the session simply has none; filter chips only show tags that actually exist.
+- **Fixed set**: tags must come from a predefined 10-category list (`Politics`, `Business`, `World`, `Technology`, `Science`, `Health`, `Environment`, `Justice`, `Entertainment`, `Sports`) defined in the `session_tags` string-array in `res/values/conversation.xml`. The summarizer is told to choose only from these names; anything else is dropped and matched case-insensitively at load/normalize time.
+- **Normalization**: legacy sessions missing or out-of-set `tags` (at either the session or the nested summary level) are normalized/filtered to the fixed set on load.
 
 ## Save & Resume Flow
 
@@ -70,7 +82,8 @@ When you start a new chat or resume a session while a response is still streamin
 | Control | Behavior |
 |---------|----------|
 | Filter chips | All / Last 7 days / Last 30 days — filters the visible list by `updatedAt` |
-| Session rows | Tap to resume the conversation |
+| Tag chips | One chip per distinct tag across sessions; multi-select, AND semantics (selected tags must all be present). Combined with the time filter |
+| Session rows | Tap to resume the conversation; shows title, date, and tag labels |
 | Checkboxes + Delete selected | Bulk-deletes checked sessions |
 | Auto-delete toggle | Enables/disables automatic deletion of chats not interacted with for 30 days |
 

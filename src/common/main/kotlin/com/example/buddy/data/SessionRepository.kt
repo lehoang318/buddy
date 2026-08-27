@@ -60,7 +60,9 @@ class SessionRepository(private val storage: SessionStorage) {
             sessions.map { session ->
                 session.copy(
                     updatedAt = if (session.updatedAt > 0) session.updatedAt else session.createdAt,
-                    raw = session.raw.map { message -> message.copy(webSearchQueries = message.webSearchQueries ?: emptyList()) }
+                    raw = session.raw.map { message -> message.copy(webSearchQueries = message.webSearchQueries ?: emptyList()) },
+                    summaries = session.summaries.map { summary -> summary.copy(tags = SessionTags.normalize(summary.tags ?: emptyList())) },
+                    tags = SessionTags.normalize(session.tags ?: emptyList())
                 )
             }
         } catch (_: Exception) {

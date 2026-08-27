@@ -1,5 +1,6 @@
 package com.example.buddy.chat
 
+import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Role
 import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionMessage
@@ -25,6 +26,8 @@ class ChatSessionManager(private val repository: SessionRepository) {
         val title = messages.firstOrNull { it.role == Role.USER }
             ?.content?.trim()?.take(50)?.ifBlank { "Untitled" } ?: "Untitled"
 
+        val tags = summaries.flatMap { it.tags }.distinct().takeLast(AppConfigProvider.current.summaries.maxSessionTags)
+
         val activeId = activeSessionId
         if (activeId != null && !dirty) return null
 
@@ -35,14 +38,16 @@ class ChatSessionManager(private val repository: SessionRepository) {
                 updatedAt = System.currentTimeMillis(),
                 title = title,
                 raw = messages,
-                summaries = summaries
+                summaries = summaries,
+                tags = tags
             )
         } else {
             SavedSession(
                 createdAt = System.currentTimeMillis(),
                 title = title,
                 raw = messages,
-                summaries = summaries
+                summaries = summaries,
+                tags = tags
             )
         }
     }
