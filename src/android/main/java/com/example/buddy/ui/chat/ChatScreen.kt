@@ -30,17 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardDoubleArrowDown
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import com.example.buddy.LocalLlmClient
 import com.example.buddy.LocalUrlFetcher
 import com.example.buddy.LocalWebSearch
@@ -189,7 +180,26 @@ fun ChatScreen(
                     keyboard?.hide()
                     vm.sendMessage()
                 },
-                onCancel = { vm.cancelRequest() }
+                onCancel = { vm.cancelRequest() },
+                showPairNavigation = isScrollable && userMessageIndices.isNotEmpty(),
+                canGoBack = userMessageIndices.firstOrNull()?.let { it < listState.firstVisibleItemIndex } ?: false,
+                canGoLatest = if (userMessageIndices.isNotEmpty()) {
+                    (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) < userMessageIndices.last()
+                } else false,
+                onGoBack = {
+                    val topIdx = listState.firstVisibleItemIndex
+                    val pos = userMessageIndices.indexOfFirst { it >= topIdx }.let { if (it >= 0) it else userMessageIndices.lastIndex }
+                    if (pos > 0) {
+                        scope.launch { listState.animateScrollToItem(userMessageIndices[pos - 1]) }
+                    } else if (userMessageIndices.isNotEmpty() && userMessageIndices[0] < topIdx) {
+                        scope.launch { listState.animateScrollToItem(userMessageIndices[0]) }
+                    }
+                },
+                onGoLatest = {
+                    userMessageIndices.lastOrNull()?.let { last ->
+                        scope.launch { listState.animateScrollToItem(last) }
+                    }
+                }
             )
         }
     ) { padding ->
@@ -227,59 +237,6 @@ fun ChatScreen(
                 if (state.webSearchCancelled) {
                     item {
                         WebSearchCancelledPill()
-                    }
-                }
-            }
-
-            if (isScrollable && userMessageIndices.isNotEmpty()) {
-                val lastUserIndex = userMessageIndices.last()
-                val lastVisibleItemIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-                val topIndex = listState.firstVisibleItemIndex
-                val canGoUp = userMessageIndices.first() < topIndex
-                val canGoDown = lastVisibleItemIndex < lastUserIndex
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 16.dp, end = 4.dp)
-                ) {
-                    IconButton(
-                        onClick = {
-                            val topIdx = listState.firstVisibleItemIndex
-                            val pos = userMessageIndices.indexOfFirst { it >= topIdx }.let { if (it >= 0) it else userMessageIndices.lastIndex }
-                            if (pos > 0) {
-                                scope.launch {
-                                    listState.animateScrollToItem(userMessageIndices[pos - 1])
-                                }
-                            } else if (userMessageIndices.isNotEmpty() && userMessageIndices[0] < topIdx) {
-                                scope.launch {
-                                    listState.animateScrollToItem(userMessageIndices[0])
-                                }
-                            }
-                        },
-                        enabled = canGoUp,
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Previous",
-                            tint = if (canGoUp) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                listState.animateScrollToItem(lastUserIndex)
-                            }
-                        },
-                        enabled = canGoDown,
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardDoubleArrowDown,
-                            contentDescription = "Latest",
-                            tint = if (canGoDown) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        )
                     }
                 }
             }

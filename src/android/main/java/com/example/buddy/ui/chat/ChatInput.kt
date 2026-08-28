@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.LastPage
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
@@ -78,6 +80,11 @@ fun InputBar(
     onClearFile: () -> Unit,
     onPickAttachment: () -> Unit,
     onTakePhoto: () -> Unit,
+    showPairNavigation: Boolean,
+    canGoBack: Boolean,
+    canGoLatest: Boolean,
+    onGoBack: () -> Unit,
+    onGoLatest: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -174,12 +181,15 @@ fun InputBar(
 
         Spacer(Modifier.height(6.dp))
 
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.Center
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onPickAttachment,
                     enabled = !isOffline,
@@ -205,7 +215,41 @@ fun InputBar(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (showPairNavigation) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onGoBack,
+                        enabled = canGoBack,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Previous",
+                            tint = if (canGoBack) TextColor else SecondaryIcons
+                        )
+                    }
+                    IconButton(
+                        onClick = onGoLatest,
+                        enabled = canGoLatest,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.LastPage,
+                            contentDescription = "Latest",
+                            tint = if (canGoLatest) TextColor else SecondaryIcons
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onToggleReasoning,
                     enabled = !isOffline,
