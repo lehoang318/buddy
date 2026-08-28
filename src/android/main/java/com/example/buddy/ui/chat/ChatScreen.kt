@@ -183,7 +183,7 @@ fun ChatScreen(
                 onCancel = { vm.cancelRequest() },
                 showPairNavigation = isScrollable && userMessageIndices.isNotEmpty(),
                 canGoBack = userMessageIndices.firstOrNull()?.let { it < listState.firstVisibleItemIndex } ?: false,
-                canGoLatest = if (userMessageIndices.isNotEmpty()) {
+                canGoForward = if (userMessageIndices.isNotEmpty()) {
                     (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) < userMessageIndices.last()
                 } else false,
                 onGoBack = {
@@ -195,7 +195,21 @@ fun ChatScreen(
                         scope.launch { listState.animateScrollToItem(userMessageIndices[0]) }
                     }
                 },
-                onGoLatest = {
+                onGoForward = {
+                    val bottomIdx = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                    val pos = userMessageIndices.indexOfLast { it <= bottomIdx }
+                    if (pos >= 0 && pos < userMessageIndices.lastIndex) {
+                        scope.launch { listState.animateScrollToItem(userMessageIndices[pos + 1]) }
+                    } else if (pos < 0 && userMessageIndices.isNotEmpty()) {
+                        scope.launch { listState.animateScrollToItem(userMessageIndices.first()) }
+                    }
+                },
+                onGoFirst = {
+                    userMessageIndices.firstOrNull()?.let { first ->
+                        scope.launch { listState.animateScrollToItem(first) }
+                    }
+                },
+                onGoLast = {
                     userMessageIndices.lastOrNull()?.let { last ->
                         scope.launch { listState.animateScrollToItem(last) }
                     }
