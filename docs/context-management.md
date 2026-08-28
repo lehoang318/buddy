@@ -24,6 +24,7 @@ Summary(question: String, points: List<SummaryPoint>, tags: List<String>)
 
 Rules:
 - **2–3 points** per exchange, extracted by the LLM
+- **Images**: if the user's message carried an image, the image is included in the summarizer call (as an `image_url` part when the model is multimodal) and key visual facts are captured as points — so visual context survives once the exchange leaves the recent-pairs window (`max_qa_pairs`).
 - `key: true` — used sparingly for hard user decisions, absolute constraints, or strong preferences
 - `key: false` — ordinary facts from the exchange
 - Points are **sanitized** against a restrictive-patterns blacklist to prevent prompt over-generalization

@@ -123,10 +123,9 @@ sequenceDiagram
     participant LLMClient
 
     User->>ChatScreen: Take photo or select image
-    ChatScreen->>ViewModel: onImagePicked(imageUri)
-    ViewModel->>ViewModel: Process image URI
-    ViewModel->>ImageProcessor: Convert to base64
-    ImageProcessor-->>ViewModel: Return base64 image data
+    ChatScreen->>ViewModel: onImageUri(imageUri)
+    ViewModel->>ViewModel: Decode (two-pass, IO) → scale → base64
+    ViewModel-->>ViewModel: pendingImageBase64
     User->>ChatScreen: Type message about image
     ChatScreen->>ViewModel: onInputChange(message)
     ViewModel->>ViewModel: Check for pending image

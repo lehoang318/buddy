@@ -125,7 +125,7 @@ Behavioral notes:
 
 ## SessionMessage Metadata
 
-`SessionMessage` persists the web-search flags per assistant turn (`webSearchUsed`, `webSearchSkipped`, `webSearchQueries`) so the web-search indicators and query chips are preserved after resume. Image attachments are stored as inline Base64 in `imageBase64`; file attachments keep their name and extracted text (the raw `Uri` is not persisted).
+`SessionMessage` persists the web-search flags per assistant turn (`webSearchUsed`, `webSearchSkipped`, `webSearchQueries`) so the web-search indicators and query chips are preserved after resume. Image attachments are **not** stored inline in the DataStore JSON: `SessionImageStore` (Android) writes each image's JPEG bytes to `filesDir/session_images/<sessionId>/<index>.jpg` at save time and stores only the filename in `SessionMessage.imageRef` (`imageBase64` stays `null` on disk). On resume the files are read back into `imageBase64` so thumbnails and recent-pair re-sends work as before. Deleting a session or the 30-day auto-purge also deletes the session's image directory. Legacy sessions saved with inline Base64 keep working: `hydrate()` leaves messages without an `imageRef` untouched, and the next save migrates them to files. File attachments keep their name and extracted text (the raw `Uri` is not persisted).
 
 ## Related Files
 
@@ -134,6 +134,7 @@ Behavioral notes:
 - `src/common/main/kotlin/com/example/buddy/data/SessionStorage.kt` — `SessionStorage` persistence interface
 - `src/common/main/kotlin/com/example/buddy/chat/ChatSessionManager.kt` — id/createdAt/dirty bookkeeping, save/reset/bind
 - `src/android/main/java/com/example/buddy/data/DataStoreSessionStorage.kt` — Android DataStore-backed `SessionStorage` implementation
+- `src/android/main/java/com/example/buddy/data/SessionImageStore.kt` — file-backed storage for session image attachments (detach/hydrate/delete)
 - `src/android/main/java/com/example/buddy/ui/history/HistoryScreen.kt` — History screen, filters, toggle + confirmation dialog
 - `src/android/main/java/com/example/buddy/ui/chat/ChatViewModel.kt` — save/resume orchestration and streaming cancellation
 - `src/android/main/java/com/example/buddy/MainActivity.kt` — startup purge trigger

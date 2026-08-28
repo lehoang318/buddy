@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,7 +72,7 @@ fun InputBar(
     pendingImage: String?,
     pendingFile: Uri?,
     pendingFileName: String?,
-    fileTooLargeError: String?,
+    attachmentError: String?,
     isOffline: Boolean,
     isProcessing: Boolean,
     isCancelling: Boolean,
@@ -93,6 +94,7 @@ fun InputBar(
     onCancel: () -> Unit
 ) {
     val canSend = text.isNotBlank()
+    val imageOnly = pendingImage != null && text.isBlank()
 
     Column(
         modifier = Modifier
@@ -102,7 +104,7 @@ fun InputBar(
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         pendingImage?.let { base64 ->
-            val bitmap = decodeBase64ToBitmap(base64)
+            val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
             if (bitmap != null) {
                 Box(modifier = Modifier.padding(bottom = 6.dp)) {
                     Image(
@@ -144,8 +146,17 @@ fun InputBar(
             }
         }
 
-        fileTooLargeError?.let { error ->
+        attachmentError?.let { error ->
             Text(error, color = SendButton, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 4.dp))
+        }
+
+        if (imageOnly && attachmentError == null) {
+            Text(
+                "Add a message to send with the image",
+                color = OnSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
         }
 
         Surface(

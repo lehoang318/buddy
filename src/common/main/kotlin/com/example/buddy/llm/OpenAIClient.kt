@@ -10,6 +10,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
+import com.google.gson.JsonPrimitive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,18 +91,7 @@ open class OpenAIClient internal constructor(
             val messageObj = JsonObject()
             messageObj.addProperty("role", msg.role.toApiRole())
             if (msg.imageBase64 != null && msg.content.isNotBlank()) {
-                val contentArray = JsonArray()
-                val textPart = JsonObject()
-                textPart.addProperty("type", "text")
-                textPart.addProperty("text", msg.content)
-                contentArray.add(textPart)
-                val imagePart = JsonObject()
-                imagePart.addProperty("type", "image_url")
-                val imageUrl = JsonObject()
-                imageUrl.addProperty("url", msg.imageBase64)
-                imagePart.add("image_url", imageUrl)
-                contentArray.add(imagePart)
-                messageObj.add("content", contentArray)
+                messageObj.add("content", buildMessageContent(msg.content, msg.imageBase64))
             } else {
                 messageObj.addProperty("content", msg.content)
             }
@@ -300,12 +290,13 @@ open class OpenAIClient internal constructor(
         }
     }
 
-    override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?): String? {
+    override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): String? {
         return withContext(Dispatchers.IO) {
             try {
+                val includeImage = imageBase64 != null && isModelMultimodal(activeModel)
                 val userMsg = JsonObject().apply {
                     addProperty("role", "user")
-                    addProperty("content", userMessage)
+                    add("content", buildMessageContent(userMessage, imageBase64, includeImage))
                 }
 
                 val requestBody = JsonObject().apply {
@@ -346,7 +337,7 @@ open class OpenAIClient internal constructor(
         }
     }
 
-    override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?): Summary {
+    override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?, imageBase64: String?): Summary {
         return withContext(Dispatchers.IO) {
             try {
                 val userContent = AppConfigProvider.current.prompts.summarizerUserTemplate
@@ -357,9 +348,10 @@ open class OpenAIClient internal constructor(
                     addProperty("content", AppConfigProvider.current.prompts.summarizerSystem.format(AppConfigProvider.current.summaries.minPoints, AppConfigProvider.current.summaries.maxPoints, AppConfigProvider.current.summaries.maxSessionTags, SessionTags.CATEGORIES.joinToString(", ")) +
                         "\n\nYour response must fit within ${AppConfigProvider.current.summaries.maxTokens} tokens maximum.")
                 }
+                val includeImage = imageBase64 != null && isModelMultimodal(model ?: activeModel)
                 val userMsg = JsonObject().apply {
                     addProperty("role", "user")
-                    addProperty("content", userContent)
+                    add("content", buildMessageContent(userContent, imageBase64, includeImage))
                 }
 
                 val requestBody = JsonObject().apply {
@@ -585,6 +577,22 @@ open class OpenAIClient internal constructor(
             Role.ASSISTANT -> "assistant"
             Role.SYSTEM -> "system"
         }
+    }
+
+    private fun buildMessageContent(text: String, imageBase64: String?, includeImage: Boolean = true): JsonElement {
+        if (!includeImage || imageBase64 == null) {
+            return JsonPrimitive(text)
+        }
+        val contentArray = JsonArray()
+        contentArray.add(JsonObject().apply {
+            addProperty("type", "text")
+            addProperty("text", text)
+        })
+        contentArray.add(JsonObject().apply {
+            addProperty("type", "image_url")
+            add("image_url", JsonObject().apply { addProperty("url", imageBase64) })
+        })
+        return contentArray
     }
 
     private fun parseTags(parsed: JsonObject?, maxTags: Int): List<String> {

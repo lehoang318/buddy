@@ -25,6 +25,7 @@ import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmSettings
+import com.example.buddy.data.SessionImageStore
 import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.fetch.JsoupUrlFetcher
@@ -107,7 +108,10 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val sessionRepository = SessionRepository(this@MainActivity)
             if (sessionRepository.autoDeleteEnabled()) {
-                sessionRepository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
+                val removed = sessionRepository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
+                if (removed.isNotEmpty()) {
+                    SessionImageStore(this@MainActivity).delete(removed)
+                }
             }
         }
 

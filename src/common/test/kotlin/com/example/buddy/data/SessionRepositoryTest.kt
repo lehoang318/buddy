@@ -94,6 +94,23 @@ class SessionRepositoryTest {
     }
 
     @Test
+    fun `purgeOlderThan returns removed session ids`() = runBlocking {
+        val storage = FakeSessionStorage()
+        val repository = SessionRepository(storage)
+        repository.addSession(
+            SavedSession(id = "old", title = "Old", createdAt = 1000, updatedAt = 1000, raw = emptyList(), summaries = emptyList())
+        )
+        repository.addSession(
+            SavedSession(id = "new", title = "New", createdAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis(), raw = emptyList(), summaries = emptyList())
+        )
+
+        val removed = repository.purgeOlderThan(30L * 24L * 60L * 60L * 1000L)
+
+        assertEquals(setOf("old"), removed)
+        assertEquals(listOf("new"), repository.sessions.first().map { it.id })
+    }
+
+    @Test
     fun `normalize filters unknowns dedups and is case insensitive`() {
         assertEquals(listOf("Health", "World"), SessionTags.normalize(listOf("health", "HEALTH", "World")))
         assertEquals(emptyList<String>(), SessionTags.normalize(listOf("henlo", "")))

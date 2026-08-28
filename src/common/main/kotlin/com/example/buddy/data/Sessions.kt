@@ -8,6 +8,7 @@ data class SessionMessage(
     val role: Role,
     val content: String,
     val imageBase64: String? = null,
+    val imageRef: String? = null,
     val attachedFileName: String? = null,
     val attachedFileText: String? = null,
     val webSearchUsed: Boolean = false,

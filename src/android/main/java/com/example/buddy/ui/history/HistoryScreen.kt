@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.data.SavedSession
+import com.example.buddy.data.SessionImageStore
 import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SessionTags
 import com.example.buddy.ui.theme.OnSurfaceVariant
@@ -76,6 +77,7 @@ fun HistoryScreen(
 ) {
     val appContext = LocalContext.current.applicationContext
     val repository = remember { SessionRepository(appContext) }
+    val imageStore = remember { SessionImageStore(appContext) }
     val scaffoldScope = rememberCoroutineScope()
     val sessions by repository.sessions.collectAsState(initial = emptyList())
     val autoDeleteOld by repository.autoDeleteOld.collectAsState(initial = false)
@@ -265,7 +267,10 @@ fun HistoryScreen(
                 onClick = {
                 val ids = selectedIds.filterValues { it }.keys
                 selectedIds.clear()
-                scaffoldScope.launch { repository.deleteSessions(ids) }
+                scaffoldScope.launch {
+                    repository.deleteSessions(ids)
+                    imageStore.delete(ids)
+                }
             },
                 enabled = selectedCount > 0,
                 modifier = Modifier
@@ -293,7 +298,8 @@ fun HistoryScreen(
                     onClick = {
                         showPurgeConfirm = false
                         scaffoldScope.launch {
-                            repository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
+                            val removed = repository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
+                            imageStore.delete(removed)
                         }
                     }
                 ) {

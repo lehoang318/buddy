@@ -95,7 +95,7 @@ fun MessageRow(message: ChatMessage) {
             if (message.webSearchSkipped) WebSearchSkippedPill()
 
             message.imageBase64?.let { base64 ->
-                val bitmap = decodeBase64ToBitmap(base64)
+                val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
                 if (bitmap != null) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
