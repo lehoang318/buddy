@@ -7,5 +7,6 @@ data class SummaryPoint(
 
 data class Summary(
     val question: String,
-    val points: List<SummaryPoint>
+    val points: List<SummaryPoint>,
+    val tags: List<String> = emptyList()
 )

@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-- [1. Settings Configuration](#1-settings-configuration)
+- [1. Providers Configuration](#1-providers-configuration)
 - [2. Adding a Custom LLM Provider](#2-adding-a-custom-llm-provider)
 - [3. Changing AI Models](#3-changing-ai-models)
   - [3.1 Switch to Another Model from Same Provider](#31-switch-to-another-model-from-same-provider)
@@ -14,22 +14,22 @@
 
 ---
 
-## 1. Settings Configuration
+## 1. Providers Configuration
 
 <details>
-  <summary>1. Settings Configuration</summary>
+  <summary>1. Providers Configuration</summary>
 
 ### Overview
 Configure your AI provider, API keys, and model settings to get started with Buddy.
 
 ### Steps
 
-#### Step 1: Access Settings
+#### Step 1: Access Providers
 1. Open Buddy app
 2. Tap the Buddy logo in the top bar to open the menu
-3. Select "Settings" from the dropdown menu
+3. Select "Providers" from the dropdown menu
 
-![Settings menu screenshot placeholder]
+![Providers menu screenshot placeholder]
 
 #### Step 2: Choose Your AI Provider
 1. In the "LLM Provider" section, tap the dropdown field
@@ -60,7 +60,7 @@ Configure your AI provider, API keys, and model settings to get started with Bud
 ![Model selection screenshot placeholder]
 
 #### Step 5: Configure AI Parameters (Optional)
-AI parameters are configured in the **Parameters** screen (accessible from the Buddy logo menu). From Settings, tap back to return to chat, then open the menu and select "Parameters" to adjust:
+AI parameters are configured in the **Parameters** screen (accessible from the Buddy logo menu). From Providers, tap back to return to chat, then open the menu and select "Parameters" to adjust:
 
 1. Adjust the sliders for:
    - **Temperature**: Controls creativity (0.0 = factual, 1.0 = creative)
@@ -108,9 +108,9 @@ Add any OpenAI-compatible LLM provider that is not in the built-in list.
 
 ### Steps
 
-#### Step 1: Open Settings
+#### Step 1: Open Providers
 1. Tap the Buddy logo in the top bar
-2. Select "Settings" from the menu
+2. Select "Providers" from the menu
 
 #### Step 2: Add Custom Provider
 1. In the "LLM Provider" section, tap the dropdown
@@ -180,10 +180,10 @@ Change to a different AI model while keeping the same AI provider.
 
 ![Chat screen model switch screenshot placeholder]
 
-#### Method 2: Using Settings (For Provider-Specific Settings)
+#### Method 2: Using Providers (For Provider-Specific Settings)
 
-1. **Go to Settings**
-   - Tap the Buddy logo → "Settings"
+1. **Go to Providers**
+   - Tap the Buddy logo → "Providers"
 
 2. **Change Model**
    - In the "Default Model" dropdown, select a different model
@@ -197,7 +197,7 @@ Change to a different AI model while keeping the same AI provider.
    - Tap back to save
    - Send a test message to verify the new model works
 
-![Settings model change screenshot placeholder]
+![Providers model change screenshot placeholder]
 
 </details>
 
@@ -216,9 +216,9 @@ Change to a completely different AI provider and model.
 
 ### Steps
 
-#### Step 1: Go to Settings
+#### Step 1: Go to Providers
 1. Tap the Buddy logo in the top bar
-2. Select "Settings" from the menu
+2. Select "Providers" from the menu
 
 #### Step 2: Change AI Provider
 1. In the "LLM Provider" section, tap the dropdown
@@ -300,9 +300,9 @@ Switch between different web search services to find current information.
 
 ### Steps
 
-#### Step 1: Access Settings
+#### Step 1: Access Providers
 1. Tap the Buddy logo in the top bar
-2. Select "Settings" from the menu
+2. Select "Providers" from the menu
 
 #### Step 2: Navigate to Web Search Section
 1. Scroll down to the "Web Search Provider" section
@@ -396,10 +396,10 @@ Toggle web search on or off to control whether Buddy searches the internet for a
 
 ![Web search toggle screenshot placeholder]
 
-#### Method 2: Using Settings (Permanent Configuration)
+#### Method 2: Using Providers (Permanent Configuration)
 
-1. **Go to Settings**
-   - Tap the Buddy logo → "Settings"
+1. **Go to Providers**
+   - Tap the Buddy logo → "Providers"
 
 2. **Configure Web Search**
    - In the "Web Search Provider" section, select your provider
@@ -408,7 +408,7 @@ Toggle web search on or off to control whether Buddy searches the internet for a
 
 3. **Enable/Disable via Top Bar**
    - Use the top bar toggle for temporary changes
-   - Settings provide the underlying capability
+   - Providers provide the underlying capability
 
 ### Understanding Web Search Behavior
 
@@ -478,7 +478,7 @@ When no providers are configured:
 - "Buddy is offline" indicator in the top bar
 - Limited model options (if any)
 - Disabled web search icon
-- Settings prompt or icon
+- Providers prompt or icon
 
 ### Step-by-Step First Time Setup
 
@@ -487,9 +487,9 @@ When no providers are configured:
 - Notice disabled features
 - Find the settings prompt
 
-#### Step 2: Access Settings
+#### Step 2: Access Providers
 - Tap the Buddy logo in the top bar
-- Select "Settings" from the menu
+- Select "Providers" from the menu
 - This is your first configuration step
 
 #### Step 3: Configure Your First Provider

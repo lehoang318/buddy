@@ -335,6 +335,34 @@ sequenceDiagram
     ChatScreen-->>User: Display response from new model
 ```
 
+### 11. Start New Chat / Resume While Streaming
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatScreen
+    participant ViewModel
+    participant SessionRepository
+
+    User->>ChatScreen: New Chat / resume a saved session (while a response is streaming)
+    ChatScreen->>ViewModel: startNewChat() / resumeSession(session)
+    ViewModel->>ViewModel: currentJob?.cancelAndJoin()
+    ViewModel->>ViewModel: In-flight stream stops; cleanup (webSearchCancelled, etc.) completes
+    ViewModel->>ViewModel: saveCurrentSession()  (save the outgoing chat)
+    ViewModel->>SessionRepository: addSession(current)
+    alt New Chat
+        ViewModel->>ViewModel: clearChat()
+    else Resume
+        ViewModel->>ViewModel: conversationEngine.restore(history, summaries)
+        ViewModel->>ViewModel: Restore UI messages
+    end
+    ViewModel->>ChatScreen: Fresh / restored UI
+    ChatScreen-->>User: Clean, non-polluted chat
+```
+
+- Cancelling and joining before saving ensures the captured outgoing chat is consistent and the old stream's cleanup cannot leak into the new one.
+- See [sessions.md](./sessions.md) for the full save/resume and auto-delete behavior.
+
 ---
 
 **Note**: These diagrams represent high-level happy path scenarios with alternative branches for common cases. Detailed error handling, retry logic, and edge cases are not shown for clarity.

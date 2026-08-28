@@ -1,4 +1,4 @@
-package com.example.buddy.ui.settings
+package com.example.buddy.ui.providers
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -64,11 +64,11 @@ import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import kotlinx.coroutines.launch
 
-private const val TAG = "Settings"
+private const val TAG = "Providers"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(
+fun ProvidersScreen(
     onBack: () -> Unit,
     initialSettings: LlmSettings? = null,
     settingsRepository: SettingsRepository? = null,
@@ -299,7 +299,7 @@ fun SettingsScreen(
                     }
                 },
                 title = {
-                    Text("Settings", color = MaterialTheme.colorScheme.onSurface)
+                    Text("Providers", color = MaterialTheme.colorScheme.onSurface)
                 }
             )
         }

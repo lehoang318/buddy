@@ -22,7 +22,7 @@
     - [How do I use web search?](#how-do-i-use-web-search)
     - [Can I share files or images with Buddy?](#can-i-share-files-or-images-with-buddy)
     - [How do I change AI models?](#how-do-i-change-ai-models)
-  - [⚙️ Settings \& Customization](#settings--customization)
+  - [⚙️ Providers \& Customization](#providers--customization)
     - [What are the AI parameters for?](#what-are-the-ai-parameters-for)
     - [How do I reset my settings?](#how-do-i-reset-my-settings)
   - [🔧 Troubleshooting](#-troubleshooting)
@@ -64,7 +64,7 @@
 
 1. **Download and install** the Buddy APK on your Android phone (Android 10.0 or later)
 2. **Open the app** and grant necessary permissions (camera if you want to use photo features)
-3. **Go to Settings** (tap the Buddy logo in the top bar)
+3. **Go to Providers** (tap the Buddy logo in the top bar)
 4. **Choose your AI provider** (like OpenAI, Anthropic, local models, etc.)
 5. **Enter your API key** (you'll need to get this from your chosen provider)
 6. **Select a model** and adjust settings if desired
@@ -203,7 +203,7 @@ Just tap the paperclip icon to attach files or use the camera icon to take photo
 3. Some models support images (multimodal) - look for the image icon next to model names
 </details>
 
-## ⚙️ Settings & Customization
+## ⚙️ Providers & Customization
 
 ### What are the AI parameters for?
 
@@ -229,7 +229,7 @@ Just tap the paperclip icon to attach files or use the camera icon to take photo
 <details>
   <summary>🔄 How do I reset my settings?</summary>
 
-Go to Settings and manually clear the fields, or uninstall and reinstall the app.
+Go to Providers and manually clear the fields, or uninstall and reinstall the app.
 </details>
 
 ## 🔧 Troubleshooting

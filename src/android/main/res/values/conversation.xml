@@ -4,6 +4,20 @@
     <integer name="max_qa_pairs">2</integer>
     <integer name="min_summary_points">2</integer>
     <integer name="max_summary_points">3</integer>
+    <integer name="max_session_tags">3</integer>
+
+    <string-array name="session_tags">
+        <item>Politics</item>
+        <item>Business</item>
+        <item>World</item>
+        <item>Technology</item>
+        <item>Science</item>
+        <item>Health</item>
+        <item>Environment</item>
+        <item>Justice</item>
+        <item>Entertainment</item>
+        <item>Sports</item>
+    </string-array>
 
     <string name="key_prefix">[KEY] </string>
     <string name="point_indent">  + </string>

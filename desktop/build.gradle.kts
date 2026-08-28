@@ -5,6 +5,17 @@ plugins {
     application
 }
 
+val copyAndroidValues = tasks.register<Copy>("copyAndroidValues") {
+    from("$rootDir/src/android/main/res") {
+        include("values/*.xml")
+    }
+    into(layout.buildDirectory.dir("generated/android-resources"))
+}
+
+tasks.processResources {
+    from(copyAndroidValues)
+}
+
 kotlin {
     jvmToolchain(17)
     sourceSets {

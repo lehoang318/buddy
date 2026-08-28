@@ -5,6 +5,8 @@ import com.example.buddy.chat.ConversationEvent
 import com.example.buddy.chat.TextAttachment
 import com.example.buddy.chat.TextAttachmentRules
 import com.example.buddy.config.AppConfigProvider
+import com.example.buddy.config.ResourceAppConfig
+import com.example.buddy.config.ResourceValuesLoader
 import com.example.buddy.crypto.EnvKeyProvider
 import com.example.buddy.data.LlmProvider
 import com.example.buddy.data.WebSearchProvider
@@ -21,6 +23,7 @@ import java.io.File
 
 fun main() = runBlocking {
     System.setProperty("org.jline.utils.log.level", "OFF")
+    AppConfigProvider.current = ResourceAppConfig(ResourceValuesLoader.loadFromClasspath())
     Log.logger = DesktopLogger("BuddyCLI")
     CliApplication().run()
 }

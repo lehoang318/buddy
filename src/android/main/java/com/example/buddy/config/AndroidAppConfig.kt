@@ -34,6 +34,8 @@ class AndroidAppConfig(context: Context) : AppConfig {
         override val maxQaPairs get() = res.getInteger(R.integer.max_qa_pairs)
         override val minPoints get() = res.getInteger(R.integer.min_summary_points)
         override val maxPoints get() = res.getInteger(R.integer.max_summary_points)
+        override val maxSessionTags get() = res.getInteger(R.integer.max_session_tags)
+        override val sessionTags get() = res.getStringArray(R.array.session_tags).toList()
         override val keyPrefix get() = res.getString(R.string.key_prefix)
         override val pointIndent get() = res.getString(R.string.point_indent)
         override val contextHeader get() = res.getString(R.string.context_header)

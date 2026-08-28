@@ -81,35 +81,35 @@ class SettingsRepository(private val context: Context) {
     suspend fun addCustomLlmProvider(provider: LlmProvider) {
         dataStore.edit {
             val current = it[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
-            val list = BuiltInProviders.deserializeProviderData(current).toMutableList()
+            val list = deserializeProviderData(current).toMutableList()
             list.removeAll { p -> p.id == provider.id }
             list.add(provider.toProviderDataWithoutKey())
-            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = BuiltInProviders.serializeProviderData(list)
+            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = serializeProviderData(list)
         }
     }
 
     suspend fun removeCustomLlmProvider(providerId: String) {
         dataStore.edit {
             val current = it[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
-            val list = BuiltInProviders.deserializeProviderData(current).toMutableList()
+            val list = deserializeProviderData(current).toMutableList()
             list.removeAll { p -> p.id == providerId }
-            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = BuiltInProviders.serializeProviderData(list)
+            it[SettingsKeys.CUSTOM_LLM_PROVIDERS] = serializeProviderData(list)
         }
     }
 
     val customLlmProviders: Flow<List<LlmProvider>> = dataStore.data.map { prefs ->
         val json = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
-        BuiltInProviders.deserializeProviderData(json).map { it.toLlmProvider() }
+        deserializeProviderData(json).map { it.toLlmProvider() }
     }
 
     val customWebSearchProviders: Flow<List<WebSearchProvider>> = dataStore.data.map { prefs ->
         val json = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
-        BuiltInProviders.deserializeProviderData(json).map { it.toWebSearchProvider() }
+        deserializeProviderData(json).map { it.toWebSearchProvider() }
     }
 
     val allLlmProviders: Flow<List<LlmProvider>> = dataStore.data.map { prefs ->
         val builtIn = BuiltInProviders.loadLlmProviders(context)
-        val custom = BuiltInProviders.deserializeProviderData(
+        val custom = deserializeProviderData(
             prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: ""
         ).map { it.toLlmProvider() }
         builtIn + custom
@@ -117,7 +117,7 @@ class SettingsRepository(private val context: Context) {
 
     val allWebSearchProviders: Flow<List<WebSearchProvider>> = dataStore.data.map { prefs ->
         val builtIn = BuiltInProviders.loadWebSearchProviders(context)
-        val custom = BuiltInProviders.deserializeProviderData(
+        val custom = deserializeProviderData(
             prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
         ).map { it.toWebSearchProvider() }
         builtIn + custom

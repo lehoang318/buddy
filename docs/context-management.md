@@ -19,7 +19,7 @@ After each Q&A exchange completes, a non-streaming LLM call generates a structur
 
 ```
 SummaryPoint(text: String, key: Boolean)
-Summary(question: String, points: List<SummaryPoint>)
+Summary(question: String, points: List<SummaryPoint>, tags: List<String>)
 ```
 
 Rules:
@@ -27,6 +27,7 @@ Rules:
 - `key: true` — used sparingly for hard user decisions, absolute constraints, or strong preferences
 - `key: false` — ordinary facts from the exchange
 - Points are **sanitized** against a restrictive-patterns blacklist to prevent prompt over-generalization
+- **Tags** — 1–3 categories chosen from a fixed 10-item list (`Politics`, `Business`, `World`, `Technology`, `Science`, `Health`, `Environment`, `Justice`, `Entertainment`, `Sports`, defined in the `session_tags` string-array in `res/values/conversation.xml`), parsed leniently (missing/wrong shape/unknown → ignored) and matched case-insensitively; aggregated into the owning session's tags (see [sessions.md](./sessions.md)). Small models that omit `"tags"` just produce an empty list.
 
 Example JSON response from the LLM:
 
@@ -35,11 +36,14 @@ Example JSON response from the LLM:
   "points": [
     {"text": "User wants to deploy on Jetson Orin Nano 8GB", "key": true},
     {"text": "They are using OpenVINO IR format", "key": false}
-  ]
+  ],
+  "tags": ["Technology"]
 }
 ```
 
 The summary is appended to `ConversationEngine.summaries`. If generation fails (network error, parse failure), the summary is silently skipped — the conversation continues with older context.
+
+During compression, the merged "Earlier conversation" summary also mechanically preserves the compressed group's tags (like key points), so old tags survive merging.
 
 ## Compression — Preventing Unbounded Growth
 
@@ -114,9 +118,9 @@ The user message is accepted after URL fetching, while actual LLM processing wai
 | File | Purpose |
 |------|---------|
 | `res/values/llm_prompts.xml` | Prompts: `search_query_prompt`, `summarizer_system_prompt`, `summarizer_user_template`, `compress_summaries_prompt` |
-| `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
+| `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), `max_session_tags` (3), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
 | `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, system_message, search tuning (see [web-search.md](./web-search.md)) |
-| `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points)` |
+| `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points, tags)` |
 | `src/common/.../chat/ConversationEngine.kt` | Turn queue, URL/search orchestration, streaming, summary generation, compression |
 | `src/common/.../chat/ConversationEngine.kt` | `MessageBuilder` assembles system prompts, summaries, Web Data, history, and attachments |
 | `src/common/.../config/AppConfig.kt` | Accessors: `summaries.maxSummaries`, `summaries.maxQaPairs`, `summaries.formatSummariesContext()`, `summaries.sanitizeSummaryPoints()`, `search.*`, etc. |

@@ -1,5 +1,7 @@
 package com.example.buddy.data
 
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.google.gson.annotations.SerializedName
 
 sealed class BaseProvider(
@@ -38,3 +40,16 @@ fun LlmProvider.toProviderData() = ProviderData(id, name, baseUrl, apiKey)
 fun LlmProvider.toProviderDataWithoutKey() = ProviderData(id, name, baseUrl, apiKey = "")
 fun ProviderData.toLlmProvider() = LlmProvider(id, name, baseUrl, apiKey)
 fun ProviderData.toWebSearchProvider() = WebSearchProvider(id, name, baseUrl, apiKey)
+
+private val providerGson = Gson()
+
+fun serializeProviderData(providers: List<ProviderData>): String = providerGson.toJson(providers)
+
+fun deserializeProviderData(json: String): List<ProviderData> {
+    if (json.isBlank()) return emptyList()
+    return try {
+        providerGson.fromJson(json, TypeToken.getParameterized(List::class.java, ProviderData::class.java).type)
+    } catch (e: Exception) {
+        emptyList()
+    }
+}

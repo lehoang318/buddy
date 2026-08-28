@@ -76,6 +76,12 @@ class ConversationEngine(
         _summaries.value = emptyList()
     }
 
+    fun restore(messages: List<ConversationMessage>, summaries: List<Summary>) {
+        history.clear()
+        history.addAll(messages)
+        _summaries.value = summaries
+    }
+
     fun send(
         userText: String,
         attachment: TextAttachment? = null,
@@ -171,7 +177,11 @@ class ConversationEngine(
                             val preservedKeys = updated.take(count)
                                 .flatMap { it.points }
                                 .filter { it.key }
-                            listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text })) + updated.drop(count)
+                            val preservedTags = updated.take(count)
+                                .flatMap { it.tags }
+                                .distinct()
+                                .takeLast(AppConfigProvider.current.summaries.maxSessionTags)
+                            listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text }, preservedTags)) + updated.drop(count)
                         } catch (e: Exception) {
                             Log.error("Chat", "Failed to compress summaries", e.message)
                             updated

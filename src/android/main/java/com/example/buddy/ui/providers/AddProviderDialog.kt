@@ -1,16 +1,12 @@
-package com.example.buddy.ui.settings
+package com.example.buddy.ui.providers
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -22,37 +18,73 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.buddy.data.LlmProvider
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
+import java.util.UUID
 
 @Composable
-fun ApiKeyConnectDialog(
-    title: String,
-    initialApiKey: String,
+fun AddProviderDialog(
+    onDismiss: () -> Unit,
     isConnecting: Boolean,
     error: String?,
-    onDismiss: () -> Unit,
-    onConnect: (String) -> Unit
+    onConnect: (LlmProvider) -> Unit
 ) {
-    var apiKey by remember { mutableStateOf(initialApiKey) }
-    var showKey by remember { mutableStateOf(false) }
+    val providerId by remember { mutableStateOf("custom_${UUID.randomUUID().toString().take(8)}") }
+    var name by remember { mutableStateOf("") }
+    var baseUrl by remember { mutableStateOf("") }
+    var apiKey by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = { if (!isConnecting) onDismiss() },
-        title = { Text(title, color = MaterialTheme.colorScheme.onSurface) },
+        title = { Text("Add Custom Provider", color = MaterialTheme.colorScheme.onSurface) },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Provider Name") },
+                    placeholder = { Text("My Provider") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextColor,
+                        unfocusedTextColor = TextColor,
+                        focusedContainerColor = SurfaceVariant,
+                        unfocusedContainerColor = SurfaceVariant,
+                        focusedBorderColor = SendButton,
+                        unfocusedBorderColor = Outline,
+                        focusedLabelColor = SendButton,
+                        unfocusedLabelColor = OnSurfaceVariant
+                    )
+                )
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = { baseUrl = it },
+                    label = { Text("Base URL") },
+                    placeholder = { Text("https://api.example.com/v1") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextColor,
+                        unfocusedTextColor = TextColor,
+                        focusedContainerColor = SurfaceVariant,
+                        unfocusedContainerColor = SurfaceVariant,
+                        focusedBorderColor = SendButton,
+                        unfocusedBorderColor = Outline,
+                        focusedLabelColor = SendButton,
+                        unfocusedLabelColor = OnSurfaceVariant
+                    )
+                )
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
@@ -60,20 +92,7 @@ fun ApiKeyConnectDialog(
                     placeholder = { Text("sk-...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    ),
-                    trailingIcon = {
-                        IconButton(onClick = { showKey = !showKey }) {
-                            Icon(
-                                imageVector = if (showKey) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = "Toggle API Key visibility",
-                                tint = SendButton
-                            )
-                        }
-                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextColor,
                         unfocusedTextColor = TextColor,
@@ -96,8 +115,17 @@ fun ApiKeyConnectDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConnect(apiKey) },
-                enabled = apiKey.isNotBlank() && !isConnecting
+                onClick = {
+                    onConnect(
+                        LlmProvider(
+                            id = providerId,
+                            name = name.ifBlank { "Custom ($providerId)" },
+                            baseUrl = baseUrl.ifBlank { "https://api.openai.com/v1" },
+                            apiKey = apiKey
+                        )
+                    )
+                },
+                enabled = (name.isNotBlank() || baseUrl.isNotBlank()) && apiKey.isNotBlank() && !isConnecting
             ) {
                 if (isConnecting) {
                     CircularProgressIndicator(
@@ -108,14 +136,6 @@ fun ApiKeyConnectDialog(
                 } else {
                     Text("Connect")
                 }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isConnecting
-            ) {
-                Text("Cancel")
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,

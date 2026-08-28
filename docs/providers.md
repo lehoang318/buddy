@@ -16,7 +16,7 @@ Buddy supports OpenAI-compatible LLM providers, giving you flexibility to choose
 | **OpenRouter** | `https://openrouter.ai/api/v1` | 400+ models from 60+ providers | ❌ SOC 2<br>❓ DPA<br>❓ No Training (API) | ✅ Tested |
 | **SiliconFlow** | `https://api.siliconflow.com/v1` | High-performance model inference | ❌ SOC 2<br>❓ DPA<br>❓ No Training (API) | ✅ Tested |
 
-Buddy also supports **custom OpenAI-compatible providers** via the Settings screen. You can add any provider that exposes an OpenAI-compatible chat completions API by providing its name, base URL, and API key.
+Buddy also supports **custom OpenAI-compatible providers** via the Providers screen. You can add any provider that exposes an OpenAI-compatible chat completions API by providing its name, base URL, and API key.
 
 ### Architecture
 
@@ -59,7 +59,7 @@ Web search capabilities allow Buddy to access current, up-to-date information fr
 
 ### Adding Custom LLM Providers
 
-1. Open Settings and tap "Add Provider..." below the LLM provider dropdown
+1. Open Providers and tap "Add Provider..." below the LLM provider dropdown
 2. Enter a **name** for your provider (e.g., "My Local LLM")
 3. Enter the **base URL** (must be OpenAI-compatible, e.g., `https://api.example.com/v1`)
 4. Optionally enter an **API Key**

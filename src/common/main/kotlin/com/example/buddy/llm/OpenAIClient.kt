@@ -4,6 +4,7 @@ import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Summary
 import com.example.buddy.data.Role
 import com.example.buddy.data.SummaryPoint
+import com.example.buddy.data.SessionTags
 import com.example.buddy.logging.Log
 import com.google.gson.Gson
 import com.google.gson.JsonArray
@@ -353,7 +354,7 @@ open class OpenAIClient internal constructor(
 
                 val systemMsg = JsonObject().apply {
                     addProperty("role", "system")
-                    addProperty("content", AppConfigProvider.current.prompts.summarizerSystem.format(AppConfigProvider.current.summaries.minPoints, AppConfigProvider.current.summaries.maxPoints) +
+                    addProperty("content", AppConfigProvider.current.prompts.summarizerSystem.format(AppConfigProvider.current.summaries.minPoints, AppConfigProvider.current.summaries.maxPoints, AppConfigProvider.current.summaries.maxSessionTags, SessionTags.CATEGORIES.joinToString(", ")) +
                         "\n\nYour response must fit within ${AppConfigProvider.current.summaries.maxTokens} tokens maximum.")
                 }
                 val userMsg = JsonObject().apply {
@@ -436,10 +437,11 @@ open class OpenAIClient internal constructor(
                         }
                     }
                     val sanitized = AppConfigProvider.current.summaries.sanitizeSummaryPoints(points)
+                    val tags = parseTags(parsed, AppConfigProvider.current.summaries.maxSessionTags)
                     Log.debug(TAG, "Summary generated",
                         "Question: ${userQuestion.take(200)}\nPoints: ${sanitized.size}\n" +
                         sanitized.joinToString("\n") { "${if (it.key) "[KEY] " else ""}${it.text}" })
-                    return@withContext Summary(question = userQuestion, points = sanitized)
+                    return@withContext Summary(question = userQuestion, points = sanitized, tags = tags)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -583,5 +585,19 @@ open class OpenAIClient internal constructor(
             Role.ASSISTANT -> "assistant"
             Role.SYSTEM -> "system"
         }
+    }
+
+    private fun parseTags(parsed: JsonObject?, maxTags: Int): List<String> {
+        if (parsed == null) return emptyList()
+        val tagsArray = parsed.get("tags")
+        if (tagsArray == null || !tagsArray.isJsonArray) return emptyList()
+        val tags = tagsArray.asJsonArray.mapNotNull { elem ->
+            if (elem.isJsonPrimitive && elem.asJsonPrimitive.isString) {
+                elem.asString.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+        }
+        return SessionTags.normalize(tags).take(maxTags)
     }
 }

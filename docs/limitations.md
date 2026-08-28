@@ -141,9 +141,20 @@ This document outlines the current technical limitations and constraints of the 
 - **Summary quality depends on LLM**: if the LLM fails to generate a summary, that exchange is not represented in future context
 - **Key/non-key classification**: the LLM may misclassify points as key or non-key, affecting what is preserved during compression
 - **Key points accumulate**: key points (user decisions, constraints) are never discarded — very long sessions with many key decisions may gradually grow the summary context
-- **No persistent storage**: summaries exist only in-memory during a session; clearing chat or restarting the app loses all summaries
+- **Summaries not independently persisted**: summaries are stored only as part of a saved session (see [sessions.md](./sessions.md)); resuming a saved session restores its summaries, but clearing a chat discards them entirely
 - **Mutex serialization**: while one message is being summarized, the next message must wait behind the lock — fast follow-up messages may see slight processing delays
 - **No token counting**: the system does not count tokens before sending; though the architecture keeps the base small, unusually long file attachments or search results could still push past a model's context limit
+
+### Chat Sessions
+
+Known constraints of session persistence (see [sessions.md](./sessions.md)):
+
+| Aspect | Limitation |
+|--------|------------|
+| **Image attachments stored inline** | Base64 image data is stored inside each `SessionMessage` in the DataStore `sessions_list` JSON blob. Preferences-style storage isn't suited to large payloads; many image-heavy sessions can bloat the file and slow reads/writes. A per-app cap (`MAX_SESSIONS = 100`) bounds the number of sessions but not individual size |
+| **File URI not persisted** | Only the file name and extracted text are saved; the original `Uri` cannot be restored after process death |
+| **Session cap** | Oldest sessions beyond `MAX_SESSIONS` (100) are silently trimmed to bound storage growth |
+| **Failed turns are saved** | A failed turn persists the user message plus an `Error: ...` assistant bubble, which then appears on resume |
 
 ---
 

@@ -27,8 +27,8 @@
 </div>
 <br>
 <div style="display: flex; justify-content: left; gap: 12px; flex-wrap: wrap;">
-  <img src="./docs/res/settings-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
-  <img src="./docs/res/parameters-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/providers-screen.png" alt="Screenshot 1" width="32%" style="max-width: 320px;">
+  <img src="./docs/res/history-screen.png" alt="Screenshot 2" width="32%" style="max-width: 320px;">
   <img src="./docs/res/events-screen.png" alt="Screenshot 3" width="32%" style="max-width: 320px;">
 </div>
 
@@ -45,7 +45,7 @@
 
 5. **Open the app** and grant camera permissions if you want to use photo capture feature.
 
-6. **Configure Settings**:
+6. **Configure Providers**:
    * LLM Provider & API Key
    * Default Model & Parameters
    * Web Search Provider & API Key
@@ -80,11 +80,12 @@ The CLI reads these environment variables: `FIREWORKS_AI_API_KEY`, `OLLAMA_CLOUD
 | [Supported Providers](./docs/providers.md) | LLM & Web Search provider details |
 | [Use Cases](./docs/use-cases.md) | Step-by-step configuration guides |
 | [Context Management](./docs/context-management.md) | History summarization, compression, and Web Data architecture |
+| [Session Management](./docs/sessions.md) | Chat history: save/resume, New Chat, and 30-day auto-delete |
 | [Web Search Workflow](./docs/web-search.md) | Query-plan generation, lenient parsing for small models, parallel fan-out, recency mapping |
 | [Technical Limitations](./docs/limitations.md) | Known constraints and limitations |
 | [Dependencies](./docs/dependencies.md) | External library reference |
 | [Sequence Diagrams](./docs/seq_chat.md) | Chat flow sequence diagrams |
-| [Sequence Diagrams (Others)](./docs/seq_others.md) | Settings, events, and about flow diagrams |
+| [Sequence Diagrams (Others)](./docs/seq_others.md) | Providers, events, and about flow diagrams |
 
 * Refer to [docs](./docs) for internal designs
 

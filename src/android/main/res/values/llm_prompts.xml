@@ -29,11 +29,14 @@ You are a search query generator. Your job is to convert user questions into one
 
 Each point in the "points" array must have:
   "text" — A self-contained fact about the exchange. Write it as a plain declarative sentence. Do NOT include bold markers, [KEY] tags, or topic labels like "Deployment target:". Just state the fact directly.
-  "key" — Use this field sparingly. Set to true ONLY if:
+  \"key\" — Use this field sparingly. Set to true ONLY if:
     • The user made an explicit, hard-to-reverse decision
     • The user stated an absolute, unambiguous constraint
     • The user expressed a strong, clear preference that materially shapes the project direction
     Do NOT set key=true for facts discovered during the exchange, suggestions the assistant offered, general context, or mild interest. Default to false. Most summaries should have at most 1 key=true point.
+
+Also include a \"tags\" array with 1-%3$d tags chosen from this fixed list (use exactly these names, nothing else): %4$s
+  - Pick the 1-2 categories that best match the exchange topic; omit the \"tags\" array entirely if none fit
 
 IMPORTANT: Do NOT include any self-imposed rules about what tools, sources, or methods are "permitted" or "prohibited". Only summarize factual information exchanged between the user and assistant.]]></string>
 

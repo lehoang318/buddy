@@ -6,22 +6,26 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.buddy.crypto.SessionKeyCache
 import com.example.buddy.config.AndroidAppConfig
 import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.BuiltInProviders
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.LlmSettings
+import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.fetch.JsoupUrlFetcher
 import com.example.buddy.fetch.UrlFetcher
@@ -33,9 +37,12 @@ import com.example.buddy.logging.Log
 import com.example.buddy.service.BackgroundScheduler
 import com.example.buddy.ui.about.AboutScreen
 import com.example.buddy.ui.chat.ChatScreen
+import com.example.buddy.ui.chat.ChatViewModel
+import com.example.buddy.ui.chat.ChatViewModelFactory
 import com.example.buddy.ui.events.EventsScreen
+import com.example.buddy.ui.history.HistoryScreen
 import com.example.buddy.ui.parameters.ParametersScreen
-import com.example.buddy.ui.settings.SettingsScreen
+import com.example.buddy.ui.providers.ProvidersScreen
 import com.example.buddy.ui.theme.BuddyTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -95,6 +102,13 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             settingsRepository.migrateKeysToSessionCache(keyCache)
+        }
+
+        lifecycleScope.launch {
+            val sessionRepository = SessionRepository(this@MainActivity)
+            if (sessionRepository.autoDeleteEnabled()) {
+                sessionRepository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
+            }
         }
 
         lifecycleScope.launch {
@@ -174,11 +188,24 @@ fun MainContent(
     val urlFetcher by urlFetcherFlow.collectAsStateWithLifecycle()
     val currentSettings by currentSettingsFlow.collectAsStateWithLifecycle()
 
-    var showSettings by remember { mutableStateOf(false) }
+    var showProviders by remember { mutableStateOf(false) }
     var showParameters by remember { mutableStateOf(false) }
     var showEvents by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val application = LocalContext.current.applicationContext as android.app.Application
+
+    val chatViewModel: ChatViewModel = viewModel(
+        factory = ChatViewModelFactory(application)
+    )
+
+    val resumeRepository = remember { SessionRepository(application) }
+    LaunchedEffect(Unit) {
+        val last = resumeRepository.latestSession()
+        if (last != null) chatViewModel.resumeSession(last)
+    }
 
     if (showParameters) {
         ParametersScreen(
@@ -202,9 +229,17 @@ fun MainContent(
         EventsScreen(onBack = { showEvents = false })
     } else if (showAbout) {
         AboutScreen(onBack = { showAbout = false })
-    } else if (showSettings) {
-        SettingsScreen(
-            onBack = { showSettings = false },
+    } else if (showHistory) {
+        HistoryScreen(
+            onBack = { showHistory = false },
+            onResume = { session ->
+                chatViewModel.resumeSession(session)
+                showHistory = false
+            }
+        )
+    } else if (showProviders) {
+        ProvidersScreen(
+            onBack = { showProviders = false },
             initialSettings = currentSettings,
             settingsRepository = settingsRepository,
             keyCache = keyCache,
@@ -228,20 +263,22 @@ fun MainContent(
                 ProvideLlmClient(llmClient!!) {
                     ProvideWebSearch(webSearch) {
                         ChatScreen(
-                            onNavigateToSettings = { showSettings = true },
+                            onNavigateToProviders = { showProviders = true },
                             onNavigateToParameters = { showParameters = true },
                             onNavigateToEvents = { showEvents = true },
-                            onNavigateToAbout = { showAbout = true }
+                            onNavigateToAbout = { showAbout = true },
+                            onNavigateToHistory = { showHistory = true }
                         )
                     }
                 }
             } else {
                 ProvideWebSearch(webSearch) {
                     ChatScreen(
-                        onNavigateToSettings = { showSettings = true },
+                        onNavigateToProviders = { showProviders = true },
                         onNavigateToParameters = { showParameters = true },
                         onNavigateToEvents = { showEvents = true },
-                        onNavigateToAbout = { showAbout = true }
+                        onNavigateToAbout = { showAbout = true },
+                        onNavigateToHistory = { showHistory = true }
                     )
                 }
             }
