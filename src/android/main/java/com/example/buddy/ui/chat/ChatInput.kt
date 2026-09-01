@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
@@ -48,6 +51,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
@@ -78,6 +82,13 @@ fun InputBar(
     onClearFile: () -> Unit,
     onPickAttachment: () -> Unit,
     onTakePhoto: () -> Unit,
+    showPairNavigation: Boolean,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
+    onGoBack: () -> Unit,
+    onGoForward: () -> Unit,
+    onGoFirst: () -> Unit,
+    onGoLast: () -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -174,12 +185,15 @@ fun InputBar(
 
         Spacer(Modifier.height(6.dp))
 
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            contentAlignment = Alignment.Center
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onPickAttachment,
                     enabled = !isOffline,
@@ -205,7 +219,53 @@ fun InputBar(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (showPairNavigation) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .combinedClickable(
+                                enabled = canGoBack,
+                                role = Role.Button,
+                                onClick = onGoBack,
+                                onLongClick = onGoFirst
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.NavigateBefore,
+                            contentDescription = "Previous",
+                            tint = if (canGoBack) TextColor else SecondaryIcons
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .combinedClickable(
+                                enabled = canGoForward,
+                                role = Role.Button,
+                                onClick = onGoForward,
+                                onLongClick = onGoLast
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.NavigateNext,
+                            contentDescription = "Next",
+                            tint = if (canGoForward) TextColor else SecondaryIcons
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onToggleReasoning,
                     enabled = !isOffline,
