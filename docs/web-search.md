@@ -11,7 +11,7 @@ sequenceDiagram
     participant LLM as LlmClient
     participant Search as WebSearch (provider)
 
-    Engine->>Helper: search(userMessage, summaries)
+    Engine->>Helper: search(userMessage, summaries, imageBase64?)
     Helper->>LLM: generateSearchQuery(cleanInput, summaries)
     LLM->>LLM: strip <think> blocks, parse query plan
     alt NO_QUERY (no search needed)
@@ -44,6 +44,12 @@ Entry point: `WebSearchHelper.search()` (`src/common/main/kotlin/com/example/bud
 or exactly `NO_QUERY` if the message doesn't need a search (greetings, casual conversation, questions about the assistant itself). The prompt (`search_query_prompt` in `res/values/llm_prompts.xml`) asks for 1 query in the common case, and 2–3 only when the question has genuinely independent parts (comparisons, multiple unrelated topics). `recency` defaults to `any` when the model doesn't specify it.
 
 Conversation summaries are included in the prompt so pronouns/references in follow-ups ("what about there?") resolve correctly — see [context-management.md](./context-management.md).
+
+### Image-Aware Query Generation
+
+When the user attaches an image, `ConversationEngine` forwards `imageBase64` through `WebSearchHelper.search()` to `generateSearchQuery()` (`src/common/main/kotlin/com/example/buddy/llm/LlmClient.kt`). If the active model is multimodal (`isModelMultimodal(activeModel)`), the user message is sent as a content array with a `text` part plus an `image_url` data-URI part; otherwise the image is dropped and only the text is used. The `search_query_prompt` instructs the model to ground queries in what is visible in the image (object, species, landmark, error text) instead of vague words like "this".
+
+Images are only sent to query generation when the underlying model supports it, so a text-only model never receives an `image_url` part in the query-gen call. For the main `/chat/completions` call, images are always attached to the user message regardless of model.
 
 ## Step 2 — Lenient Parsing (small-model tolerant)
 

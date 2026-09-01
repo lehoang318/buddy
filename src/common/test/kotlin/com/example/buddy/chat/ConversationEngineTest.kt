@@ -66,10 +66,24 @@ class ConversationEngineTest {
         assertTrue(events.filterIsInstance<ConversationEvent.SearchFinished>().single().outcome.rawResults.isNotEmpty())
     }
 
+    @Test
+    fun `engine forwards attached image to search query generation and summary`() = runBlocking {
+        val client = FakeLlmClient("""{"queries":["Buddy"],"recency":"any"}""")
+        val engine = ConversationEngine(client = client, webSearch = FakeWebSearch())
+
+        engine.send("What is this?", imageBase64 = "data:image/jpeg;base64,abc", correlationId = "offline-test").toList()
+
+        assertEquals("data:image/jpeg;base64,abc", client.lastSearchImage)
+        assertEquals("data:image/jpeg;base64,abc", client.lastSummaryImage)
+    }
+
     private class FakeLlmClient(private val searchPlan: String? = null) : LlmClient {
         override val defaultModel: String = "offline-model"
         override var activeModel: String = defaultModel
         override val isReasoningSupported: Boolean = false
+
+        var lastSearchImage: String? = null
+        var lastSummaryImage: String? = null
 
         override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> =
             flowOf("A helpful ", "assistant.")
@@ -78,10 +92,15 @@ class ConversationEngineTest {
 
         override suspend fun testConnection(): Boolean = true
 
-        override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?): String? = searchPlan
+        override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): String? {
+            lastSearchImage = imageBase64
+            return searchPlan
+        }
 
-        override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?): Summary =
-            Summary(userQuestion, listOf(SummaryPoint(assistantResponse)))
+        override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?, imageBase64: String?): Summary {
+            lastSummaryImage = imageBase64
+            return Summary(userQuestion, listOf(SummaryPoint(assistantResponse)))
+        }
 
         override suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String?): Summary =
             Summary("Compressed", listOf(SummaryPoint(summariesToCompress.joinToString { it.question })))

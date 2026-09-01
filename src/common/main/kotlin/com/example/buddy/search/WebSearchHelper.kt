@@ -25,15 +25,15 @@ class WebSearchHelper(
         val skipped: Boolean = false
     )
 
-    suspend fun search(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): WebSearchOutcome {
+    suspend fun search(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): WebSearchOutcome {
         val cleanInput = userMessage
             .replace(Regex("""https?://\S+"""), "")
             .trim()
             .ifBlank { userMessage.take(100) }
 
-        Log.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(AppConfigProvider.current.search.logPreviewMaxChars)}\nCleaned: ${cleanInput.take(AppConfigProvider.current.search.logPreviewMaxChars)}", correlationId = correlationId)
+        Log.debug(TAG, "Search query input prepared", "Original: ${userMessage.take(AppConfigProvider.current.search.logPreviewMaxChars)}\nCleaned: ${cleanInput.take(AppConfigProvider.current.search.logPreviewMaxChars)}${if (imageBase64 != null) "\nImage attached" else ""}", correlationId = correlationId)
         return try {
-            val plan = llmClient.generateSearchQuery(cleanInput, summaries, correlationId)
+            val plan = llmClient.generateSearchQuery(cleanInput, summaries, correlationId, imageBase64)
             if (plan == null) {
                 Log.info(TAG, "Search skipped", "Query generation returned null (NO_QUERY or sanitization failed)", correlationId = correlationId)
                 return WebSearchOutcome(skipped = true)

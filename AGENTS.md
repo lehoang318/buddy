@@ -69,7 +69,7 @@
 - `ChatViewModel` retains Android UI, URI, bitmap, ContentResolver, and foreground-service concerns; reusable conversation processing is implemented by `src/common/main/kotlin/.../chat/ConversationEngine.kt`
 - `ChatViewModel.updateClient()` sets `client.activeModel = client.defaultModel` when client changes
 - File attachments: max 100KB, supported extensions: `.txt`, `.md`, `.log`, `.rst`, `.adoc`, `.asciidoc`, `.rtf`, `.json`, `.xml`, `.html`, `.py`, `.js`
-- Image processing: max dimension 1440px, converted to JPEG at 85% quality, Base64-encoded
+- Image processing: `ChatViewModel.onImageUri(uri)` decodes on `Dispatchers.IO` with a two-pass bounds+`inSampleSize` decode (avoids full-resolution OOM), downscales to max dimension 1440px, JPEG quality 85, Base64 data URI. Failure sets `attachmentError` in the UI
 - Single attachment only — new attachment replaces previous one
 - Context managed via **structured summarization**: each Q&A exchange is summarized into 2–3 points by a separate LLM call after streaming completes. Points have a `key` boolean for critical decisions.
 - Summaries replace full history — only last N Q&A pairs sent as raw messages (default: 2 pairs, configurable via `max_qa_pairs` in `conversation.xml`)
@@ -78,8 +78,8 @@
 - **Session tags**: each summary also carries 1–3 tags chosen from a fixed 10-category list (`summaries.sessionTags`, sourced from the `session_tags` string-array in `res/values/conversation.xml` via `SessionTags.CATEGORIES`), parsed leniently and matched case-insensitively; out-of-set tags are dropped at parse/load. `ChatSessionManager` derives the session's tags mechanically at save: `summaries.flatMap { it.tags }.distinct().takeLast(maxSessionTags)` (default 3). History filters sessions by multi-select tag chips (AND). See `docs/sessions.md`
 - **Web Data system message**: fetched URLs and web search results injected as a separate `## Web Data` system message (markdown), not appended to user content
 - `buildLlmMessages()` structure: system prompt → summaries context → Web Data → limited Q&A pairs → current user message
-- Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. See `docs/web-search.md` for the full workflow
-- **Chat sessions** (`ChatSessionManager` + `SessionRepository`): the active chat is auto-saved after every finished turn and on navigation (New Chat / resume), capped at `MAX_SESSIONS` (100). The most recent session is resumed on launch. `SavedSession.createdAt` is immutable; `updatedAt` drives History filters, ordering, and the 30-day auto-delete. See `docs/sessions.md`
+- Web search: query generation returns a plan of 1-3 queries + a recency hint, fanned out in parallel by `WebSearchHelper` and merged; parsing is deliberately lenient for small (~9B) models, never erroring on a malformed response. When an image is attached and the active model is multimodal, the image is included in query generation so queries are grounded in its content. See `docs/web-search.md` for the full workflow
+- **Chat sessions** (`ChatSessionManager` + `SessionRepository`): the active chat is auto-saved after every finished turn and on navigation (New Chat / resume), capped at `MAX_SESSIONS` (100). The most recent session is resumed on launch. `SavedSession.createdAt` is immutable; `updatedAt` drives History filters, ordering, and the 30-day auto-delete. Image attachments are not stored inline: Android `SessionImageStore` writes JPEGs to `filesDir/session_images/<sessionId>/` and persists only `imageRef` filenames in the DataStore JSON (base64 lives in memory only); sessions are hydrated on resume and image directories deleted on session delete/purge. See `docs/sessions.md`
 - See `docs/context-management.md` for full details
 
 ### Desktop CLI Application

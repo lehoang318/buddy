@@ -121,7 +121,8 @@ class ConversationEngine(
                 val outcome = WebSearchHelper(activeClient, searchProvider).search(
                     userText,
                     _summaries.value,
-                    correlationId
+                    correlationId,
+                    imageBase64
                 )
                 emit(ConversationEvent.SearchFinished(outcome))
                 outcome
@@ -164,7 +165,8 @@ class ConversationEngine(
                     val summary = activeClient.generateSummary(
                         userMessage.content,
                         assistantText,
-                        model = activeClient.activeModel
+                        model = activeClient.activeModel,
+                        imageBase64 = userMessage.imageBase64
                     )
                     val updated = _summaries.value + summary
                     _summaries.value = if (updated.size > AppConfigProvider.current.summaries.maxSummaries) {

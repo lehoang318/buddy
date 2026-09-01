@@ -151,7 +151,7 @@ Known constraints of session persistence (see [sessions.md](./sessions.md)):
 
 | Aspect | Limitation |
 |--------|------------|
-| **Image attachments stored inline** | Base64 image data is stored inside each `SessionMessage` in the DataStore `sessions_list` JSON blob. Preferences-style storage isn't suited to large payloads; many image-heavy sessions can bloat the file and slow reads/writes. A per-app cap (`MAX_SESSIONS = 100`) bounds the number of sessions but not individual size |
+| **Image attachments stored on disk** | Image bytes are written to app-private `filesDir/session_images/<sessionId>/` as JPEGs; only a filename (`imageRef`) lives in the DataStore JSON. Images are small (max 1440px, JPEG q85) but deleting the app or clearing app data removes them, so restored sessions then show the message without its thumbnail |
 | **File URI not persisted** | Only the file name and extracted text are saved; the original `Uri` cannot be restored after process death |
 | **Session cap** | Oldest sessions beyond `MAX_SESSIONS` (100) are silently trimmed to bound storage growth |
 | **Failed turns are saved** | A failed turn persists the user message plus an `Error: ...` assistant bubble, which then appears on resume |

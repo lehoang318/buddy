@@ -37,11 +37,15 @@ class SessionRepository(private val storage: SessionStorage) {
         storage.writeSessions(serialize(list))
     }
 
-    suspend fun purgeOlderThan(ageMillis: Long) = mutex.withLock {
+    suspend fun purgeOlderThan(ageMillis: Long): Set<String> = mutex.withLock {
         val cutoff = System.currentTimeMillis() - ageMillis
         val list = deserialize(storage.sessionsJson.first()).toMutableList()
+        val removed = list.filter { it.updatedAt < cutoff }.map { it.id }.toSet()
         list.removeAll { it.updatedAt < cutoff }
-        storage.writeSessions(serialize(list))
+        if (removed.isNotEmpty()) {
+            storage.writeSessions(serialize(list))
+        }
+        removed
     }
 
     suspend fun setAutoDeleteOld(enabled: Boolean) {

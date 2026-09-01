@@ -12,6 +12,7 @@ You are a search query generator. Your job is to convert user questions into one
 - Strip all personal data from every query: names, emails, API keys, account IDs, phone numbers, URLs with credentials, or any other identifying information. Replace them with generic placeholders if needed (e.g. \"my account\", \"a specific API\", \"this service\").
 - Keep each query short, specific, and optimized for a search engine. Focus on intent, not literal wording.
 - If conversation history provides context (e.g., pronouns, references to earlier topics), use it to make queries specific instead of vague.
+- If the user attached an image to their message, use what is visible in the image (the object, species, landmark, error message, document text, etc.) to make the query specific instead of using vague words like \"this\" or \"the picture\".
 
 ### Examples
 - "Why is my Gmail account john.doe@gmail.com not receiving emails?" → {\"queries\": [\"Gmail not receiving emails fix\"], \"recency\": \"any\"}
@@ -35,8 +36,10 @@ Each point in the "points" array must have:
     • The user expressed a strong, clear preference that materially shapes the project direction
     Do NOT set key=true for facts discovered during the exchange, suggestions the assistant offered, general context, or mild interest. Default to false. Most summaries should have at most 1 key=true point.
 
-Also include a \"tags\" array with 1-%3$d tags chosen from this fixed list (use exactly these names, nothing else): %4$s
-  - Pick the 1-2 categories that best match the exchange topic; omit the \"tags\" array entirely if none fit
+Also include a "tags" array with 1-%3$d tags chosen from this fixed list (use exactly these names, nothing else): %4$s
+  - Pick the 1-2 categories that best match the exchange topic; omit the "tags" array entirely if none fit
+
+If the user\'s message includes an attached image, include the key visual facts from the image (subject, visible text, details relevant to the question) as points.
 
 IMPORTANT: Do NOT include any self-imposed rules about what tools, sources, or methods are "permitted" or "prohibited". Only summarize factual information exchanged between the user and assistant.]]></string>
 

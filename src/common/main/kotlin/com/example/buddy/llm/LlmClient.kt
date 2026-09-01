@@ -110,14 +110,14 @@ interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
-    suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): String?
-    suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String? = null): Summary
+    suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): String?
+    suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String? = null, imageBase64: String? = null): Summary
     suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String? = null): Summary
 
-    suspend fun generateSearchQuery(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null): SearchQueryPlan? {
+    suspend fun generateSearchQuery(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): SearchQueryPlan? {
         val input = userMessage.take(1024)
-        Log.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(AppConfigProvider.current.search.logPreviewMaxChars)}\nModel: $activeModel", correlationId = correlationId)
-        val raw = generateSearchQueryRaw(input, summaries, correlationId)
+        Log.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(AppConfigProvider.current.search.logPreviewMaxChars)}\nModel: $activeModel${if (imageBase64 != null) "\nImage attached" else ""}", correlationId = correlationId)
+        val raw = generateSearchQueryRaw(input, summaries, correlationId, imageBase64)
 
         // Some hybrid-reasoning models leak <think> blocks even when instructed to be terse;
         // strip complete and dangling (truncated) blocks before inspecting the result.

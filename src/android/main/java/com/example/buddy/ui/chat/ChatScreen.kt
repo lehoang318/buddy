@@ -1,6 +1,5 @@
 package com.example.buddy.ui.chat
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,24 +86,21 @@ fun ChatScreen(
         if (uri != null) {
             val mimeType = context.contentResolver.getType(uri)
             if (mimeType?.startsWith("image/") == true) {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = inputStream?.use { BitmapFactory.decodeStream(it) }
-                val base64 = bitmap?.let { vm.bitmapToBase64(it) }
-                bitmap?.recycle()
-                vm.onImagePicked(base64)
+                vm.onImageUri(uri)
             } else {
                 vm.onFilePicked(uri)
             }
         }
     }
 
+    val cameraTempFile = remember {
+        File.createTempFile("buddy_camera_", ".jpg", context.cacheDir)
+    }
     val cameraTempUri = remember {
-        val cacheDir = context.cacheDir
-        val imageFile = File.createTempFile("buddy_camera_", ".jpg", cacheDir)
         FileProvider.getUriForFile(
             context.applicationContext,
             "${context.packageName}.fileprovider",
-            imageFile
+            cameraTempFile
         )
     }
 
@@ -112,11 +108,7 @@ fun ChatScreen(
         ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
         if (success && cameraTempUri != null) {
-            val inputStream = context.contentResolver.openInputStream(cameraTempUri)
-            val bitmap = inputStream?.use { BitmapFactory.decodeStream(it) }
-            val base64 = bitmap?.let { vm.bitmapToBase64(it) }
-            bitmap?.recycle()
-            vm.onImagePicked(base64)
+            vm.onImageUri(cameraTempUri)
         }
     }
 
@@ -129,7 +121,7 @@ fun ChatScreen(
     DisposableEffect(Unit) {
         onDispose {
             try {
-                File(cameraTempUri.path!!).delete()
+                cameraTempFile.delete()
             } catch (e: Exception) {
             }
         }
@@ -161,7 +153,7 @@ fun ChatScreen(
                 pendingImage = state.pendingImageBase64,
                 pendingFile = state.pendingFileUri,
                 pendingFileName = state.pendingFileName,
-                fileTooLargeError = state.fileTooLargeError,
+                attachmentError = state.attachmentError,
                 isOffline = state.isOffline,
                 isProcessing = state.isLoading || state.isStreaming || state.urlFetchInProgress,
                 isCancelling = state.isCancelling,

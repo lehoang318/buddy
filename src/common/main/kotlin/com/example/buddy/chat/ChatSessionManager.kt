@@ -52,11 +52,12 @@ class ChatSessionManager(private val repository: SessionRepository) {
         }
     }
 
-    suspend fun save(messages: List<SessionMessage>, summaries: List<Summary>) {
+    suspend fun save(messages: List<SessionMessage>, summaries: List<Summary>, transform: suspend (SavedSession) -> SavedSession = { it }) {
         val toSave = buildSession(messages, summaries) ?: return
-        repository.addSession(toSave)
-        activeSessionId = toSave.id
-        activeSessionCreatedAt = toSave.createdAt
+        val final = transform(toSave)
+        repository.addSession(final)
+        activeSessionId = final.id
+        activeSessionCreatedAt = final.createdAt
         dirty = false
     }
 
