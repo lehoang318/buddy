@@ -18,6 +18,7 @@ import com.example.buddy.chat.TextAttachment
 import com.example.buddy.chat.TextAttachmentRules
 import com.example.buddy.chat.ConversationMessage
 import com.example.buddy.data.Role
+import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionMessage
 import com.example.buddy.data.SessionRepository
@@ -124,6 +125,18 @@ class ChatViewModel(
         val next = llmClient?.toggleReasoning(current) ?: ReasoningEffort.HIGH
         _uiState.update {
             it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
+        }
+    }
+
+    fun updateSettings(settings: LlmSettings) {
+        _uiState.update {
+            it.copy(generationConfig = LlmGenerationConfig(
+                temperature = settings.temperature,
+                topP = settings.topP,
+                topK = settings.topK.takeIf { v -> v > 0 },
+                maxTokens = settings.maxTokens.takeIf { v -> v > 0 },
+                reasoningEffort = it.generationConfig.reasoningEffort
+            ))
         }
     }
 

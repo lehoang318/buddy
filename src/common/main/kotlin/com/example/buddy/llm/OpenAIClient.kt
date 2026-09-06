@@ -45,6 +45,55 @@ open class OpenAIClient internal constructor(
 
     protected val gson = Gson()
 
+    private val contextLengths = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    internal fun setModelContextLength(modelId: String, length: Int?) {
+        if (length != null && length > 0) contextLengths[modelId] = length else contextLengths.remove(modelId)
+    }
+
+    internal open fun buildChatRequestBody(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): JsonObject {
+        val llmConfig = AppConfigProvider.current.llm
+        val statedMaxTokens = config.maxTokens ?: llmConfig.maxTokens
+        val hardMaxTokens = clampToContextWindow(
+            messages = messages,
+            model = model,
+            maxTokens = statedMaxTokens * llmConfig.responseLimitMultiplier,
+            minTokens = llmConfig.minResponseTokens
+        )
+        val apiMessages = messages.map { msg ->
+            val messageObj = JsonObject()
+            messageObj.addProperty("role", msg.role.toApiRole())
+            if (msg.imageBase64 != null && msg.content.isNotBlank()) {
+                messageObj.add("content", buildMessageContent(msg.content, msg.imageBase64))
+            } else {
+                messageObj.addProperty("content", msg.content)
+            }
+            messageObj
+        }
+        return JsonObject().apply {
+            addProperty("model", model)
+            add("messages", JsonArray().apply { apiMessages.forEach { add(it) } })
+            addProperty("max_tokens", hardMaxTokens)
+            addProperty("temperature", config.temperature ?: llmConfig.temperature)
+            addProperty("top_p", config.topP ?: llmConfig.topP)
+            addProperty("top_k", config.topK ?: llmConfig.topK)
+            addReasoningParameter(this, config.reasoningEffort, forSearchQuery = false)
+            addProperty("stream", true)
+        }
+    }
+
+    private fun clampToContextWindow(messages: List<LlmMessage>, model: String, maxTokens: Int, minTokens: Int): Int {
+        val contextLength = contextLengths[model] ?: return maxTokens
+        val promptTokens = messages.sumOf { it.content.length } / 4
+        if (promptTokens + maxTokens > contextLength) {
+            val clamped = maxOf(contextLength - promptTokens, minTokens)
+            Log.warning(TAG, "Response budget clamped to context window",
+                "model=$model, window=$contextLength, promptEstimate=$promptTokens, requested=$maxTokens, clamped=$clamped")
+            return clamped
+        }
+        return maxTokens
+    }
+
     private val normalizedBaseUrl: String
         get() = baseUrl.trimEnd('/')
 
@@ -87,26 +136,7 @@ open class OpenAIClient internal constructor(
     }
 
     override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> = flow {
-        val apiMessages = messages.map { msg ->
-            val messageObj = JsonObject()
-            messageObj.addProperty("role", msg.role.toApiRole())
-            if (msg.imageBase64 != null && msg.content.isNotBlank()) {
-                messageObj.add("content", buildMessageContent(msg.content, msg.imageBase64))
-            } else {
-                messageObj.addProperty("content", msg.content)
-            }
-            messageObj
-        }
-
-        val requestBody = JsonObject().apply {
-            addProperty("model", model)
-            add("messages", JsonArray().apply { apiMessages.forEach { add(it) } })
-            addProperty("max_tokens", config.maxTokens.takeIf { it > 0 } ?: AppConfigProvider.current.llm.maxTokens)
-            addProperty("temperature", config.temperature.takeIf { it > 0 } ?: AppConfigProvider.current.llm.temperature)
-            addProperty("top_p", config.topP.takeIf { it > 0 } ?: AppConfigProvider.current.llm.topP)
-            addReasoningParameter(this, config.reasoningEffort, forSearchQuery = false)
-            addProperty("stream", true)
-        }
+        val requestBody = buildChatRequestBody(messages, model, config)
 
         val request = Request.Builder()
             .url("$normalizedBaseUrl/chat/completions")
@@ -253,8 +283,17 @@ open class OpenAIClient internal constructor(
                         val modelJson = modelObj.asJsonObject
                         if (!shouldIncludeModel(modelJson)) return@mapNotNull null
                         val id = modelJson.get("id").asString
+                        val contextLength = (modelJson.get("context_length") ?: modelJson.get("context_window"))
+                            ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }
+                            ?.asInt
+                        setModelContextLength(id, contextLength)
                         val isMultimodal = detectMultimodalFromApi(modelJson) || isModelMultimodal(id)
-                        LlmModel(id = id, name = getModelDisplayName(id), isMultimodal = isMultimodal)
+                        LlmModel(
+                            id = id,
+                            name = getModelDisplayName(id),
+                            isMultimodal = isMultimodal,
+                            contextLength = contextLength
+                        )
                     }.sortedWith(
                         compareByDescending<LlmModel> { it.isMultimodal }
                             .thenBy { it.name }
@@ -315,7 +354,7 @@ open class OpenAIClient internal constructor(
                         })
                         add(userMsg)
                     })
-                    addProperty("max_tokens", 4096)
+                    addProperty("max_tokens", AppConfigProvider.current.search.queryMaxTokens)
                     addProperty("temperature", AppConfigProvider.current.search.queryTemperature)
                     addReasoningParameter(this, ReasoningEffort.LOW, forSearchQuery = true)
                 }

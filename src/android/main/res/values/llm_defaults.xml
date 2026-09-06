@@ -4,6 +4,9 @@
     <item name="default_top_p" format="float" type="dimen">0.95</item>
     <integer name="default_top_k">20</integer>
     <integer name="default_max_tokens">4096</integer>
+    <integer name="response_hard_limit_multiplier">2</integer>
+    <integer name="request_max_chars">32768</integer>
+    <integer name="min_response_tokens">256</integer>
     <string name="default_system_message">You are a helpful assistant.</string>
     <item name="search_query_temperature" format="float" type="dimen">0.2</item>
     <integer name="search_query_max_chars">128</integer>
@@ -11,6 +14,7 @@
     <integer name="search_total_max_results">10</integer>
     <integer name="log_preview_max_chars">1024</integer>
     <integer name="search_result_content_max_chars">2000</integer>
+    <integer name="search_query_max_tokens">4096</integer>
     <item name="summary_temperature" format="float" type="dimen">0.2</item>
     <integer name="summary_max_tokens">512</integer>
     <string name="default_reasoning_chat_low">low</string>

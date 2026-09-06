@@ -5,14 +5,15 @@ import com.example.buddy.data.Role
 data class LlmModel(
     val id: String,
     val name: String,
-    val isMultimodal: Boolean = false
+    val isMultimodal: Boolean = false,
+    val contextLength: Int? = null
 )
 
 data class LlmGenerationConfig(
-    val temperature: Float = 0f,
-    val topP: Float = 0f,
-    val topK: Int = 0,
-    val maxTokens: Int = 0,
+    val temperature: Float? = null,
+    val topP: Float? = null,
+    val topK: Int? = null,
+    val maxTokens: Int? = null,
     val reasoningEffort: ReasoningEffort? = null
 )
 

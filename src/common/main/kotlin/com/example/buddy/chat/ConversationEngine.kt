@@ -138,7 +138,8 @@ class ConversationEngine(
                 summaries = _summaries.value,
                 searchResults = searchOutcome?.rawResults.orEmpty(),
                 fetchedUrls = fetchedUrls,
-                searchAnswer = searchOutcome?.answer
+                searchAnswer = searchOutcome?.answer,
+                outputLimit = generationConfig.maxTokens
             )
             val response = StringBuilder()
             try {
@@ -206,53 +207,24 @@ object MessageBuilder {
         summaries: List<Summary> = emptyList(),
         searchResults: List<SearchResult> = emptyList(),
         fetchedUrls: List<FetchedUrl> = emptyList(),
-        searchAnswer: String? = null
+        searchAnswer: String? = null,
+        outputLimit: Int? = null
     ): List<LlmMessage> {
+        val llmConfig = AppConfigProvider.current.llm
+        val summariesConfig = AppConfigProvider.current.summaries
+        val searchConfig = AppConfigProvider.current.search
+        val maxChars = llmConfig.maxRequestChars
+        val resolvedLimit = outputLimit ?: llmConfig.maxTokens
+
         val currentDate = java.time.LocalDate.now()
             .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", java.util.Locale.US))
 
-        val systemParts = mutableListOf<String>()
-        systemParts.add("## Instructions\n${AppConfigProvider.current.llm.defaultSystemMessage}\n\nCurrent date: $currentDate")
-
-        if (summaries.isNotEmpty()) {
-            systemParts.add(AppConfigProvider.current.summaries.formatSummariesContext(summaries))
-        }
-
-        if (fetchedUrls.isNotEmpty() || searchResults.isNotEmpty()) {
-            val webParts = mutableListOf<String>()
-            webParts.add(AppConfigProvider.current.summaries.webDataHeader)
-            webParts.add(AppConfigProvider.current.search.webDataInstructions)
-
-            if (fetchedUrls.isNotEmpty()) {
-                webParts.add("### Fetched URL")
-                fetchedUrls.forEach {
-                    webParts.add("#### ${it.url}")
-                    webParts.add(it.content)
-                }
-            }
-
-            if (!searchAnswer.isNullOrBlank()) {
-                webParts.add("### Search Engine Summary")
-                webParts.add(searchAnswer)
-            }
-
-            if (searchResults.isNotEmpty()) {
-                webParts.add("### Web Search")
-                searchResults.forEach {
-                    webParts.add("#### ${it.title}")
-                    webParts.add("Source: ${it.url}" + (it.publishedDate?.let { date -> " (Published: $date)" } ?: ""))
-                    webParts.add(it.content)
-                }
-            }
-            systemParts.add(webParts.joinToString("\n"))
-        }
-
-        systemParts.add("## Output Limit\nYour response may not exceed ${AppConfigProvider.current.llm.maxTokens} tokens.")
-        val result = mutableListOf(LlmMessage(Role.SYSTEM, systemParts.joinToString("\n\n")))
+        val instructionsPart = "## Instructions\n${llmConfig.defaultSystemMessage}\n\nCurrent date: $currentDate"
+        val outputLimitPart = "## Output Limit\nYour response may not exceed $resolvedLimit tokens."
 
         val currentUser = history.lastOrNull()?.takeIf { it.role == Role.USER }
         val previous = if (currentUser != null) history.dropLast(1) else history
-        val pairs = mutableListOf<Pair<ConversationMessage, ConversationMessage>>()
+        var pairs = mutableListOf<Pair<ConversationMessage, ConversationMessage>>()
         var index = 0
         while (index < previous.size - 1) {
             if (previous[index].role == Role.USER && previous[index + 1].role == Role.ASSISTANT) {
@@ -263,11 +235,81 @@ object MessageBuilder {
             }
         }
 
-        pairs.takeLast(AppConfigProvider.current.summaries.maxQaPairs).forEach { (user, assistant) ->
+        var retainedSummaries = summaries.toMutableList()
+        var retainedResults = searchResults.toMutableList()
+        var retainedUrls = fetchedUrls.toMutableList()
+        var retainedAnswer = searchAnswer
+        pairs = pairs.takeLast(summariesConfig.maxQaPairs).toMutableList()
+        var currentUserText = currentUser?.let { buildMessageContent(it) } ?: ""
+
+        var trimmed = false
+
+        fun webSectionText(): String {
+            if (retainedAnswer.isNullOrBlank() && retainedUrls.isEmpty() && retainedResults.isEmpty()) return ""
+            val parts = mutableListOf<String>()
+            parts.add(summariesConfig.webDataHeader)
+            parts.add(searchConfig.webDataInstructions)
+            retainedAnswer?.let { parts.add("### Search Engine Summary\n$it") }
+            retainedUrls.forEach { parts.add("### Fetched URL\n#### ${it.url}\n${it.content}") }
+            retainedResults.forEach {
+                parts.add("### Web Search\n#### ${it.title}\nSource: ${it.url}" +
+                    (it.publishedDate?.let { date -> " (Published: $date)" } ?: "") + "\n${it.content}")
+            }
+            return parts.joinToString("\n")
+        }
+
+        fun systemText(): String {
+            val parts = mutableListOf(instructionsPart)
+            summariesConfig.formatSummariesContext(retainedSummaries).takeIf { it.isNotBlank() }?.let { parts.add(it) }
+            webSectionText().takeIf { it.isNotBlank() }?.let { parts.add(it) }
+            parts.add(outputLimitPart)
+            return parts.joinToString("\n\n")
+        }
+
+        fun totalLength(): Int = systemText().length +
+            pairs.sumOf { it.first.content.length + it.second.content.length } +
+            currentUserText.length
+
+        fun truncateAtWordBoundary(text: String, maxChars: Int): String {
+            if (text.length <= maxChars) return text
+            val cut = text.take(maxChars)
+            val lastSpace = cut.lastIndexOf(' ')
+            return if (lastSpace > maxChars / 2) cut.take(lastSpace).trim() else cut.trim()
+        }
+
+        if (totalLength() > maxChars) {
+            trimmed = true
+            while (totalLength() > maxChars && retainedResults.isNotEmpty()) retainedResults.removeAt(retainedResults.size - 1)
+            while (totalLength() > maxChars && retainedUrls.isNotEmpty()) retainedUrls.removeAt(retainedUrls.size - 1)
+            if (totalLength() > maxChars && !retainedAnswer.isNullOrBlank()) { retainedAnswer = null }
+            while (totalLength() > maxChars && retainedSummaries.isNotEmpty()) retainedSummaries.removeAt(0)
+            while (totalLength() > maxChars && pairs.isNotEmpty()) pairs.removeAt(0)
+            if (totalLength() > maxChars && currentUserText.isNotEmpty()) {
+                val over = totalLength() - maxChars
+                currentUserText = truncateAtWordBoundary(currentUserText, (currentUserText.length - over).coerceAtLeast(0)).trim()
+                if (currentUserText.isBlank()) {
+                    currentUserText = ""
+                    trimmed = true
+                }
+            }
+        }
+
+        if (trimmed) {
+            Log.warning("Chat", "Request trimmed to fit $maxChars character limit",
+                "Summaries kept: ${retainedSummaries.size}, results kept: ${retainedResults.size}, " +
+                    "urls kept: ${retainedUrls.size}, pairs kept: ${pairs.size}, answer kept: ${!retainedAnswer.isNullOrBlank()}")
+        }
+
+        val systemMessage = systemText().takeIf { it.isNotBlank() }?.let { LlmMessage(Role.SYSTEM, it) }
+        val finalUserMessage = currentUser?.takeIf { currentUserText.isNotBlank() }
+            ?.let { LlmMessage(Role.USER, currentUserText, it.imageBase64) }
+        val result = mutableListOf<LlmMessage>()
+        systemMessage?.let { result += it }
+        pairs.forEach { (user, assistant) ->
             result += LlmMessage(Role.USER, buildMessageContent(user), user.imageBase64)
             result += LlmMessage(Role.ASSISTANT, assistant.content)
         }
-        currentUser?.let { result += LlmMessage(Role.USER, buildMessageContent(it), it.imageBase64) }
+        finalUserMessage?.let { result += it }
         return result
     }
 

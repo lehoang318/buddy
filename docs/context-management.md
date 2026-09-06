@@ -82,6 +82,27 @@ Key decisions are never lost during compression — they are preserved programma
 
 **Pair selection:** Messages are scanned for consecutive USER→ASSISTANT pairs. Unpaired messages (e.g. the greeting) are naturally excluded.
 
+## Token & Request Size Limits
+
+All limit values live in `res/values/llm_defaults.xml` and are exposed through `AppConfig` (`AndroidAppConfig` reads them via `R` on device; `ResourceAppConfig` reads the same XML from the desktop jar's classpath).
+
+**Response limits (chat only):**
+- The system prompt states a soft limit: `## Output Limit — "Your response may not exceed N tokens"`, where `N` is the effective value of `llm.maxTokens` (`default_max_tokens`, 4096; overridden by the persisted Android setting).
+- The API request actually sends `max_tokens = N * responseLimitMultiplier` (2), so the provider enforces a hard cap of 2N. This gives the model headroom (formatting, reasoning overhead) while the prompt keeps the visible answer tight. The prompt and the API parameter always derive from the same `N`, so they stay consistent.
+- If the selected model's `context_length` is known (parsed from `/models`; OpenRouter exposes it, others may not), the prompt is estimated at `Σ content chars / 4` tokens. When `prompt + hard limit` exceeds the window, `max_tokens` is clamped to the remaining budget, never below `min_response_tokens` (256). A warning is logged to the Events screen. The guard is best-effort — it only applies when a context length is known.
+- Summary/compression calls keep `max_tokens == summary_max_tokens` (512) matching their prompt statement. Search-query generation uses its own `search_query_max_tokens`.
+
+**Request size cap (chat only):**
+- The assembled request (system prompt + memory + Web Data + pairs + current message) is capped at `llm.maxRequestChars` (32768 characters). Image base64 is excluded from the count (it would blow the budget on every image request).
+- When the cap is exceeded, content is trimmed in priority order (lowest value first), with a warning logged:
+  1. Search result contents (dropped from the tail)
+  2. Fetched URL contents (dropped from the tail)
+  3. Search engine summary
+  4. Summaries (oldest first)
+  5. Raw Q&A pairs (oldest first)
+  6. Current user message (truncated at a word boundary, last resort)
+- If the whole Web Data section empties, `## Web Data` is omitted entirely.
+
 ## Web Data
 
 Fetched URLs and web search results share a single `## Web Data` system message:
@@ -120,7 +141,7 @@ The user message is accepted after URL fetching, while actual LLM processing wai
 |------|---------|
 | `res/values/llm_prompts.xml` | Prompts: `search_query_prompt`, `summarizer_system_prompt`, `summarizer_user_template`, `compress_summaries_prompt` |
 | `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), `max_session_tags` (3), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
-| `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, system_message, search tuning (see [web-search.md](./web-search.md)) |
+| `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, `response_hard_limit_multiplier`, `request_max_chars`, `min_response_tokens`, `search_query_max_tokens`, system_message, search tuning (see [web-search.md](./web-search.md)) |
 | `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points, tags)` |
 | `src/common/.../chat/ConversationEngine.kt` | Turn queue, URL/search orchestration, streaming, summary generation, compression |
 | `src/common/.../chat/ConversationEngine.kt` | `MessageBuilder` assembles system prompts, summaries, Web Data, history, and attachments |

@@ -15,12 +15,16 @@ class AndroidAppConfig(context: Context) : AppConfig {
         override val topP get() = ResourcesCompat.getFloat(res, R.dimen.default_top_p)
         override val topK get() = res.getInteger(R.integer.default_top_k)
         override val maxTokens get() = res.getInteger(R.integer.default_max_tokens)
+        override val responseLimitMultiplier get() = res.getInteger(R.integer.response_hard_limit_multiplier)
+        override val minResponseTokens get() = res.getInteger(R.integer.min_response_tokens)
+        override val maxRequestChars get() = res.getInteger(R.integer.request_max_chars)
         override val defaultSystemMessage get() = res.getString(R.string.default_system_message)
     }
 
     override val search = object : SearchConfig {
         override val queryTemperature get() = ResourcesCompat.getFloat(res, R.dimen.search_query_temperature)
         override val queryMaxChars get() = res.getInteger(R.integer.search_query_max_chars)
+        override val queryMaxTokens get() = res.getInteger(R.integer.search_query_max_tokens)
         override val maxResults get() = res.getInteger(R.integer.search_max_results)
         override val totalMaxResults get() = res.getInteger(R.integer.search_total_max_results)
         override val logPreviewMaxChars get() = res.getInteger(R.integer.log_preview_max_chars)
