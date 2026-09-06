@@ -9,12 +9,16 @@ class ResourceAppConfig(private val values: ResourceValues) : AppConfig {
         override val topP get() = values.dimension("default_top_p")
         override val topK get() = values.integer("default_top_k")
         override val maxTokens get() = values.integer("default_max_tokens")
+        override val responseLimitMultiplier get() = values.integer("response_hard_limit_multiplier")
+        override val minResponseTokens get() = values.integer("min_response_tokens")
+        override val maxRequestChars get() = values.integer("request_max_chars")
         override val defaultSystemMessage get() = values.string("default_system_message")
     }
 
     override val search = object : SearchConfig {
         override val queryTemperature get() = values.dimension("search_query_temperature")
         override val queryMaxChars get() = values.integer("search_query_max_chars")
+        override val queryMaxTokens get() = values.integer("search_query_max_tokens")
         override val maxResults get() = values.integer("search_max_results")
         override val totalMaxResults get() = values.integer("search_total_max_results")
         override val logPreviewMaxChars get() = values.integer("log_preview_max_chars")

@@ -10,12 +10,16 @@ interface LlmConfig {
     val topP: Float
     val topK: Int
     val maxTokens: Int
+    val responseLimitMultiplier: Int
+    val minResponseTokens: Int
+    val maxRequestChars: Int
     val defaultSystemMessage: String
 }
 
 interface SearchConfig {
     val queryTemperature: Float
     val queryMaxChars: Int
+    val queryMaxTokens: Int
     val maxResults: Int
     val totalMaxResults: Int
     val logPreviewMaxChars: Int

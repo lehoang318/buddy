@@ -157,10 +157,10 @@ interface LlmClient {
         correlationId: String? = null
     ): Flow<String> {
         val startTime = System.currentTimeMillis()
-        val resolvedTemp = config.temperature.takeIf { it > 0 } ?: AppConfigProvider.current.llm.temperature
-        val resolvedTopP = config.topP.takeIf { it > 0 } ?: AppConfigProvider.current.llm.topP
-        val resolvedTopK = config.topK.takeIf { it > 0 } ?: AppConfigProvider.current.llm.topK
-        val resolvedMaxTokens = config.maxTokens.takeIf { it > 0 } ?: AppConfigProvider.current.llm.maxTokens
+        val resolvedTemp = config.temperature ?: AppConfigProvider.current.llm.temperature
+        val resolvedTopP = config.topP ?: AppConfigProvider.current.llm.topP
+        val resolvedTopK = config.topK ?: AppConfigProvider.current.llm.topK
+        val resolvedMaxTokens = config.maxTokens ?: AppConfigProvider.current.llm.maxTokens
         val paramDetail = "model=$model, temp=$resolvedTemp, topP=$resolvedTopP, topK=$resolvedTopK, maxTokens=$resolvedMaxTokens, reasoning=${config.reasoningEffort}"
         Log.info(TAG_LLM, "Request sent: ${messages.size} messages", data = paramDetail, correlationId = correlationId)
         if (AppConfigProvider.current.debugLogging) {

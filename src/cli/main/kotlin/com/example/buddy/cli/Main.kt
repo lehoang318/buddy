@@ -130,6 +130,7 @@ private class CliApplication {
             println("Could not create ${provider.name} client: ${it.message}")
             return true
         }
+        runCatching { client.getModels() }
         updateEngine(client = client)
         println("LLM provider: ${provider.name}; model: $model")
         return true

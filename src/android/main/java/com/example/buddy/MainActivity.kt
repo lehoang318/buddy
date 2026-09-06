@@ -211,6 +211,10 @@ fun MainContent(
         if (last != null) chatViewModel.resumeSession(last)
     }
 
+    LaunchedEffect(currentSettings) {
+        chatViewModel.updateSettings(currentSettings)
+    }
+
     if (showParameters) {
         ParametersScreen(
             onBack = { showParameters = false },

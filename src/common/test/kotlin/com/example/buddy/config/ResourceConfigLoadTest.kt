@@ -14,7 +14,11 @@ class ResourceConfigLoadTest {
         assertEquals(0.7f, config.llm.temperature, 0f)
         assertEquals(0.95f, config.llm.topP, 0f)
         assertEquals(4096, config.llm.maxTokens)
+        assertEquals(2, config.llm.responseLimitMultiplier)
+        assertEquals(256, config.llm.minResponseTokens)
+        assertEquals(32768, config.llm.maxRequestChars)
         assertEquals("You are a helpful assistant.", config.llm.defaultSystemMessage)
+        assertEquals(4096, config.search.queryMaxTokens)
         assertEquals(32, config.events.maxEntries)
         assertEquals(2048, config.events.maxDataLength)
         assertTrue(config.prompts.summarizerSystem.contains("%4\$s"))
@@ -39,8 +43,8 @@ class ResourceConfigLoadTest {
 
     @Test
     fun loadsAllConfigKeys() {
-        config.llm.run { temperature; topP; topK; maxTokens; defaultSystemMessage }
-        config.search.run { queryTemperature; queryMaxChars; maxResults; totalMaxResults; logPreviewMaxChars; resultContentMaxChars; queryPrompt; webDataInstructions }
+        config.llm.run { temperature; topP; topK; maxTokens; responseLimitMultiplier; minResponseTokens; maxRequestChars; defaultSystemMessage }
+        config.search.run { queryTemperature; queryMaxChars; queryMaxTokens; maxResults; totalMaxResults; logPreviewMaxChars; resultContentMaxChars; queryPrompt; webDataInstructions }
         config.summaries.run { maxSummaries; maxQaPairs; minPoints; maxPoints; maxSessionTags; sessionTags; keyPrefix; pointIndent; contextHeader; webDataHeader; temperature; maxTokens; restrictivePatterns }
         config.prompts.run { summarizerSystem; summarizerUserTemplate; compressSummaries }
         config.togetherAi.run { adjustableEffortModels; hybridModels; effortChatLow; effortChatHigh; effortSearch; hybridChatLow; hybridChatHigh; hybridSearch }
