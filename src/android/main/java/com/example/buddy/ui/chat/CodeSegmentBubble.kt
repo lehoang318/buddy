@@ -2,8 +2,12 @@ package com.example.buddy.ui.chat
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
@@ -22,6 +26,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Visibility
@@ -45,6 +50,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.example.buddy.chat.codeFileName
+import com.example.buddy.chat.extensionForLang
 import com.example.buddy.data.EventLog
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.SecondaryIcons
@@ -77,6 +84,7 @@ fun CodeSegmentBubble(
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     val scope = rememberCoroutineScope()
     var copied by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
     var showPreview by remember { mutableStateOf(false) }
     var userCollapsed by remember { mutableStateOf<Boolean?>(null) }
     val lineCount = code.lines().size
@@ -133,6 +141,27 @@ fun CodeSegmentBubble(
                             imageVector = Icons.Default.Visibility,
                             contentDescription = "Preview",
                             tint = SendButton,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                if (!streaming) {
+                    IconButton(
+                        onClick = {
+                            scope.launch {
+                                val name = saveCodeToDownloads(context, lang, code)
+                                if (name != null) {
+                                    saved = true
+                                    Toast.makeText(context, "Saved to Downloads/$name", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (saved) Icons.Default.Check else Icons.Default.Download,
+                            contentDescription = "Save as file",
+                            tint = if (saved) UserBubble else SecondaryIcons,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -233,4 +262,39 @@ private suspend fun openHtmlInBrowser(context: Context, html: String) {
             Toast.makeText(context, "No browser available", Toast.LENGTH_SHORT).show()
             EventLog.error(TAG, "HTML browser launch failed", it.message.orEmpty())
         }
+}
+
+private suspend fun saveCodeToDownloads(context: Context, lang: String, code: String): String? {
+    val name = codeFileName(lang, System.currentTimeMillis())
+    val ext = extensionForLang(lang)
+    val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "text/plain"
+    val resolver = context.contentResolver
+    val result = withContext(Dispatchers.IO) {
+        runCatching {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("insert returned null")
+            resolver.openOutputStream(uri)?.use { it.write(code.toByteArray(Charsets.UTF_8)) }
+                ?: error("openOutputStream returned null")
+            resolver.update(
+                uri,
+                ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) },
+                null,
+                null
+            )
+            name
+        }.getOrNull()
+    }
+    if (result == null) {
+        Toast.makeText(context, "Could not save file", Toast.LENGTH_SHORT).show()
+        EventLog.error(TAG, "Code block save failed", "${code.length} chars")
+    } else {
+        EventLog.debug(TAG, "Code block saved", "$name (${code.length} chars)")
+    }
+    return result
 }
