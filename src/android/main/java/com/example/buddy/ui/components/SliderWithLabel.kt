@@ -36,7 +36,8 @@ fun SliderWithLabel(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     onValueChange: (Float) -> Unit,
-    valueDisplay: String
+    valueDisplay: String,
+    onValueChangeFinished: (() -> Unit)? = null
 ) {
     var showTooltip by remember { mutableStateOf(false) }
 
@@ -87,6 +88,7 @@ fun SliderWithLabel(
         Slider(
             value = value,
             onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
             valueRange = valueRange,
             steps = steps,
             colors = SliderDefaults.colors(

@@ -175,9 +175,8 @@ fun ChatScreen(
                 onCancel = { vm.cancelRequest() },
                 showPairNavigation = isScrollable && userMessageIndices.isNotEmpty(),
                 canGoBack = userMessageIndices.firstOrNull()?.let { it < listState.firstVisibleItemIndex } ?: false,
-                canGoForward = if (userMessageIndices.isNotEmpty()) {
-                    (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) < userMessageIndices.last()
-                } else false,
+                canGoForward = listState.canScrollForward &&
+                    (userMessageIndices.lastOrNull()?.let { it > listState.firstVisibleItemIndex } ?: false),
                 onGoBack = {
                     val topIdx = listState.firstVisibleItemIndex
                     val pos = userMessageIndices.indexOfFirst { it >= topIdx }.let { if (it >= 0) it else userMessageIndices.lastIndex }
@@ -188,8 +187,8 @@ fun ChatScreen(
                     }
                 },
                 onGoForward = {
-                    val bottomIdx = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                    val pos = userMessageIndices.indexOfLast { it <= bottomIdx }
+                    val topIdx = listState.firstVisibleItemIndex
+                    val pos = userMessageIndices.indexOfLast { it <= topIdx }
                     if (pos >= 0 && pos < userMessageIndices.lastIndex) {
                         scope.launch { listState.animateScrollToItem(userMessageIndices[pos + 1]) }
                     } else if (pos < 0 && userMessageIndices.isNotEmpty()) {

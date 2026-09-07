@@ -5,7 +5,7 @@
     <integer name="default_top_k">20</integer>
     <integer name="default_max_tokens">4096</integer>
     <integer name="response_hard_limit_multiplier">2</integer>
-    <integer name="request_max_chars">32768</integer>
+    <integer name="request_max_chars">65536</integer>
     <integer name="min_response_tokens">256</integer>
     <string name="default_system_message">You are a helpful assistant.</string>
     <item name="search_query_temperature" format="float" type="dimen">0.2</item>

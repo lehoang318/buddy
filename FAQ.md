@@ -21,6 +21,7 @@
     - [What can I ask Buddy?](#what-can-i-ask-buddy)
     - [How do I use web search?](#how-do-i-use-web-search)
     - [Can I share files or images with Buddy?](#can-i-share-files-or-images-with-buddy)
+    - [How do I preview HTML code?](#how-do-i-preview-html-code)
     - [How do I change AI models?](#how-do-i-change-ai-models)
   - [⚙️ Providers \& Customization](#providers--customization)
     - [What are the AI parameters for?](#what-are-the-ai-parameters-for)
@@ -191,6 +192,23 @@ Yes! Buddy supports:
 - **Web pages**: Paste any URL to analyze the content
 
 Just tap the paperclip icon to attach files or use the camera icon to take photos.
+</details>
+
+### How do I preview HTML code?
+
+<details>
+  <summary>🌐 How do I preview HTML code?</summary>
+
+HTML blocks don't have an in-app renderer — tapping the **Open in browser** button writes the HTML to a cache file and opens it in your **system browser** (via a `content://` URI). A real browser has a correct viewport, so full-page decks and viewport-sized layouts render as intended.
+
+Notes:
+- Markdown blocks still preview **in-app** in a native dialog.
+- If no browser is installed or the launch fails, Buddy shows a toast; the **copy** button is always the fallback.
+- The page runs with the browser's normal privileges (JS and network work), but it comes from an opaque origin, so it can't read your cookies or site storage for other pages.
+
+Deck-sized pages still look best on a phone screen if they avoid locking the page to the viewport:
+
+> Mobile-safe HTML: use `min-height: 100dvh` (with `min-height: 100vh` as a fallback) and `width: 100%`, keep elements in normal document flow, and let the page scroll.
 </details>
 
 ### How do I change AI models?

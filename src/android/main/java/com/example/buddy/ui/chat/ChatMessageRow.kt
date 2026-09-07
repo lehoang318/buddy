@@ -54,9 +54,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
+import com.example.buddy.chat.MessageSegment
+import com.example.buddy.chat.splitIntoSegments
 import com.example.buddy.data.ChatMessage
 import com.example.buddy.data.Role
 import com.example.buddy.ui.theme.Dimens
@@ -65,9 +67,7 @@ import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SecondaryIcons
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
-import com.example.buddy.ui.theme.TextColor
 import com.example.buddy.ui.theme.UserBubble
-import com.example.buddy.ui.theme.VintageBackground
 
 @Composable
 fun MessageRow(message: ChatMessage) {
@@ -117,53 +117,53 @@ fun MessageRow(message: ChatMessage) {
             }
 
             if (message.content.isNotEmpty()) {
-                val bubbleBg = if (isUser) UserBubble else SurfaceVariant
-                val textColor = if (isUser) Color.White else TextColor
-                val shape = if (isUser)
-                    RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
-                else
-                    RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
-
-                val infiniteTransition = rememberInfiniteTransition(label = "glow")
-                val glowAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.3f, targetValue = 0.8f,
-                    animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
-                    label = "glow_alpha"
-                )
-                val glowBorderWidth = if (!isUser && message.isStreaming) 2.dp else 0.dp
-                val glowBorderColor = if (!isUser && message.isStreaming) SendButton.copy(alpha = glowAlpha) else Color.Transparent
-
-                Surface(
-                    color = bubbleBg,
-                    shape = shape,
-                    modifier = Modifier
-                        .widthIn(max = maxBubbleWidth)
-                        .then(if (glowBorderWidth > 0.dp) Modifier.border(glowBorderWidth, glowBorderColor, shape) else Modifier)
-                ) {
-                    if (message.content.startsWith("```")) {
-                        CodeBubble(message.content)
-                    } else if (!isUser && message.isComplete) {
-                        MarkdownRenderer(
-                            markdown = message.content,
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
-                        )
-                    } else if (!isUser && message.isStreaming) {
-                        RawTextRenderer(
-                            text = message.content,
-                            modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
-                        )
-                    } else {
+                if (isUser) {
+                    val shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
+                    Surface(
+                        color = UserBubble,
+                        shape = shape,
+                        modifier = Modifier.widthIn(max = maxBubbleWidth)
+                    ) {
                         SelectionContainer {
                             Text(
                                 text = message.content,
-                                color = textColor,
+                                color = Color.White,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
                             )
                         }
                     }
+                } else {
+                    val segments = remember(message.content) { splitIntoSegments(message.content) }
+                    val infiniteTransition = rememberInfiniteTransition(label = "glow")
+                    val glowAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.3f, targetValue = 0.8f,
+                        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+                        label = "glow_alpha"
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        segments.forEachIndexed { index, segment ->
+                            val isLast = index == segments.lastIndex
+                            val streaming = message.isStreaming && isLast
+                            when (segment) {
+                                is MessageSegment.Text -> TextSegmentBubble(
+                                    text = segment.content,
+                                    markdown = !streaming,
+                                    streaming = streaming,
+                                    maxWidth = maxBubbleWidth,
+                                    glowAlpha = glowAlpha
+                                )
+                                is MessageSegment.Code -> CodeSegmentBubble(
+                                    lang = segment.lang,
+                                    code = segment.code,
+                                    streaming = streaming,
+                                    maxWidth = maxBubbleWidth,
+                                    glowAlpha = glowAlpha
+                                )
+                            }
+                        }
+                    }
                 }
-
             }
 
             if (message.isStreaming) {
@@ -217,32 +217,26 @@ fun MessageRow(message: ChatMessage) {
 }
 
 @Composable
-fun CodeBubble(raw: String) {
-    val lines = raw.trimIndent().lines()
-    val lang = lines.firstOrNull()?.removePrefix("```") ?: ""
-    val code = lines.drop(1).dropLastWhile { it.trim() == "```" }.joinToString("\n")
-    Column(
+private fun TextSegmentBubble(
+    text: String,
+    markdown: Boolean,
+    streaming: Boolean,
+    maxWidth: Dp,
+    glowAlpha: Float
+) {
+    val shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
+    Surface(
+        color = SurfaceVariant,
+        shape = shape,
         modifier = Modifier
-            .widthIn(max = 280.dp)
-            .padding(10.dp)
+            .widthIn(max = maxWidth)
+            .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
-        if (lang.isNotEmpty()) {
-            Text(lang, color = OnSurfaceVariant, style = MaterialTheme.typography.labelSmall)
-            Spacer(Modifier.height(4.dp))
-        }
-        Surface(
-            color = VintageBackground,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            SelectionContainer {
-                Text(
-                    text = code,
-                    color = SendButton,
-                    fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
+        val innerModifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
+        if (markdown) {
+            MarkdownRenderer(markdown = text, modifier = innerModifier)
+        } else {
+            RawTextRenderer(text = text, modifier = innerModifier)
         }
     }
 }

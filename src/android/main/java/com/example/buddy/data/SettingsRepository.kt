@@ -55,26 +55,26 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun updateAll(
-        provider: String,
-        model: String,
-        temperature: Float = AppConfigProvider.current.llm.temperature,
-        topP: Float = AppConfigProvider.current.llm.topP,
-        topK: Int = AppConfigProvider.current.llm.topK,
-        maxTokens: Int = AppConfigProvider.current.llm.maxTokens,
-        reasoningEffort: String = "",
-        systemMessage: String = AppConfigProvider.current.llm.defaultSystemMessage,
-        webSearchProvider: String = ""
+        provider: String? = null,
+        model: String? = null,
+        temperature: Float? = null,
+        topP: Float? = null,
+        topK: Int? = null,
+        maxTokens: Int? = null,
+        reasoningEffort: String? = null,
+        systemMessage: String? = null,
+        webSearchProvider: String? = null
     ) {
-        dataStore.edit {
-            it[SettingsKeys.PROVIDER] = provider
-            it[SettingsKeys.MODEL] = model
-            it[SettingsKeys.TEMPERATURE] = temperature
-            it[SettingsKeys.TOP_P] = topP
-            it[SettingsKeys.TOP_K] = topK
-            it[SettingsKeys.MAX_TOKENS] = maxTokens
-            it[SettingsKeys.REASONING_EFFORT] = reasoningEffort
-            it[SettingsKeys.SYSTEM_MESSAGE] = systemMessage
-            it[SettingsKeys.WEBSEARCH_PROVIDER] = webSearchProvider
+        dataStore.edit { prefs ->
+            provider?.let { prefs[SettingsKeys.PROVIDER] = it }
+            model?.let { prefs[SettingsKeys.MODEL] = it }
+            temperature?.let { prefs[SettingsKeys.TEMPERATURE] = it }
+            topP?.let { prefs[SettingsKeys.TOP_P] = it }
+            topK?.let { prefs[SettingsKeys.TOP_K] = it }
+            maxTokens?.let { prefs[SettingsKeys.MAX_TOKENS] = it }
+            reasoningEffort?.let { prefs[SettingsKeys.REASONING_EFFORT] = it }
+            systemMessage?.let { prefs[SettingsKeys.SYSTEM_MESSAGE] = it }
+            webSearchProvider?.let { prefs[SettingsKeys.WEBSEARCH_PROVIDER] = it }
         }
     }
 
