@@ -16,7 +16,7 @@ class ResourceConfigLoadTest {
         assertEquals(4096, config.llm.maxTokens)
         assertEquals(2, config.llm.responseLimitMultiplier)
         assertEquals(256, config.llm.minResponseTokens)
-        assertEquals(32768, config.llm.maxRequestChars)
+        assertEquals(65536, config.llm.maxRequestChars)
         assertEquals("You are a helpful assistant.", config.llm.defaultSystemMessage)
         assertEquals(4096, config.search.queryMaxTokens)
         assertEquals(32, config.events.maxEntries)

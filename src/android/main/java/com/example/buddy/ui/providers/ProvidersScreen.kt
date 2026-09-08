@@ -56,7 +56,6 @@ import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.llm.LlmClientFactory
 import com.example.buddy.llm.LlmModel
-import com.example.buddy.ui.components.SliderWithLabel
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
@@ -287,8 +286,7 @@ fun ProvidersScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         onSaveModelSettings(
-                            LlmSettings(
-                                provider = effectiveInitial.provider,
+                            effectiveInitial.copy(
                                 model = selectedModel,
                                 webSearchProvider = selectedWebSearchProvider
                             )

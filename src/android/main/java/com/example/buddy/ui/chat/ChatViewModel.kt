@@ -131,8 +131,8 @@ class ChatViewModel(
     fun updateSettings(settings: LlmSettings) {
         _uiState.update {
             it.copy(generationConfig = LlmGenerationConfig(
-                temperature = settings.temperature,
-                topP = settings.topP,
+                temperature = settings.temperature.takeIf { v -> v > 0f },
+                topP = settings.topP.takeIf { v -> v > 0f },
                 topK = settings.topK.takeIf { v -> v > 0 },
                 maxTokens = settings.maxTokens.takeIf { v -> v > 0 },
                 reasoningEffort = it.generationConfig.reasoningEffort

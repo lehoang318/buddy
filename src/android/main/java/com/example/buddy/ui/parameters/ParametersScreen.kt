@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.buddy.data.EventLog
@@ -43,6 +44,7 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private const val TAG = "Settings"
 
@@ -72,6 +74,7 @@ fun ParametersScreen(
         temperature = AppConfigProvider.current.llm.temperature
         topP = AppConfigProvider.current.llm.topP
         topK = AppConfigProvider.current.llm.topK
+        onSaveParameters(temperature, topP, topK, systemMessage)
     }
 
     Scaffold(
@@ -81,6 +84,7 @@ fun ParametersScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 navigationIcon = {
                     IconButton(onClick = {
+                        onSaveParameters(temperature, topP, topK, systemMessage)
                         EventLog.info(TAG, "Parameters updated", "temp=$temperature, topP=$topP, topK=$topK")
                         onBack()
                     }) {
@@ -112,21 +116,23 @@ fun ParametersScreen(
         ) {
             SliderWithLabel(
                 label = "Temperature",
-                tooltip = "0.0 \u2013 0.3: factual answers, math, code, precise tasks\n0.5 \u2013 0.8: balanced chat, reasoning, general use (0.7 is a popular default)\n0.9 \u2013 1.2+: creative writing, brainstorming, storytelling",
+                tooltip = "0.1 \u2013 0.3: factual answers, math, code, precise tasks\n0.5 \u2013 0.8: balanced chat, reasoning, general use (0.7 is a popular default)\n0.9 \u2013 1.0: creative writing, brainstorming, storytelling",
                 value = temperature,
-                valueRange = 0f..1f,
-                steps = 9,
-                onValueChange = { temperature = it; onSaveParameters(temperature, topP, topK, systemMessage) },
+                valueRange = 0.1f..1f,
+                steps = 8,
+                onValueChange = { temperature = (it * 10f).roundToInt() / 10f },
+                onValueChangeFinished = { onSaveParameters(temperature, topP, topK, systemMessage) },
                 valueDisplay = String.format(Locale.US, "%.1f", temperature)
             )
 
             SliderWithLabel(
                 label = "Top-p",
-                tooltip = "0.1 \u2013 0.5: more focused, deterministic output\n0.7 \u2013 0.95: good balance (0.9 is very common)\n1.0: no restriction (consider all tokens)",
+                tooltip = "0.05 \u2013 0.5: more focused, deterministic output\n0.7 \u2013 0.95: good balance (0.9 is very common)\n1.0: no restriction (consider all tokens)",
                 value = topP,
-                valueRange = 0f..1f,
-                steps = 19,
-                onValueChange = { topP = it; onSaveParameters(temperature, topP, topK, systemMessage) },
+                valueRange = 0.05f..1f,
+                steps = 18,
+                onValueChange = { topP = (it * 20f).roundToInt() / 20f },
+                onValueChangeFinished = { onSaveParameters(temperature, topP, topK, systemMessage) },
                 valueDisplay = String.format(Locale.US, "%.2f", topP)
             )
 
@@ -135,18 +141,24 @@ fun ParametersScreen(
                 tooltip = "1: greedy decoding (very deterministic)\n40 \u2013 100: common default in many open-source setups\nHigher values: more diversity",
                 value = topK.toFloat(),
                 valueRange = 1f..100f,
-                steps = 19,
-                onValueChange = { topK = it.toInt(); onSaveParameters(temperature, topP, topK, systemMessage) },
+                steps = 98,
+                onValueChange = { topK = it.roundToInt() },
+                onValueChangeFinished = { onSaveParameters(temperature, topP, topK, systemMessage) },
                 valueDisplay = topK.toString()
             )
 
             OutlinedTextField(
                 value = systemMessage,
-                onValueChange = { systemMessage = it; onSaveParameters(temperature, topP, topK, systemMessage) },
+                onValueChange = { systemMessage = it },
                 label = { Text("System Message") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 120.dp),
+                    .heightIn(min = 120.dp)
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused) {
+                            onSaveParameters(temperature, topP, topK, systemMessage)
+                        }
+                    },
                 maxLines = 5,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = TextColor,
