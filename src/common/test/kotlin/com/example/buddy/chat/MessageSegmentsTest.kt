@@ -18,7 +18,7 @@ class MessageSegmentsTest {
     fun `entire message is one code block`() {
         val input = "```kotlin\nval x = 1\n```"
         assertEquals(
-            listOf(MessageSegment.Code(lang = "kotlin", code = "val x = 1", isClosed = true)),
+            listOf(MessageSegment.Code(lang = "kotlin", code = "val x = 1")),
             splitIntoSegments(input)
         )
     }
@@ -29,7 +29,7 @@ class MessageSegmentsTest {
         assertEquals(
             listOf(
                 MessageSegment.Text("Here is the fix:"),
-                MessageSegment.Code(lang = "python", code = "print(1)", isClosed = true),
+                MessageSegment.Code(lang = "python", code = "print(1)"),
                 MessageSegment.Text("That's it.")
             ),
             splitIntoSegments(input)
@@ -41,8 +41,8 @@ class MessageSegmentsTest {
         val input = "```a\n1\n```\n```b\n2\n```"
         assertEquals(
             listOf(
-                MessageSegment.Code(lang = "a", code = "1", isClosed = true),
-                MessageSegment.Code(lang = "b", code = "2", isClosed = true)
+                MessageSegment.Code(lang = "a", code = "1"),
+                MessageSegment.Code(lang = "b", code = "2")
             ),
             splitIntoSegments(input)
         )
@@ -54,7 +54,7 @@ class MessageSegmentsTest {
         assertEquals(
             listOf(
                 MessageSegment.Text("Some text"),
-                MessageSegment.Code(lang = "py", code = "print(1)", isClosed = false)
+                MessageSegment.Code(lang = "py", code = "print(1)")
             ),
             splitIntoSegments(input)
         )
@@ -63,7 +63,7 @@ class MessageSegmentsTest {
     @Test
     fun `open code segment with only a language line`() {
         assertEquals(
-            listOf(MessageSegment.Code(lang = "java", code = "", isClosed = false)),
+            listOf(MessageSegment.Code(lang = "java", code = "")),
             splitIntoSegments("```java")
         )
     }
@@ -87,7 +87,7 @@ class MessageSegmentsTest {
     fun `longer backtick close lines are accepted leniently`() {
         val input = "```\na\n````"
         assertEquals(
-            listOf(MessageSegment.Code(lang = "", code = "a", isClosed = true)),
+            listOf(MessageSegment.Code(lang = "", code = "a")),
             splitIntoSegments(input)
         )
     }
@@ -98,7 +98,7 @@ class MessageSegmentsTest {
         assertEquals(
             listOf(
                 MessageSegment.Text("Intro"),
-                MessageSegment.Code(lang = "sql", code = "SELECT 1", isClosed = true),
+                MessageSegment.Code(lang = "sql", code = "SELECT 1"),
                 MessageSegment.Text("Outro")
             ),
             splitIntoSegments(input)
@@ -111,7 +111,7 @@ class MessageSegmentsTest {
         assertEquals(
             listOf(
                 MessageSegment.Text("Text"),
-                MessageSegment.Code(lang = "py", code = "x", isClosed = true)
+                MessageSegment.Code(lang = "py", code = "x")
             ),
             splitIntoSegments(input)
         )
@@ -122,7 +122,7 @@ class MessageSegmentsTest {
         val input = "```\na\n```\n\n\nTrailing after\n"
         assertEquals(
             listOf(
-                MessageSegment.Code(lang = "", code = "a", isClosed = true),
+                MessageSegment.Code(lang = "", code = "a"),
                 MessageSegment.Text("Trailing after")
             ),
             splitIntoSegments(input)

@@ -64,7 +64,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val TAG = "Preview"
+private const val PREVIEW_TAG = "Preview"
+private const val SAVE_TAG = "Save"
 
 private val HTML_LANGS = setOf("html", "htm")
 private val MARKDOWN_LANGS = setOf("markdown", "md")
@@ -248,7 +249,7 @@ private suspend fun openHtmlInBrowser(context: Context, html: String) {
     }
     if (file == null) {
         Toast.makeText(context, "Could not export HTML", Toast.LENGTH_SHORT).show()
-        EventLog.error(TAG, "HTML browser export failed", "${html.length} chars")
+        EventLog.error(PREVIEW_TAG, "HTML browser export failed", "${html.length} chars")
         return
     }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -257,10 +258,10 @@ private suspend fun openHtmlInBrowser(context: Context, html: String) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     runCatching { context.startActivity(intent) }
-        .onSuccess { EventLog.debug(TAG, "HTML opened in browser", "${file.length()} bytes") }
+        .onSuccess { EventLog.debug(PREVIEW_TAG, "HTML opened in browser", "${file.length()} bytes") }
         .onFailure {
             Toast.makeText(context, "No browser available", Toast.LENGTH_SHORT).show()
-            EventLog.error(TAG, "HTML browser launch failed", it.message.orEmpty())
+            EventLog.error(PREVIEW_TAG, "HTML browser launch failed", it.message.orEmpty())
         }
 }
 
@@ -269,7 +270,7 @@ private suspend fun saveCodeToDownloads(context: Context, lang: String, code: St
     val ext = extensionForLang(lang)
     val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "text/plain"
     val resolver = context.contentResolver
-    val result = withContext(Dispatchers.IO) {
+    val failure = withContext(Dispatchers.IO) {
         runCatching {
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
@@ -288,13 +289,13 @@ private suspend fun saveCodeToDownloads(context: Context, lang: String, code: St
                 null
             )
             name
-        }.getOrNull()
+        }.exceptionOrNull()
     }
-    if (result == null) {
+    if (failure != null) {
         Toast.makeText(context, "Could not save file", Toast.LENGTH_SHORT).show()
-        EventLog.error(TAG, "Code block save failed", "${code.length} chars")
+        EventLog.error(SAVE_TAG, "Code block save failed", failure.message.orEmpty())
     } else {
-        EventLog.debug(TAG, "Code block saved", "$name (${code.length} chars)")
+        EventLog.debug(SAVE_TAG, "Code block saved", "$name (${code.length} chars)")
     }
-    return result
+    return if (failure == null) name else null
 }

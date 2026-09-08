@@ -2,7 +2,7 @@ package com.example.buddy.chat
 
 sealed interface MessageSegment {
     data class Text(val content: String) : MessageSegment
-    data class Code(val lang: String, val code: String, val isClosed: Boolean) : MessageSegment
+    data class Code(val lang: String, val code: String) : MessageSegment
 }
 
 private val CLOSE_FENCE = Regex("^`{3,}$")
@@ -22,12 +22,10 @@ fun splitIntoSegments(content: String): List<MessageSegment> {
             flushText(textBuffer, segments)
             val lang = line.trimStart().drop(3).trim().lowercase()
             val codeLines = mutableListOf<String>()
-            var closed = false
             i++
             while (i < lines.size) {
                 val codeLine = lines[i]
                 if (CLOSE_FENCE.matches(codeLine.trim())) {
-                    closed = true
                     i++
                     break
                 }
@@ -37,8 +35,7 @@ fun splitIntoSegments(content: String): List<MessageSegment> {
             segments.add(
                 MessageSegment.Code(
                     lang = lang,
-                    code = codeLines.joinToString("\n"),
-                    isClosed = closed
+                    code = codeLines.joinToString("\n")
                 )
             )
         } else {

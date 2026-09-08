@@ -200,10 +200,10 @@ Just tap the paperclip icon to attach files or use the camera icon to take photo
 <details>
   <summary>🌐 How do I preview HTML code?</summary>
 
-HTML blocks don't have an in-app renderer — tapping the **Open in browser** button writes the HTML to a cache file and opens it in your **system browser** (via a `content://` URI). A real browser has a correct viewport, so full-page decks and viewport-sized layouts render as intended.
+HTML blocks don't have an in-app renderer — tapping the **Preview** button (eye icon on the code block) writes the HTML to a cache file and opens it in your **system browser** (via a `content://` URI). A real browser has a correct viewport, so full-page decks and viewport-sized layouts render as intended.
 
 Notes:
-- Markdown blocks still preview **in-app** in a native dialog.
+- Markdown blocks also use the eye icon but preview **in-app** in a native dialog.
 - If no browser is installed or the launch fails, Buddy shows a toast; the **copy** button is always the fallback.
 - The page runs with the browser's normal privileges (JS and network work), but it comes from an opaque origin, so it can't read your cookies or site storage for other pages.
 
