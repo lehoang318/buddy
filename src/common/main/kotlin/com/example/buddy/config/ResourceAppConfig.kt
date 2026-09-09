@@ -19,6 +19,7 @@ class ResourceAppConfig(private val values: ResourceValues) : AppConfig {
         override val queryTemperature get() = values.dimension("search_query_temperature")
         override val queryMaxChars get() = values.integer("search_query_max_chars")
         override val queryMaxTokens get() = values.integer("search_query_max_tokens")
+        override val queryRejectChars get() = values.integer("search_query_reject_chars")
         override val maxResults get() = values.integer("search_max_results")
         override val totalMaxResults get() = values.integer("search_total_max_results")
         override val logPreviewMaxChars get() = values.integer("log_preview_max_chars")

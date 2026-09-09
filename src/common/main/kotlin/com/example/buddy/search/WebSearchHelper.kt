@@ -35,7 +35,7 @@ class WebSearchHelper(
         return try {
             val plan = llmClient.generateSearchQuery(cleanInput, summaries, correlationId, imageBase64)
             if (plan == null) {
-                Log.info(TAG, "Search skipped", "Query generation returned null (NO_QUERY or sanitization failed)", correlationId = correlationId)
+                Log.info(TAG, "Search skipped", "Query generation returned null (search not needed or plan unusable)", correlationId = correlationId)
                 return WebSearchOutcome(skipped = true)
             }
             Log.info(TAG, "Query plan generated", "Queries: ${plan.queries.joinToString(" | ") { "`$it`" }}\nRecency: ${plan.recency}\nFrom: ${cleanInput.take(AppConfigProvider.current.search.logPreviewMaxChars)}", correlationId = correlationId)

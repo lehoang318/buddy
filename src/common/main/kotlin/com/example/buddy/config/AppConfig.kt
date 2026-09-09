@@ -20,6 +20,7 @@ interface SearchConfig {
     val queryTemperature: Float
     val queryMaxChars: Int
     val queryMaxTokens: Int
+    val queryRejectChars: Int
     val maxResults: Int
     val totalMaxResults: Int
     val logPreviewMaxChars: Int

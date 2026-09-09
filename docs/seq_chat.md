@@ -54,7 +54,7 @@ sequenceDiagram
     WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
     Note over WebSearchHelper: Summaries injected as system context
     LLMClient-->>WebSearchHelper: Return query plan (1-3 queries + recency) or null
-    alt plan is null (NO_QUERY)
+    alt plan is null (search not needed or unusable)
         WebSearchHelper-->>ViewModel: WebSearchOutcome(skipped = true)
     else plan parsed
         par one search per query

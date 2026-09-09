@@ -164,7 +164,7 @@ See [web-search.md](./web-search.md) for the full workflow. Known constraints:
 
 | Aspect | Limitation |
 |--------|------------|
-| **Query quality depends on the query-gen model** | Small (~9B) models frequently deviate from the requested JSON format; parsing degrades gracefully (worst case: whole response treated as one plain query) rather than failing, but a poor query still produces poor results |
+| **Query quality depends on the query-gen model** | Small (~9B) models frequently deviate from the requested JSON shape. Parsing now degrades by **skipping** the search (never by treating prose as a query): `search: false`, non-JSON prose, and answer-shaped query strings all skip with a logged reason code. A short single-sentence answer smuggled inside `queries` can still slip past the length/structure gate; structured-output enforcement would close that gap |
 | **Multi-query API cost** | A single message can trigger up to 3 parallel search-provider calls (comparisons, multi-part questions), multiplying web-search API usage for that message |
 | **Tavily has no publish dates** | `published_date` is only populated by Tavily when `topic: "news"` is set, which the app doesn't send — Tavily results never carry a visible date, even though `time_range` still filters server-side |
 | **Exa recency may exclude undated pages** | When a recency hint is present, Exa's `startPublishedDate` filter can exclude pages that don't have a detectable publish date |

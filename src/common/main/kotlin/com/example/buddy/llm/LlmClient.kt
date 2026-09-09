@@ -18,8 +18,10 @@ data class SearchQueryPlan(
     val recency: SearchRecency = SearchRecency.ANY
 )
 
-private fun isNoQuerySentinel(text: String): Boolean =
-    text.trim().trim('"', '\'', '.', '`').equals("NO_QUERY", ignoreCase = true)
+data class RawSearchResponse(
+    val content: String?,
+    val finishReason: String?
+)
 
 private fun stripCodeFences(text: String): String = text.trim()
     .removePrefix("```json\n").removePrefix("```json").removePrefix("```\n").removePrefix("```")
@@ -32,23 +34,52 @@ private fun tryParseJson(text: String): JsonElement? = try {
     null
 }
 
-// Accepts the canonical {"queries": [...]} shape plus common small-model deviations:
-// singular {"query": "..."}, a string where the array should be, a bare array of strings,
-// or a bare quoted string.
+// Accepts the canonical {"search": ..., "queries": [...]} shape plus common small-model
+// deviations: singular {"query": "..."}, a string where the array should be, a bare array
+// of strings, or a bare quoted string. Non-string primitives (bare booleans/numbers) yield
+// no queries.
 private fun extractQueries(element: JsonElement): List<String> = when {
     element.isJsonObject -> {
         val obj = element.asJsonObject
         val queries = obj.get("queries")
         when {
             queries?.isJsonArray == true ->
-                queries.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }
-            queries?.isJsonPrimitive == true -> listOf(queries.asString)
-            else -> obj.get("query")?.takeIf { it.isJsonPrimitive }?.asString?.let { listOf(it) } ?: emptyList()
+                queries.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive && e.asJsonPrimitive.isString }?.asString }
+            queries?.isJsonPrimitive == true -> queries.asJsonPrimitive.takeIf { it.isString }?.asString?.let { listOf(it) } ?: emptyList()
+            else -> obj.get("query")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString?.let { listOf(it) } ?: emptyList()
         }
     }
-    element.isJsonArray -> element.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive }?.asString }
-    element.isJsonPrimitive -> listOf(element.asString)
+    element.isJsonArray -> element.asJsonArray.mapNotNull { it.takeIf { e -> e.isJsonPrimitive && e.asJsonPrimitive.isString }?.asString }
+    element.isJsonPrimitive -> element.asJsonPrimitive.takeIf { it.isString }?.asString?.let { listOf(it) } ?: emptyList()
     else -> emptyList()
+}
+
+// "Do I need to search?" is a first-class field. A false value wins unconditionally over any
+// queries the model also happened to emit. Tolerates a bare JSON boolean response.
+private fun isSearchFalse(element: JsonElement): Boolean {
+    if (element.isJsonPrimitive && element.asJsonPrimitive.isBoolean) return !element.asJsonPrimitive.asBoolean
+    if (!element.isJsonObject) return false
+    val obj = element.asJsonObject
+    for (key in listOf("search", "needed", "required", "should_search", "search_needed")) {
+        val value = obj.get(key) ?: continue
+        if (value.isJsonPrimitive && value.asJsonPrimitive.isBoolean) return !value.asJsonPrimitive.asBoolean
+    }
+    return false
+}
+
+// Determines whether a single query string looks like a prose answer rather than a search
+// query. Applied per extracted query, never to the whole response (pretty-printed JSON
+// legitimately contains newlines). Deliberately narrow to avoid rejecting real queries that
+// contain dots, operators or CJK text ("Node.js 22 LTS", "site:github.com -android",
+// "C# generics", "St. Louis weather", "RTX 5090 - release date").
+private fun looksLikeAnswer(query: String): Boolean {
+    if (query.length > AppConfigProvider.current.search.queryRejectChars) return true
+    if (query.contains('\n')) return true
+    if (query.contains("```")) return true
+    if (Regex("(?m)^(?:[-*]|#{1,6})\\s").containsMatchIn(query)) return true
+    // Two or more sentence boundaries followed by an uppercase start: prose, not a query
+    // fragment. A single occurrence stays safe (dots in "St. Louis", "Node.js 22").
+    return Regex("[.!?]\\s+[A-Z]").findAll(query).count() >= 2
 }
 
 private fun extractRecency(element: JsonElement): SearchRecency {
@@ -71,36 +102,53 @@ private fun truncateAtWordBoundary(text: String, maxChars: Int): String {
     return if (lastSpace > maxChars / 2) cut.take(lastSpace).trim() else cut.trim()
 }
 
-// Never rejects: worst case (no JSON found at all) treats the whole cleaned text as one
-// plain query, matching the pre-multi-query behavior. Only a null/blank raw response upstream
-// still surfaces as a failure.
+// Never invents a query from prose: if the model answered the user instead of producing a
+// plan, the search is skipped rather than performed with the answer text as a query. A null
+// return means "skip" (search=false, empty plan, or everything rejected); only an upstream
+// null/blank raw response still surfaces as a hard failure.
 internal fun parseQueryPlan(cleaned: String, correlationId: String? = null): SearchQueryPlan? {
-    if (isNoQuerySentinel(cleaned)) return null
-
     val fenceStripped = stripCodeFences(cleaned)
-    if (isNoQuerySentinel(fenceStripped)) return null
 
     val jsonElement = tryParseJson(fenceStripped)
         ?: Regex("(?s)\\{.*\\}").find(fenceStripped)?.value?.let { tryParseJson(it) }
 
-    val rawQueries: List<String>
-    val recency: SearchRecency
-    if (jsonElement != null) {
-        rawQueries = extractQueries(jsonElement)
-        recency = extractRecency(jsonElement)
-    } else {
-        Log.warning(TAG_LLM, "Query plan not JSON, using raw text as single query",
+    if (jsonElement == null) {
+        Log.warning(TAG_LLM, "Search skipped (no JSON plan)",
             "Raw: ${fenceStripped.take(AppConfigProvider.current.search.logPreviewMaxChars)}", correlationId = correlationId)
-        rawQueries = listOf(fenceStripped)
-        recency = SearchRecency.ANY
+        return null
     }
 
-    val queries = rawQueries
+    if (isSearchFalse(jsonElement)) {
+        Log.info(TAG_LLM, "Search skipped (search field false)", correlationId = correlationId)
+        return null
+    }
+
+    val recency = extractRecency(jsonElement)
+    val candidates = extractQueries(jsonElement)
         .map { it.trim() }
-        .filter { it.isNotBlank() && !isNoQuerySentinel(it) }
+        .filter { it.isNotBlank() }
+        .distinctBy { it.lowercase() }
+
+    if (candidates.isEmpty()) {
+        Log.info(TAG_LLM, "Search skipped (empty plan)", correlationId = correlationId)
+        return null
+    }
+
+    val (accepted, rejected) = candidates.partition { !looksLikeAnswer(it) }
+    if (rejected.isNotEmpty()) {
+        Log.warning(TAG_LLM, "Dropped answer-shaped queries",
+            "Rejected ${rejected.size}: ${rejected.joinToString(" | ") { it.take(60) }}", correlationId = correlationId)
+    }
+    if (accepted.isEmpty()) {
+        Log.info(TAG_LLM, "Search skipped (query rejected as answer-shaped)", correlationId = correlationId)
+        return null
+    }
+
+    val queries = accepted
+        .map { truncateAtWordBoundary(it, AppConfigProvider.current.search.queryMaxChars) }
+        .filter { it.isNotBlank() }
         .distinctBy { it.lowercase() }
         .take(3)
-        .map { truncateAtWordBoundary(it, AppConfigProvider.current.search.queryMaxChars) }
 
     if (queries.isEmpty()) return null
     return SearchQueryPlan(queries, recency)
@@ -110,18 +158,24 @@ interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
-    suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): String?
+    suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): RawSearchResponse
     suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String? = null, imageBase64: String? = null): Summary
     suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String? = null): Summary
 
     suspend fun generateSearchQuery(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): SearchQueryPlan? {
         val input = userMessage.take(1024)
         Log.debug(TAG_LLM, "Search query generation started", "Input: ${input.take(AppConfigProvider.current.search.logPreviewMaxChars)}\nModel: $activeModel${if (imageBase64 != null) "\nImage attached" else ""}", correlationId = correlationId)
+
         val raw = generateSearchQueryRaw(input, summaries, correlationId, imageBase64)
 
-        // Some hybrid-reasoning models leak <think> blocks even when instructed to be terse;
+        if (raw.finishReason == "length") {
+            Log.warning(TAG_LLM, "Search skipped (output truncated)", "finish_reason=length: query plan would be incomplete", correlationId = correlationId)
+            return null
+        }
+
+        // Some hybrid-reasoning models leak thinking blocks even when instructed to be terse;
         // strip complete and dangling (truncated) blocks before inspecting the result.
-        val cleaned = raw
+        val cleaned = raw.content
             ?.replace(Regex("(?is)<think>.*?</think>"), "")
             ?.replace(Regex("(?is)<think>.*"), "")
             ?.trim()
@@ -130,15 +184,14 @@ interface LlmClient {
 
         if (cleaned.isNullOrBlank()) {
             Log.warning(TAG_LLM, "Search query generation failed",
-                "API call returned null or blank (network error or no response). Raw: ${raw?.take(AppConfigProvider.current.search.logPreviewMaxChars)}",
+                "API call returned blank content. Raw: ${raw.content?.take(AppConfigProvider.current.search.logPreviewMaxChars)}",
                 correlationId = correlationId)
             throw Exception("Unable to generate search query")
         }
 
         val plan = parseQueryPlan(cleaned, correlationId)
         if (plan == null) {
-            Log.info(TAG_LLM, "Search query skipped (NO_QUERY)",
-                "LLM indicated no web search is needed for this input", correlationId = correlationId)
+            Log.info(TAG_LLM, "Search skipped", "Query plan was rejected or declared unnecessary", correlationId = correlationId)
             return null
         }
 

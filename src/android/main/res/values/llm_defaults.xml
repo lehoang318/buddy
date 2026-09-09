@@ -14,7 +14,8 @@
     <integer name="search_total_max_results">10</integer>
     <integer name="log_preview_max_chars">1024</integer>
     <integer name="search_result_content_max_chars">2000</integer>
-    <integer name="search_query_max_tokens">4096</integer>
+    <integer name="search_query_max_tokens">512</integer>
+    <integer name="search_query_reject_chars">256</integer>
     <item name="summary_temperature" format="float" type="dimen">0.2</item>
     <integer name="summary_max_tokens">512</integer>
     <string name="default_reasoning_chat_low">low</string>
