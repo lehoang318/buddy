@@ -2,6 +2,8 @@
 
 ## Chat Scenarios
 
+The platform-independent `ConversationEngine` (`src/common`) owns turn processing: URL fetching, web search, message assembly (`MessageBuilder`), streaming, and summarization. `ChatViewModel` collects its `ConversationEvent` flow and renders it; the engine's `processingLock` mutex serializes turns.
+
 ### 1. Basic Chat (No Web Search, No URL)
 
 ```mermaid
@@ -9,30 +11,31 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Type message and send
-    ChatScreen->>ViewModel: onInputChange(message)
+    ChatScreen->>ViewModel: sendMessage()
     ViewModel->>ViewModel: Validate message, add to uiState
-    ViewModel->>ViewModel: processingLock.withLock {
-    ConversationEngine->>MessageBuilder: build messages with summaries context
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare API request
-    LLMClient->>LLMClient: Send to provider
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate and display response
+    ViewModel->>Engine: send(message, config) — collect events
+    Engine->>Engine: processingLock.withLock
+    Engine->>MessageBuilder: build(messages, summaries, outputLimit)
+    Engine->>LLMClient: streamCompletionWithLogging(...)
+    LLMClient->>LLMClient: Prepare API request and send to provider
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI streaming
     ChatScreen-->>User: Display partial response
-    ViewModel->>LLMClient: generateSummary(question, response)
-    LLMClient-->>ViewModel: Summary JSON (2-3 points)
-    ViewModel->>ViewModel: Append to summaries list
+    Engine->>LLMClient: generateSummary(question, response)
+    LLMClient-->>Engine: Summary JSON (2-3 points)
+    Engine->>Engine: Append to summaries list
     alt exceeds maxSummaries
-        ViewModel->>LLMClient: compressSummaries(batch)
-        LLMClient-->>ViewModel: Compressed summary
-        ViewModel->>ViewModel: Replace oldest batch
+        Engine->>LLMClient: compressSummaries(batch)
+        LLMClient-->>Engine: Compressed summary
+        Engine->>Engine: Replace oldest batch
     end
-    ViewModel->>ViewModel: }  (lock released)
-    ViewModel->>ChatScreen: Update UI with response
+    Engine-->>ViewModel: Turn finished (mutex released)
+    ViewModel->>ViewModel: saveCurrentSession() (auto-save)
     ChatScreen-->>User: Display final response
 ```
 
@@ -43,39 +46,41 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
+    participant Helper as WebSearchHelper
     participant LLMClient
-    participant WebSearchHelper
     participant WebSearch
 
     User->>ChatScreen: Type message about current events
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate, add to uiState, lock mutex
-    ViewModel->>WebSearchHelper: search(message, summaries)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
-    Note over WebSearchHelper: Summaries injected as system context
-    LLMClient-->>WebSearchHelper: Return query plan (1-3 queries + recency) or null
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>Engine: processingLock.withLock
+    Engine->>Helper: search(message, summaries, imageBase64?)
+    Helper->>LLMClient: generateSearchQuery(cleanInput, summaries)
+    Note over Helper: Summaries injected as context
+    LLMClient-->>Helper: Query plan (1-3 queries + recency) or null
     alt plan is null (search not needed or unusable)
-        WebSearchHelper-->>ViewModel: WebSearchOutcome(skipped = true)
+        Helper-->>Engine: WebSearchOutcome(skipped = true)
     else plan parsed
         par one search per query
-            WebSearchHelper->>WebSearch: search(query1, recency)
-            WebSearchHelper->>WebSearch: search(query2, recency)
+            Helper->>WebSearch: search(query1, recency)
+            Helper->>WebSearch: search(query2, recency)
         end
-        WebSearch-->>WebSearchHelper: SearchResponse per query
-        WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap results; compose answers
-        WebSearchHelper-->>ViewModel: Merged results + answer + query label
-        ConversationEngine->>MessageBuilder: build messages with Web Data system message
-        ViewModel->>LLMClient: streamCompletion(messages with ## Web Data)
-        LLMClient-->>ViewModel: Stream response tokens
-        ViewModel->>ViewModel: Accumulate and display
-        ViewModel->>ChatScreen: Update UI streaming
-        ChatScreen-->>User: Display partial response
+        WebSearch-->>Helper: SearchResponse per query
+        Helper->>Helper: Interleave, dedupe, cap results; compose answers
+        Helper-->>Engine: Merged results + answer + query label
     end
-    ViewModel->>LLMClient: generateSummary(question, response)
-    LLMClient-->>ViewModel: Summary JSON
-    ViewModel->>ViewModel: Append to summaries list
-    ViewModel->>ViewModel: Release mutex
-    ViewModel->>ChatScreen: Update UI with response
+    Engine->>MessageBuilder: build messages with ## Web Data system message
+    Engine->>LLMClient: streamCompletionWithLogging(messages with ## Web Data)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
+    ViewModel->>ChatScreen: Update UI streaming
+    ChatScreen-->>User: Display partial response
+    Engine->>LLMClient: generateSummary(question, response)
+    LLMClient-->>Engine: Summary JSON
+    Engine->>Engine: Append to summaries; mutex released
+    Engine-->>ViewModel: Turn finished
+    ViewModel->>ViewModel: saveCurrentSession() (auto-save)
     ChatScreen-->>User: Display final response (with one "Searched" pill per query)
 ```
 
@@ -88,27 +93,28 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant UrlFetcher
     participant LLMClient
 
     User->>ChatScreen: Type message with URL
-    ChatScreen->>ViewModel: onInputChange(message + url)
-    ViewModel->>ViewModel: Detect URL, add to uiState, lock mutex
-    ViewModel->>UrlFetcher: fetchAll(urls)
-    UrlFetcher->>UrlFetcher: Fetch each URL
-    UrlFetcher-->>ViewModel: List<FetchedUrl>
-    ConversationEngine->>MessageBuilder: build messages with ## Web Data > Fetched URL
-    ViewModel->>LLMClient: streamCompletion(messages with Web Data)
-    LLMClient->>LLMClient: Prepare API request
-    LLMClient->>LLMClient: Send to provider
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate response
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>UrlFetcher: fetchAll(urls) — outside the mutex
+    UrlFetcher-->>Engine: List<FetchedUrl>
+    Engine->>Engine: processingLock.withLock
+    Engine->>MessageBuilder: build messages with ## Web Data > Fetched URL
+    Engine->>LLMClient: streamCompletionWithLogging(messages with Web Data)
+    LLMClient->>LLMClient: Prepare API request and send to provider
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI streaming
     ChatScreen-->>User: Display partial response
-    ViewModel->>LLMClient: generateSummary(question, response)
-    LLMClient-->>ViewModel: Summary JSON
-    ViewModel->>ViewModel: Append to summaries, release mutex
-    ViewModel->>ChatScreen: Update UI with response
+    Engine->>LLMClient: generateSummary(question, response)
+    LLMClient-->>Engine: Summary JSON
+    Engine->>Engine: Append to summaries; mutex released
+    Engine-->>ViewModel: Turn finished
+    ViewModel->>ViewModel: saveCurrentSession() (auto-save)
     ChatScreen-->>User: Display response referencing URL
 ```
 
@@ -119,7 +125,7 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
-    participant ImageProcessor
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Take photo or select image
@@ -127,14 +133,13 @@ sequenceDiagram
     ViewModel->>ViewModel: Decode (two-pass, IO) → scale → base64
     ViewModel-->>ViewModel: pendingImageBase64
     User->>ChatScreen: Type message about image
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Check for pending image
-    ViewModel->>ViewModel: Create multimodal request
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare multimodal API request
-    LLMClient->>LLMClient: Send to provider
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process and accumulate response
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message, imageBase64)
+    Engine->>MessageBuilder: build multimodal user message (image_url part)
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
+    LLMClient->>LLMClient: Prepare multimodal API request and send to provider
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI with response
     ChatScreen-->>User: Display response about image
 ```
@@ -146,23 +151,20 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
-    participant FileProcessor
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Select text/code file
     ChatScreen->>ViewModel: onFilePicked(fileUri)
-    ViewModel->>ViewModel: Process file URI
-    ViewModel->>FileProcessor: Read file content
-    FileProcessor-->>ViewModel: Return file text content
+    ViewModel->>ViewModel: Validate extension and size (≤100KB), extract text
+    ViewModel-->>ViewModel: pending file (name + text)
     User->>ChatScreen: Type message about file
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Check for pending file
-    ViewModel->>ViewModel: Create request with file context
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare API request with context
-    LLMClient->>LLMClient: Send to provider
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Process and accumulate response
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message, attachment)
+    Engine->>MessageBuilder: build user message with file text appended
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI with response
     ChatScreen-->>User: Display response referencing file
 ```
@@ -174,36 +176,37 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant UrlFetcher
-    participant WebSearchHelper
-    participant WebSearch
+    participant Helper as WebSearchHelper
     participant LLMClient
+    participant WebSearch
 
     User->>ChatScreen: Type message with URL, enable web search
-    ChatScreen->>ViewModel: onInputChange(message + url)
-    ViewModel->>ViewModel: Detect URL, add to uiState, lock mutex
-    ViewModel->>UrlFetcher: fetchAll(urls)
-    UrlFetcher->>UrlFetcher: Make HTTP requests to URLs
-    UrlFetcher-->>ViewModel: Return List<FetchedUrl>
-    ViewModel->>WebSearchHelper: search(message, summaries)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
-    LLMClient-->>WebSearchHelper: Return query plan (1-3 queries + recency)
-    WebSearchHelper->>WebSearch: search(query, recency) — one call per query, in parallel
-    WebSearch->>WebSearch: Query web search provider
-    WebSearch-->>WebSearchHelper: Return search results per query
-    WebSearchHelper->>WebSearchHelper: Interleave, dedupe, cap; compose answers
-    WebSearchHelper-->>ViewModel: Merged search results
-    ConversationEngine->>MessageBuilder: build messages with ## Web Data
-    Note over ViewModel: Web Data includes ### Fetched URL + ### Search Engine Summary + ### Web Search
-    ViewModel->>LLMClient: streamCompletion(messages)
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate response
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>UrlFetcher: fetchAll(urls) — outside the mutex
+    UrlFetcher-->>Engine: List<FetchedUrl>
+    Engine->>Engine: processingLock.withLock
+    Engine->>Helper: search(message, summaries)
+    Helper->>LLMClient: generateSearchQuery(message, summaries)
+    LLMClient-->>Helper: Query plan (1-3 queries + recency)
+    Helper->>WebSearch: search(query, recency) — one call per query, in parallel
+    WebSearch-->>Helper: Search results per query
+    Helper->>Helper: Interleave, dedupe, cap; compose answers
+    Helper-->>Engine: Merged search results
+    Engine->>MessageBuilder: build messages with ## Web Data
+    Note over Engine: Web Data includes ### Fetched URL + ### Search Engine Summary + ### Web Search
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI streaming
     ChatScreen-->>User: Display partial response
-    ViewModel->>LLMClient: generateSummary(question, response)
-    LLMClient-->>ViewModel: Summary JSON
-    ViewModel->>ViewModel: Append to summaries, release mutex
-    ViewModel->>ChatScreen: Update UI with response
+    Engine->>LLMClient: generateSummary(question, response)
+    LLMClient-->>Engine: Summary JSON
+    Engine->>Engine: Append to summaries; mutex released
+    Engine-->>ViewModel: Turn finished
+    ViewModel->>ViewModel: saveCurrentSession() (auto-save)
     ChatScreen-->>User: Display comprehensive response
 ```
 
@@ -214,19 +217,22 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Type message and send
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate message, lock mutex
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Prepare API request
-    LLMClient->>LLMClient: Send to provider
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>Engine: processingLock.withLock
+    Engine->>MessageBuilder: build messages with summaries context
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
+    LLMClient->>LLMClient: Prepare API request and send to provider
     Note over LLMClient: Connection timeout or error
-    LLMClient-->>ViewModel: Throw exception
-    ViewModel->>ViewModel: Catch exception, no summary generated
-    ViewModel->>ViewModel: Release mutex
-    ViewModel->>ChatScreen: Update UI with error message
+    LLMClient-->>Engine: Throw exception
+    Engine-->>ViewModel: ConversationEvent.Failed(exception)
+    Engine->>Engine: Mutex released (no summary generated)
+    ViewModel->>ViewModel: Show "Error: ..." assistant bubble
+    ViewModel->>ViewModel: saveCurrentSession() (failed turn is persisted)
     ChatScreen-->>User: Display "Error: [exception message]" in chat
 ```
 
@@ -237,42 +243,45 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
-    participant WebSearchHelper
-    participant WebSearch
+    participant Engine as ConversationEngine
+    participant Helper as WebSearchHelper
     participant LLMClient
+    participant WebSearch
 
     User->>ChatScreen: Type message about current events
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate, lock mutex
-    ViewModel->>WebSearchHelper: search(message, summaries)
-    WebSearchHelper->>LLMClient: generateSearchQuery(message, summaries)
-    LLMClient-->>WebSearchHelper: Return query plan (e.g. 2 queries)
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>Engine: processingLock.withLock
+    Engine->>Helper: search(message, summaries)
+    Helper->>LLMClient: generateSearchQuery(message, summaries)
+    LLMClient-->>Helper: Query plan (e.g. 2 queries)
     par one search per query
-        WebSearchHelper->>WebSearch: search(query1, recency)
-        WebSearchHelper->>WebSearch: search(query2, recency)
+        Helper->>WebSearch: search(query1, recency)
+        Helper->>WebSearch: search(query2, recency)
     end
     alt all queries fail (e.g. invalid API key)
         Note over WebSearch: Invalid API key or network error
-        WebSearch-->>WebSearchHelper: Return error for every query
-        WebSearchHelper-->>ViewModel: Error message, no results
-        ViewModel->>ViewModel: Set webSearchError in uiState
-        ConversationEngine->>MessageBuilder: build messages without ## Web Search
+        WebSearch-->>Helper: Error for every query
+        Helper-->>Engine: Error message, no results
+        Engine-->>ViewModel: SearchFinished outcome with error
+        ViewModel->>ViewModel: Show web-search error pill
+        Engine->>MessageBuilder: build messages without ## Web Search
     else some queries fail, others succeed
-        WebSearch-->>WebSearchHelper: Mixed results/errors
-        Note over WebSearchHelper: Warning logged; search proceeds with the successful subset
-        WebSearchHelper-->>ViewModel: Partial results (no error pill)
-        ConversationEngine->>MessageBuilder: build messages with ## Web Data from partial results
+        WebSearch-->>Helper: Mixed results/errors
+        Note over Helper: Warning logged; search proceeds with the successful subset
+        Helper-->>Engine: Partial results (no error pill)
+        Engine->>MessageBuilder: build messages with ## Web Data from partial results
     end
-    ViewModel->>LLMClient: streamCompletion(messages)
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate response
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Token events
     ViewModel->>ChatScreen: Update UI streaming
     ChatScreen-->>User: Display partial response
-    ViewModel->>LLMClient: generateSummary(question, response)
-    LLMClient-->>ViewModel: Summary JSON
-    ViewModel->>ViewModel: Append to summaries, release mutex
-    ViewModel->>ChatScreen: Update UI with response (+ error pill only if all queries failed)
-    ChatScreen-->>User: Display response
+    Engine->>LLMClient: generateSummary(question, response)
+    LLMClient-->>Engine: Summary JSON
+    Engine->>Engine: Append to summaries; mutex released
+    ViewModel->>ViewModel: saveCurrentSession() (auto-save)
+    ChatScreen-->>User: Display response (+ error pill only if all queries failed)
 ```
 
 ### 9. Chat with Invalid API Key
@@ -282,18 +291,20 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Type message and send
-    ChatScreen->>ViewModel: onInputChange(message)
-    ViewModel->>ViewModel: Validate message
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
+    ChatScreen->>ViewModel: sendMessage()
+    ViewModel->>Engine: send(message) — collect events
+    Engine->>LLMClient: streamCompletionWithLogging(messages)
     LLMClient->>LLMClient: Prepare API request (ApiKeyInterceptor injects key)
     LLMClient->>LLMClient: Send to provider
     Note over LLMClient: Provider rejects invalid key (HTTP 401)
-    LLMClient-->>ViewModel: Throw exception with error details
-    ViewModel->>ViewModel: Catch exception
-    ViewModel->>ChatScreen: Update UI with error message
+    LLMClient-->>Engine: Throw exception with error details
+    Engine-->>ViewModel: ConversationEvent.Failed(exception)
+    ViewModel->>ViewModel: Show error assistant bubble
+    ViewModel->>ViewModel: saveCurrentSession() (failed turn is persisted)
     ChatScreen-->>User: Display "Error: API error 401: ..." in chat
 ```
 
@@ -304,16 +315,15 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant LLMClient
 
     User->>ChatScreen: Send message
     ChatScreen->>ViewModel: sendMessage()
-    ViewModel->>ViewModel: Validate message
-    ViewModel->>LLMClient: streamCompletion(messages, model, config)
-    LLMClient->>LLMClient: Process with current model
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate response
-    ViewModel->>ChatScreen: Update UI with response
+    ViewModel->>Engine: send(message)
+    Engine->>LLMClient: streamCompletionWithLogging(messages, currentModel)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Turn finished
     ChatScreen-->>User: Display response
 
     User->>ChatScreen: Tap model name in top bar
@@ -326,11 +336,10 @@ sequenceDiagram
 
     User->>ChatScreen: Send new message
     ChatScreen->>ViewModel: sendMessage()
-    ViewModel->>LLMClient: streamCompletion(messages, newModel, config)
-    LLMClient->>LLMClient: Process with new model
-    LLMClient-->>ViewModel: Stream response tokens
-    ViewModel->>ViewModel: Accumulate response
-    ViewModel->>ChatScreen: Update UI with response
+    ViewModel->>Engine: send(message)
+    Engine->>LLMClient: streamCompletionWithLogging(messages, newModel)
+    LLMClient-->>Engine: Stream response tokens
+    Engine-->>ViewModel: Turn finished
     ChatScreen-->>User: Display response from new model
 ```
 
@@ -341,6 +350,7 @@ sequenceDiagram
     participant User
     participant ChatScreen
     participant ViewModel
+    participant Engine as ConversationEngine
     participant SessionRepository
 
     User->>ChatScreen: New Chat / resume a saved session (while a response is streaming)
@@ -350,10 +360,11 @@ sequenceDiagram
     ViewModel->>ViewModel: saveCurrentSession()  (save the outgoing chat)
     ViewModel->>SessionRepository: addSession(current)
     alt New Chat
-        ViewModel->>ViewModel: clearChat()
+        ViewModel->>Engine: clear()
+        ViewModel->>ViewModel: Clear UI messages and pending attachments
     else Resume
-        ViewModel->>ViewModel: conversationEngine.restore(history, summaries)
-        ViewModel->>ViewModel: Restore UI messages
+        ViewModel->>Engine: restore(history, summaries)
+        ViewModel->>ViewModel: Restore UI messages (hydrated images, search flags)
     end
     ViewModel->>ChatScreen: Fresh / restored UI
     ChatScreen-->>User: Clean, non-polluted chat

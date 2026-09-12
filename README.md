@@ -13,6 +13,8 @@
         <li><strong>📄 Document Intelligence</strong>: Extract insights from images and text files on device</li>
         <li><strong>📸 Camera Analysis</strong>: Instantly process photos via camera capture for text, charts, or data</li>
         <li><strong>⚙️ Provider Selection</strong>: Choose your preferred LLM and Web Search providers</li>
+        <li><strong>💬 Chat History</strong>: Conversations auto-save and resume, with tag filters and 30-day auto-delete</li>
+        <li><strong>🧩 Rich Code Blocks</strong>: Copy, save to Downloads, or preview Markdown and HTML output</li>
       </ul>
     </td>
   </tr>
@@ -39,7 +41,7 @@
 2. Generate Web Search API Key from [Tavily](https://docs.tavily.com/welcome), [Exa](https://exa.ai/), or [LinkUp](https://www.linkup.so/)
 
 3. **Download the APK**
-  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.6)
+  → [Download Latest Version](https://github.com/lehoang318/buddy/releases/tag/v0.7)
 
 4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 10 VII - Android 16).
 
@@ -71,6 +73,18 @@ Or build an executable distribution with:
 The CLI first requires an LLM provider and model selection, then offers optional web-search provider setup before accepting chat messages. It supports `/help`, `/provider`, `/web`, `/attach <file path>`, `/exit`, and `/quit`; Ctrl+D and double Esc also exit.
 
 The CLI reads these environment variables: `FIREWORKS_AI_API_KEY`, `OLLAMA_CLOUD_API_KEY`, `OPEN_ROUTER_API_KEY`, `SILICON_FLOW_API_KEY`, `TOGETHER_AI_API_KEY`, `EXA_API_KEY`, `LINKUP_API_KEY`, and `TAVILY_API_KEY`.
+
+## 🏗️ Architecture
+
+The codebase is split into platform-independent and platform-specific parts:
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| `:app` (Android) | `src/android/` | Compose UI, DataStore settings, Keystore-backed key cache, session image store, foreground service |
+| `:cli` (Desktop) | `src/cli/` | Standalone JVM terminal app; API keys come from environment variables |
+| Shared core | `src/common/` | LLM client, web search, URL fetching, conversation engine, session repository, typed config |
+
+The platform-independent `ConversationEngine` owns URL detection/fetching, web search orchestration, message assembly, streaming, and context summarization — both the Android app and the desktop CLI consume its events. Configuration lives in `src/android/main/res/values/*.xml`, read natively on Android and from bundled resources on desktop.
 
 ## Documentation
 

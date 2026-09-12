@@ -237,6 +237,6 @@ See [web-search.md](./web-search.md) for the full workflow. Known constraints:
 
 ---
 
-**Last Updated**: v0.5.0
+**Last Updated**: v0.7.0
 
 **Note**: These limitations are subject to change in future updates.

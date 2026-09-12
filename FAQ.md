@@ -18,6 +18,9 @@
       - [Keep it safe:](#keep-it-safe)
   - [💬 Using Buddy](#-using-buddy)
     - [How do I chat with Buddy?](#how-do-i-chat-with-buddy)
+    - [How do I find or resume a past conversation?](#how-do-i-find-or-resume-a-past-conversation)
+    - [Are my chats deleted automatically?](#are-my-chats-deleted-automatically)
+    - [How do I copy a response or jump between messages?](#how-do-i-copy-a-response-or-jump-between-messages)
     - [What can I ask Buddy?](#what-can-i-ask-buddy)
     - [How do I use web search?](#how-do-i-use-web-search)
     - [Can I share files or images with Buddy?](#can-i-share-files-or-images-with-buddy)
@@ -153,6 +156,41 @@ An **API key** is like a special password that lets Buddy securely connect to AI
 Simply type your question or message in the text input field at the bottom of the screen and tap the send button. Buddy will respond with an AI-generated answer.
 </details>
 
+### How do I find or resume a past conversation?
+
+<details>
+  <summary>🕘 How do I find or resume a past conversation?</summary>
+
+Conversations are saved automatically after every reply, so you can safely close the app at any time.
+
+- **Resume**: the most recent chat reopens automatically when you start Buddy.
+- **Past chats**: tap the Buddy logo in the top bar and choose **History**. Tap a row to reopen that conversation.
+- **Find a chat**: filter by time (All / 7 / 30 days) or by topic tags; combine tag chips to narrow further (all selected tags must match).
+- **Clean up**: select rows with the checkboxes to bulk-delete, or tap **New Chat** in the Buddy logo menu to start fresh (the current chat is saved first).
+</details>
+
+### Are my chats deleted automatically?
+
+<details>
+  <summary>🗑️ Are my chats deleted automatically?</summary>
+
+Only if you turn it on. In **History**, enable the **Auto-delete** toggle to remove chats that haven't been interacted with for 30 days:
+
+- If old chats exist when you enable it, Buddy asks for confirmation before deleting them.
+- The purge also runs on app startup while the toggle is on.
+- Actively used chats keep getting re-aged on every save, so they won't be deleted while you keep using them.
+- Declining the confirmation keeps auto-delete enabled; it only skips deleting the old chats right away.
+</details>
+
+### How do I copy a response or jump between messages?
+
+<details>
+  <summary>📋 How do I copy a response or jump between messages?</summary>
+
+- **Copy**: every message has a small copy icon next to its timestamp; code blocks have their own per-block copy button.
+- **Jump**: when the conversation is longer than the screen, previous/next arrows appear in the input bar — tap to hop between your messages (long-press to jump to the very first/last).
+</details>
+
 ### What can I ask Buddy?
 
 <details>
@@ -230,8 +268,8 @@ Code blocks have a **download** button (shown once streaming finishes). Tapping 
 <details>
   <summary>🔄 How do I change AI models?</summary>
 
-1. Tap the Buddy logo in the top bar to open the menu
-2. Select your preferred model from the dropdown
+1. Tap the model name in the top bar (next to the Buddy logo)
+2. Pick a model from the list — the switch applies from your next message on
 3. Some models support images (multimodal) - look for the image icon next to model names
 </details>
 

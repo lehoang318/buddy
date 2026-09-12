@@ -11,6 +11,8 @@
   - [4.1 Change Web Search Provider](#41-change-web-search-provider)
   - [4.2 Enable/Disable Web Search](#42-enabledisable-web-search)
 - [5. First Time Startup](#5-first-time-startup)
+- [6. Chat History & Sessions](#6-chat-history--sessions)
+- [7. Working with the Conversation Area](#7-working-with-the-conversation-area)
 
 ---
 
@@ -607,6 +609,74 @@ When no providers are configured:
 - Different providers produce different styles
 - Web search results depend on the provider's capabilities
 - Your questions and prompts affect results
+
+</details>
+
+## 6. Chat History & Sessions
+
+<details>
+  <summary>6. Chat History &amp; Sessions</summary>
+
+### Overview
+Conversations are saved automatically after every finished reply, so nothing is lost when the app closes. Use the History screen to revisit, organize, and clean up saved chats.
+
+### When to Use This
+- You closed the app and want to continue where you left off
+- You want to look up an older conversation
+- You want to organize or delete old chats
+
+### Steps
+
+#### Step 1: Open History
+1. Tap the Buddy logo in the top bar
+2. Select "History" from the menu
+
+#### Step 2: Find a Session
+- Use the time filter chips (All / 7 / 30 days) — filtering is based on when the chat was last updated
+- Tap tag chips to filter by topic (e.g. Technology, Health); multiple tags combine with AND
+- Each row shows the title (derived from your first message), date, and topic tags
+
+#### Step 3: Resume or Delete
+- Tap a row to resume that conversation (the current chat is saved first)
+- Check rows and tap "Delete selected" to bulk-delete
+- Sessions are capped at 100; the oldest are removed first
+
+### Automatic Deletion
+1. In History, enable the "Auto-delete" toggle
+2. If chats older than 30 days exist, confirm the "Delete Old Chats?" dialog
+3. While enabled, the purge also runs on every app startup
+4. Chats you keep using are re-aged on every save, so they stay safe
+
+### Notes
+- The most recent session reopens automatically on launch; tap "New Chat" to start fresh
+- Failed turns are saved too (the assistant bubble shows the error), so you can retry after resuming
+- Image attachments in saved sessions are restored from app-private storage; deleting a chat removes its images
+
+</details>
+
+## 7. Working with the Conversation Area
+
+<details>
+  <summary>7. Working with the Conversation Area</summary>
+
+### Overview
+Buddy renders assistant answers as stacked segment bubbles — prose and fenced code blocks are separated so each code block is easier to read and reuse. The split is visual only; the saved conversation keeps the full unsplit text.
+
+### Reading Responses
+- Prose segments render as Markdown (tables, lists, links)
+- Fenced code blocks become their own wider bubble, labeled with the language when provided
+- While a response streams, the last segment shows a glowing border and blinking cursor; Markdown formatting settles once the reply finishes
+
+### Per-Block Actions (available once streaming finishes)
+- **Copy** (all code blocks): copies the code verbatim
+- **Save** (all code blocks): writes the code to your Downloads as `buddy_code_<timestamp>.<ext>` — no permission prompt, no file picker
+- **Preview**:
+  - Markdown blocks open an in-app preview dialog
+  - HTML blocks open in your system browser (JS and network work; the page runs from an opaque origin)
+
+### Message Tools
+- Every message has a copy icon next to its timestamp
+- When the conversation overflows the screen, previous/next arrows appear in the input bar to jump between your messages (long-press for very first/last)
 
 </details>
 
