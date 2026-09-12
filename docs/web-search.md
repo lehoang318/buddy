@@ -98,7 +98,7 @@ Query validation deliberately stays narrow (length + line structure + multi-sent
 
 ## Recency → Provider Parameter Mapping
 
-`SearchRecency` (`ext/search/WebSearch.kt`) is `DAY | WEEK | MONTH | ANY`. For `ANY`, no recency parameter is sent at all — a single-query, no-recency search produces a byte-identical request to the pre-multi-query implementation.
+`SearchRecency` (`src/common/main/kotlin/com/example/buddy/search/WebSearch.kt`) is `DAY | WEEK | MONTH | ANY`. For `ANY`, no recency parameter is sent at all — a single-query, no-recency search produces a byte-identical request to the pre-multi-query implementation.
 
 | Provider | Parameter | Format | Notes |
 |---|---|---|---|
@@ -106,7 +106,7 @@ Query validation deliberately stays narrow (length + line structure + multi-sent
 | LinkUp | `fromDate` | ISO date `YYYY-MM-DD`, `today − {1,7,31} days` | Omitted for `any`. |
 | Exa | `startPublishedDate` | ISO date `YYYY-MM-DD` | Omitted for `any`. Live-verified: Exa accepts the date-only format (no need for a full timestamp) and correctly filters results to that window. May exclude undated pages. |
 
-Date math: `SearchRecency.sinceDateOrNull()` in `ext/search/WebSearch.kt`, using `java.time.LocalDate`.
+Date math: `SearchRecency.sinceDateOrNull()` in `src/common/main/kotlin/com/example/buddy/search/WebSearch.kt`, using `java.time.LocalDate`.
 
 ## Provider Capability Table
 

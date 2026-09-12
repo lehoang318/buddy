@@ -93,7 +93,7 @@ All limit values live in `res/values/llm_defaults.xml` and are exposed through `
 - Summary/compression calls keep `max_tokens == summary_max_tokens` (512) matching their prompt statement. Search-query generation uses its own `search_query_max_tokens`.
 
 **Request size cap (chat only):**
-- The assembled request (system prompt + memory + Web Data + pairs + current message) is capped at `llm.maxRequestChars` (32768 characters). Image base64 is excluded from the count (it would blow the budget on every image request).
+- The assembled request (system prompt + memory + Web Data + pairs + current message) is capped at `llm.maxRequestChars` (65536 characters). Image base64 is excluded from the count (it would blow the budget on every image request).
 - When the cap is exceeded, content is trimmed in priority order (lowest value first), with a warning logged:
   1. Search result contents (dropped from the tail)
   2. Fetched URL contents (dropped from the tail)

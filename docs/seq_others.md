@@ -336,6 +336,8 @@ sequenceDiagram
     participant User
     participant MainActivity
     participant ChatScreen
+    participant HistoryScreen
+    participant SessionRepository
     participant ProvidersScreen
     participant EventsScreen
     participant AboutScreen
@@ -352,6 +354,18 @@ sequenceDiagram
 
     User->>ProvidersScreen: Tap back button
     ProvidersScreen->>MainActivity: Return to chat
+    MainActivity->>ChatScreen: Resume chat screen
+
+    User->>MainActivity: Tap Buddy logo again
+    MainActivity->>MainActivity: Show menu dropdown
+
+    User->>MainActivity: Select History
+    MainActivity->>HistoryScreen: Navigate to history
+    HistoryScreen->>SessionRepository: Load saved sessions
+    HistoryScreen-->>User: Show history screen with filters
+
+    User->>HistoryScreen: Tap back button
+    HistoryScreen->>MainActivity: Return to chat
     MainActivity->>ChatScreen: Resume chat screen
 
     User->>MainActivity: Tap Buddy logo again
@@ -414,6 +428,30 @@ sequenceDiagram
     ProvidersScreen-->>User: Return to chat screen
 ```
 
+### 12. History - Resume a Saved Session
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant HistoryScreen
+    participant ViewModel
+    participant SessionRepository
+    participant Engine as ConversationEngine
+
+    User->>HistoryScreen: Tap a saved session row
+    HistoryScreen->>ViewModel: onSessionSelected(session)
+    ViewModel->>ViewModel: currentJob?.cancelAndJoin() (stop in-flight stream)
+    ViewModel->>ViewModel: saveCurrentSession() (save the outgoing chat first)
+    ViewModel->>SessionRepository: addSession(current)
+    ViewModel->>Engine: restore(history, summaries)
+    ViewModel->>ViewModel: Hydrate UI messages (images from SessionImageStore, search flags)
+    ViewModel->>HistoryScreen: onBack()
+    HistoryScreen-->>User: Show restored conversation
+```
+
+- The most recent session is restored automatically at app startup; **New Chat** saves the outgoing chat before clearing.
+- Bulk delete and the 30-day auto-delete purge follow the flows documented in [sessions.md](./sessions.md).
+
 ---
 
-**Note**: These diagrams represent high-level happy path scenarios for providers, events, and about functionality. Detailed error handling and edge cases are not shown for clarity.
+**Note**: These diagrams represent high-level happy path scenarios for providers, history, events, and about functionality. Detailed error handling and edge cases are not shown for clarity.
