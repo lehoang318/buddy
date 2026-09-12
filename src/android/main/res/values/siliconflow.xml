@@ -28,5 +28,5 @@
     </string-array>
     <integer name="siliconflow_reasoning_chat_low">2048</integer>
     <integer name="siliconflow_reasoning_chat_high">8192</integer>
-    <integer name="siliconflow_reasoning_search">2048</integer>
+    <integer name="siliconflow_reasoning_search">256</integer>
 </resources>

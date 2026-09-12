@@ -10,6 +10,7 @@ import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
 import com.example.buddy.llm.LlmMessage
 import com.example.buddy.llm.LlmModel
+import com.example.buddy.llm.RawSearchResponse
 import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.search.SearchResponse
 import com.example.buddy.search.SearchRecency
@@ -92,9 +93,9 @@ class ConversationEngineTest {
 
         override suspend fun testConnection(): Boolean = true
 
-        override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): String? {
+        override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): RawSearchResponse {
             lastSearchImage = imageBase64
-            return searchPlan
+            return RawSearchResponse(searchPlan, null)
         }
 
         override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?, imageBase64: String?): Summary {

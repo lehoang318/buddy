@@ -135,6 +135,48 @@ open class OpenAIClient internal constructor(
         }
     }
 
+    // Non-streaming request used for tiny, structured calls (query generation) whose whole
+    // output is needed before the turn can proceed. Unlike executeStreamingRequest, it
+    // surfaces the HTTP status/body on failure (so a 400 is distinguishable from a network
+    // error) and returns finish_reason (so truncation is detectable via `finish_reason=length`).
+    private fun executeNonStreamingRequest(requestBody: JsonObject, correlationId: String?, cancellationJob: Job?): RawSearchResponse? {
+        val request = Request.Builder()
+            .url("$normalizedBaseUrl/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .post(gson.toJson(requestBody).toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val call = httpClient.newCall(request)
+        cancellationJob?.invokeOnCompletion { call.cancel() }
+
+        return call.execute().use { response ->
+            if (!response.isSuccessful) {
+                val body = response.body?.string().orEmpty()
+                Log.warning(TAG, "Search query request failed",
+                    "HTTP ${response.code}: ${body.take(AppConfigProvider.current.search.logPreviewMaxChars)}", correlationId = correlationId)
+                return@use null
+            }
+            val body = response.body?.string().orEmpty()
+            try {
+                val json = gson.fromJson(body, JsonObject::class.java)
+                val choice = json.getAsJsonArray("choices").firstOrNull()?.asJsonObject
+                val message = choice?.getAsJsonObject("message")
+                val content = message?.get("content")
+                    ?.takeIf { !it.isJsonNull }
+                    ?.asString
+                    ?.trim()
+                val finishReason = choice?.get("finish_reason")
+                    ?.takeIf { !it.isJsonNull }
+                    ?.asString
+                RawSearchResponse(content = content?.ifBlank { null }, finishReason = finishReason)
+            } catch (e: Exception) {
+                Log.error(TAG, "Failed to parse search query response", e.message, correlationId = correlationId)
+                null
+            }
+        }
+    }
+
     override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> = flow {
         val requestBody = buildChatRequestBody(messages, model, config)
 
@@ -329,7 +371,7 @@ open class OpenAIClient internal constructor(
         }
     }
 
-    override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): String? {
+    override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): RawSearchResponse {
         return withContext(Dispatchers.IO) {
             try {
                 val includeImage = imageBase64 != null && isModelMultimodal(activeModel)
@@ -361,17 +403,16 @@ open class OpenAIClient internal constructor(
 
                 Log.debug(TAG, "Search query request", gson.toJson(requestBody), correlationId = correlationId)
 
-                val content = executeStreamingRequest(requestBody, coroutineContext[Job])
+                val content = executeNonStreamingRequest(requestBody, correlationId, coroutineContext[Job])
                 if (content == null) {
                     Log.warning(TAG, "Failed to generate search query", correlationId = correlationId)
-                    return@withContext null
                 }
-                return@withContext content
+                return@withContext content ?: RawSearchResponse(null, null)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.error(TAG, "Failed to generate search query", e.message, correlationId = correlationId)
-                null
+                RawSearchResponse(null, null)
             }
         }
     }

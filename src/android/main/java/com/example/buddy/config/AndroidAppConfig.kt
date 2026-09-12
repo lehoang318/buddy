@@ -25,6 +25,7 @@ class AndroidAppConfig(context: Context) : AppConfig {
         override val queryTemperature get() = ResourcesCompat.getFloat(res, R.dimen.search_query_temperature)
         override val queryMaxChars get() = res.getInteger(R.integer.search_query_max_chars)
         override val queryMaxTokens get() = res.getInteger(R.integer.search_query_max_tokens)
+        override val queryRejectChars get() = res.getInteger(R.integer.search_query_reject_chars)
         override val maxResults get() = res.getInteger(R.integer.search_max_results)
         override val totalMaxResults get() = res.getInteger(R.integer.search_total_max_results)
         override val logPreviewMaxChars get() = res.getInteger(R.integer.log_preview_max_chars)
