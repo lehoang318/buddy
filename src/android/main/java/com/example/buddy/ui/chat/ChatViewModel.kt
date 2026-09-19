@@ -11,6 +11,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.SessionImageStore
+import com.example.buddy.agent.ASK_USER_SKIP_ANSWER
 import com.example.buddy.chat.ConversationEngine
 import com.example.buddy.chat.ConversationEvent
 import com.example.buddy.chat.ChatSessionManager
@@ -49,6 +50,11 @@ private const val MAX_IMAGE_DIMENSION = 1440
 private const val JPEG_QUALITY = 85
 private const val TAG = "Chat"
 
+data class PendingQuestion(
+    val question: String,
+    val options: List<String>
+)
+
 data class ChatUiState(
     val messages: List<UiChatMessage> = emptyList(),
     val inputText: String = "",
@@ -69,6 +75,7 @@ data class ChatUiState(
     val urlFetchWarnings: List<String> = emptyList(),
     val isStreaming: Boolean = false,
     val isCancelling: Boolean = false,
+    val pendingQuestion: PendingQuestion? = null,
     val summaries: List<Summary> = emptyList()
 )
 
@@ -197,6 +204,8 @@ class ChatViewModel(
                 webSearchUsed = m.webSearchUsed,
                 webSearchSkipped = m.webSearchSkipped,
                 webSearchQueries = m.webSearchQueries,
+                questionAsked = m.questionAsked,
+                questionAnswer = m.questionAnswer,
                 timestamp = m.timestamp
             )
         }
@@ -226,7 +235,8 @@ class ChatViewModel(
     }
 
     private fun withRestoredSession(session: SavedSession) {
-        val raw = session.raw.map { m ->
+        val restored = migrateLegacyQuestionAnswers(session.raw)
+        val raw = restored.map { m ->
             UiChatMessage(
                 role = m.role,
                 content = m.content,
@@ -236,18 +246,28 @@ class ChatViewModel(
                 webSearchUsed = m.webSearchUsed,
                 webSearchSkipped = m.webSearchSkipped,
                 webSearchQueries = m.webSearchQueries,
+                questionAsked = m.questionAsked,
+                questionAnswer = m.questionAnswer,
                 timestamp = m.timestamp,
                 isStreaming = false,
                 isComplete = true
             )
         }
-        val engineHistory = session.raw.map { m ->
-            ConversationMessage(
-                role = m.role,
-                content = m.content,
-                imageBase64 = m.imageBase64,
-                attachment = m.attachedFileText?.let { TextAttachment(m.attachedFileName ?: "attachment", it) }
-            )
+        val engineHistory = buildList {
+            restored.forEach { m ->
+                if (m.role == Role.ASSISTANT && !m.questionAsked.isNullOrBlank() && !m.questionAnswer.isNullOrBlank()) {
+                    add(ConversationMessage(Role.USER, m.questionAnswer))
+                }
+                add(
+                    ConversationMessage(
+                        role = m.role,
+                        content = m.content,
+                        imageBase64 = m.imageBase64,
+                        attachment = m.attachedFileText?.let { TextAttachment(m.attachedFileName ?: "attachment", it) },
+                        questionAsked = m.questionAsked
+                    )
+                )
+            }
         }
         conversationEngine.restore(engineHistory, session.summaries)
         _uiState.update { state ->
@@ -264,10 +284,33 @@ class ChatViewModel(
                 isLoading = false,
                 isStreaming = false,
                 urlFetchInProgress = false,
+                pendingQuestion = null,
                 summaries = session.summaries
             )
         }
         sessionManager.bind(session)
+    }
+
+    private fun migrateLegacyQuestionAnswers(messages: List<SessionMessage>): List<SessionMessage> {
+        val result = mutableListOf<SessionMessage>()
+        var index = 0
+        while (index < messages.size) {
+            val message = messages[index]
+            val next = messages.getOrNull(index + 1)
+            if (message.role == Role.ASSISTANT &&
+                !message.questionAsked.isNullOrBlank() &&
+                message.questionAnswer == null &&
+                next?.role == Role.USER
+            ) {
+                val answer = if (next.content == "(skipped)") ASK_USER_SKIP_ANSWER else next.content
+                result += message.copy(questionAnswer = answer)
+                index += 2
+            } else {
+                result += message
+                index++
+            }
+        }
+        return result
     }
 
     private fun loadAvailableModels() {
@@ -374,8 +417,51 @@ class ChatViewModel(
         job.cancel()
     }
 
+    fun skipPendingQuestion() {
+        if (_uiState.value.pendingQuestion == null) return
+        submitAnswer("")
+    }
+
+    fun answerQuestion(answer: String) {
+        if (_uiState.value.pendingQuestion == null) return
+        submitAnswer(answer)
+    }
+
+    private fun submitAnswer(rawAnswer: String) {
+        val answer = rawAnswer.trim()
+        val accepted = conversationEngine.answerPendingQuestion(answer)
+        if (!accepted) {
+            _uiState.update { it.copy(pendingQuestion = null) }
+            return
+        }
+        EventLog.info(TAG, "Clarification answered", "${answer.length} chars")
+        _uiState.update { current ->
+            val questionIndex = current.messages.indexOfLast { message ->
+                message.role == Role.ASSISTANT &&
+                    !message.questionAsked.isNullOrBlank() &&
+                    message.questionAnswer == null
+            }
+            val answerText = answer.ifEmpty { ASK_USER_SKIP_ANSWER }
+            current.copy(
+                inputText = "",
+                pendingQuestion = null,
+                messages = if (questionIndex < 0) {
+                    current.messages
+                } else {
+                    current.messages.mapIndexed { index, message ->
+                        if (index == questionIndex) message.copy(questionAnswer = answerText) else message
+                    }
+                }
+            )
+        }
+    }
+
     fun sendMessage() {
         val state = _uiState.value
+        if (state.pendingQuestion != null) {
+            submitAnswer(state.inputText)
+            return
+        }
         val text = state.inputText.trim()
         if (text.isBlank()) return
 
@@ -481,6 +567,21 @@ class ChatViewModel(
                             }
                             ServiceHelper.onOperationEnd(application)
                         }
+                        ConversationEvent.ClarificationAnswered -> {
+                            _uiState.update { it.copy(pendingQuestion = null) }
+                            BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.LLM_STREAMING, "Generating response...")
+                        }
+                        is ConversationEvent.QuestionAsked -> {
+                            _uiState.update { current ->
+                                current.copy(
+                                    messages = current.messages.map { message ->
+                                        if (message.id == assistantId) message.copy(questionAsked = event.question) else message
+                                    },
+                                    pendingQuestion = PendingQuestion(event.question, event.options)
+                                )
+                            }
+                            BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.LLM_STREAMING, "Waiting for your answer...")
+                        }
                         is ConversationEvent.AssistantStarted -> {
                             assistantId = event.id
                             _uiState.update {
@@ -527,6 +628,7 @@ class ChatViewModel(
                                         if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true) else message
                                     },
                                     isStreaming = false,
+                                    pendingQuestion = null,
                                     summaries = event.summaries
                                 )
                             }
@@ -539,7 +641,8 @@ class ChatViewModel(
                                         if (message.id == assistantId) message.copy(content = "Error: ${event.error.message}", isStreaming = false, isComplete = true) else message
                                     },
                                     isLoading = false,
-                                    isStreaming = false
+                                    isStreaming = false,
+                                    pendingQuestion = null
                                 )
                             }
                             ServiceHelper.onOperationEnd(application)
@@ -554,7 +657,8 @@ class ChatViewModel(
                             if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true) else message
                         },
                         isStreaming = false,
-                        isCancelling = false
+                        isCancelling = false,
+                        pendingQuestion = null
                     )
                 }
                 _uiState.update { it.copy(webSearchCancelled = true) }
@@ -567,7 +671,8 @@ class ChatViewModel(
                         isCancelling = false,
                         isLoading = false,
                         isStreaming = false,
-                        urlFetchInProgress = false
+                        urlFetchInProgress = false,
+                        pendingQuestion = null
                     )
                 }
                 BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.IDLE, "")

@@ -159,6 +159,7 @@ fun ChatScreen(
                 isOffline = state.isOffline,
                 isProcessing = state.isLoading || state.isStreaming || state.urlFetchInProgress,
                 isCancelling = state.isCancelling,
+                answeringQuestion = state.pendingQuestion != null,
                 reasoningEffort = state.generationConfig.reasoningEffort,
                 onToggleReasoning = vm::toggleReasoningEffort,
                 onTextChange = vm::onInputChange,
@@ -226,7 +227,21 @@ fun ChatScreen(
                     DayLabel("Today")
                 }
                 items(state.messages, key = { it.id }) { msg ->
-                    MessageRow(message = msg)
+                    val isAsking = msg.role == Role.ASSISTANT &&
+                        !msg.questionAsked.isNullOrBlank() &&
+                        msg.questionAnswer == null
+                    MessageRow(
+                        message = msg,
+                        pendingOptions = if (isAsking) state.pendingQuestion?.options.orEmpty() else emptyList(),
+                        onAnswerOption = { option ->
+                            keyboard?.hide()
+                            vm.answerQuestion(option)
+                        },
+                        onSkipAnswer = {
+                            keyboard?.hide()
+                            vm.skipPendingQuestion()
+                        }
+                    )
                 }
                 if (state.isLoading) {
                     item { TypingIndicator() }

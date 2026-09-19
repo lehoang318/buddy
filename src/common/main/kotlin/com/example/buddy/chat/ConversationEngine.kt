@@ -2,6 +2,7 @@ package com.example.buddy.chat
 
 import com.example.buddy.agent.AgentTurn
 import com.example.buddy.agent.AgentTurnEvent
+import com.example.buddy.agent.QuestionBridge
 import com.example.buddy.agent.SummarizerAgent
 import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Role
@@ -31,7 +32,8 @@ data class ConversationMessage(
     val role: Role,
     val content: String,
     val imageBase64: String? = null,
-    val attachment: TextAttachment? = null
+    val attachment: TextAttachment? = null,
+    val questionAsked: String? = null
 )
 
 sealed interface ConversationEvent {
@@ -41,6 +43,8 @@ sealed interface ConversationEvent {
     data object SearchStarted : ConversationEvent
     data class SearchQueriesPlanned(val queries: List<String>) : ConversationEvent
     data class SearchFinished(val outcome: WebSearchHelper.WebSearchOutcome) : ConversationEvent
+    data class QuestionAsked(val question: String, val options: List<String>) : ConversationEvent
+    data object ClarificationAnswered : ConversationEvent
     data class AssistantStarted(
         val id: String,
         val searchOutcome: WebSearchHelper.WebSearchOutcome?,
@@ -61,6 +65,7 @@ class ConversationEngine(
     private val processingLock = Mutex()
     private val history = mutableListOf<ConversationMessage>()
     private val _summaries = MutableStateFlow<List<Summary>>(emptyList())
+    private var activeQuestionBridge: QuestionBridge? = null
 
     val summaries = _summaries.asStateFlow()
     var client: LlmClient? = client
@@ -77,6 +82,8 @@ class ConversationEngine(
         this.webSearch = webSearch
         this.urlFetcher = urlFetcher
     }
+
+    fun answerPendingQuestion(text: String): Boolean = activeQuestionBridge?.send(text) ?: false
 
     fun clear() {
         history.clear()
@@ -200,11 +207,15 @@ class ConversationEngine(
 
         val response = StringBuilder()
         var failed = false
+        var askedQuestion: String? = null
+        val questionBridge = QuestionBridge()
+        activeQuestionBridge = questionBridge
         val turn = AgentTurn(
             client = activeClient,
             webSearch = webSearch,
             urlFetcher = urlFetcher,
-            webSearchEnabled = webSearchEnabled
+            webSearchEnabled = webSearchEnabled,
+            questionBridge = questionBridge
         )
         val agentUserText = buildString {
             userMessage.attachment?.let { append("[File: ${it.name}]\n${it.text}\n\n") }
@@ -229,10 +240,19 @@ class ConversationEngine(
                         emit(ConversationEvent.AnswerReset(event.retractedText))
                     }
                     is AgentTurnEvent.ToolCallStarted -> {
-                        if (event.name == "web_search") {
-                            emit(ConversationEvent.SearchStarted)
-                            val queries = toolCallQueries(event.args)
-                            if (queries.isNotEmpty()) emit(ConversationEvent.SearchQueriesPlanned(queries))
+                        when (event.name) {
+                            "web_search" -> {
+                                emit(ConversationEvent.SearchStarted)
+                                val queries = toolCallQueries(event.args)
+                                if (queries.isNotEmpty()) emit(ConversationEvent.SearchQueriesPlanned(queries))
+                            }
+                            "ask_user" -> {
+                                val question = (event.args["question"] as? String)?.trim().orEmpty()
+                                if (question.isNotBlank()) {
+                                    askedQuestion = question
+                                    emit(ConversationEvent.QuestionAsked(question, toolCallOptions(event.args)))
+                                }
+                            }
                         }
                     }
                     is AgentTurnEvent.ToolCallFinished -> {
@@ -241,6 +261,12 @@ class ConversationEngine(
                             "fetch_url" -> {
                                 emit(ConversationEvent.UrlFetchStarted)
                                 emit(ConversationEvent.UrlFetchFinished(toFetchResult(event.result)))
+                            }
+                            "ask_user" -> {
+                                (event.result["answer"] as? String)?.let { answer ->
+                                    history += ConversationMessage(Role.USER, answer)
+                                    emit(ConversationEvent.ClarificationAnswered)
+                                }
                             }
                         }
                     }
@@ -256,11 +282,13 @@ class ConversationEngine(
         } catch (e: Exception) {
             emit(ConversationEvent.Failed(e))
             return
+        } finally {
+            activeQuestionBridge = null
         }
         if (failed) return
 
         val assistantText = response.toString()
-        history += ConversationMessage(Role.ASSISTANT, assistantText)
+        history += ConversationMessage(Role.ASSISTANT, assistantText, questionAsked = askedQuestion)
         updateSummaries(activeClient, userMessage, assistantText)
         emit(ConversationEvent.Completed(assistantText, _summaries.value))
     }
@@ -330,6 +358,10 @@ class ConversationEngine(
     private fun toolCallQueries(args: Map<String, Any?>): List<String> =
         (args["queries"] as? List<*>)?.filterIsInstance<String>().orEmpty()
             .map { it.trim() }.filter { it.isNotBlank() }.distinctBy { it.lowercase() }
+
+    private fun toolCallOptions(args: Map<String, Any?>): List<String> =
+        (args["options"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+            .map { it.trim() }.filter { it.isNotBlank() }.take(4)
 }
 
 object MessageBuilder {
@@ -438,7 +470,10 @@ object MessageBuilder {
         systemMessage?.let { result += it }
         pairs.forEach { (user, assistant) ->
             result += LlmMessage(Role.USER, buildMessageContent(user), user.imageBase64)
-            result += LlmMessage(Role.ASSISTANT, assistant.content)
+            val assistantContent = assistant.questionAsked
+                ?.let { "You asked the user: \"$it\"\n\n${assistant.content}" }
+                ?: assistant.content
+            result += LlmMessage(Role.ASSISTANT, assistantContent)
         }
         finalUserMessage?.let { result += it }
         return result

@@ -10,6 +10,9 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 
+/** Sentinel returned by [AskUserTool] when the user skips a clarifying question. */
+const val ASK_USER_SKIP_ANSWER = "(The user did not provide an answer.)"
+
 /**
  * ADK function tool that runs the web-search fan-out/merge for an explicit query list chosen by the
  * model. Unlike the prompt-plan path, no query-generation LLM call is made here — the model has
@@ -60,6 +63,48 @@ class WebSearchTool(
         "week" -> SearchRecency.WEEK
         "month" -> SearchRecency.MONTH
         else -> SearchRecency.ANY
+    }
+}
+
+/**
+ * ADK function tool that pauses the turn until the user answers a clarifying question. The tool
+ * suspends on [QuestionBridge] so the agentic turn flow stays open across the wait.
+ */
+class AskUserTool(
+    private val bridge: QuestionBridge,
+    description: String
+) : FunctionTool(name = "ask_user", description = description) {
+
+    override fun declaration(): FunctionDeclaration = FunctionDeclaration(
+        name = "ask_user",
+        description = description,
+        parameters = Schema(
+            type = Type.OBJECT,
+            properties = mapOf(
+                "question" to Schema(
+                    type = Type.STRING,
+                    description = "The question to ask the user."
+                ),
+                "options" to Schema(
+                    type = Type.ARRAY,
+                    items = Schema(type = Type.STRING),
+                    description = "Optional 2-4 short answer choices to offer the user."
+                )
+            ),
+            required = listOf("question")
+        )
+    )
+
+    override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
+        val question = (args["question"] as? String)?.trim().orEmpty()
+        if (question.isBlank()) return mapOf("error" to "No question provided")
+
+        val answer = bridge.receive().trim()
+        return if (answer.isEmpty()) {
+            mapOf("answer" to ASK_USER_SKIP_ANSWER)
+        } else {
+            mapOf("answer" to answer)
+        }
     }
 }
 

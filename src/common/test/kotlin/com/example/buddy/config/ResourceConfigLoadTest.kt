@@ -63,6 +63,6 @@ class ResourceConfigLoadTest {
         config.defaults.run { reasoningChatLow; reasoningChatHigh; reasoningSearch }
         config.providers.llm.isNotEmpty()
         config.providers.webSearch.isNotEmpty()
-        config.agentic.run { enabledByDefault; agentName; agentDescription; maxSteps; baseInstruction; webSearchInstruction; fetchUrlInstruction; noToolsInstruction; webSearchToolDescription; fetchUrlToolDescription }
+        config.agentic.run { enabledByDefault; agentName; agentDescription; maxSteps; baseInstruction; webSearchInstruction; fetchUrlInstruction; noToolsInstruction; webSearchToolDescription; fetchUrlToolDescription; askUserInstruction; askUserToolDescription }
     }
 }

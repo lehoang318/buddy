@@ -44,7 +44,8 @@ class AgentTurn(
     private val client: LlmClient,
     private val webSearch: WebSearch?,
     private val urlFetcher: UrlFetcher?,
-    private val webSearchEnabled: Boolean
+    private val webSearchEnabled: Boolean,
+    private val questionBridge: QuestionBridge = QuestionBridge()
 ) {
 
     fun run(
@@ -64,13 +65,16 @@ class AgentTurn(
             if (urlFetcher != null) {
                 add(FetchUrlTool(urlFetcher, agentic.fetchUrlToolDescription))
             }
+            add(AskUserTool(questionBridge, agentic.askUserToolDescription))
         }
         val toolInstruction = when {
             tools.any { it.name == "web_search" } || tools.any { it.name == "fetch_url" } ->
                 buildList {
                     if (tools.any { it.name == "web_search" }) add(agentic.webSearchInstruction)
                     if (tools.any { it.name == "fetch_url" }) add(agentic.fetchUrlInstruction)
+                    if (tools.any { it.name == "ask_user" }) add(agentic.askUserInstruction)
                 }.joinToString("\n\n")
+            tools.any { it.name == "ask_user" } -> agentic.askUserInstruction
             else -> agentic.noToolsInstruction
         }
 
@@ -192,21 +196,41 @@ class AgentTurn(
     private fun formatRecentConversation(history: List<ConversationMessage>, maxPairs: Int): String {
         if (maxPairs <= 0) return ""
         val previous = if (history.lastOrNull()?.role == BuddyRole.USER) history.dropLast(1) else history
-        val pairs = mutableListOf<Pair<ConversationMessage, ConversationMessage>>()
+        val exchanges = mutableListOf<List<ConversationMessage>>()
         var index = 0
-        while (index < previous.size - 1) {
-            if (previous[index].role == BuddyRole.USER && previous[index + 1].role == BuddyRole.ASSISTANT) {
-                pairs += previous[index] to previous[index + 1]
-                index += 2
-            } else {
+        while (index < previous.size) {
+            val user = previous[index]
+            if (user.role != BuddyRole.USER) {
                 index++
+                continue
+            }
+            val second = previous.getOrNull(index + 1)
+            val third = previous.getOrNull(index + 2)
+            when {
+                second?.role == BuddyRole.ASSISTANT -> {
+                    exchanges += listOf(user, second)
+                    index += 2
+                }
+                second?.role == BuddyRole.USER && third?.role == BuddyRole.ASSISTANT && third.questionAsked != null -> {
+                    exchanges += listOf(user, second, third)
+                    index += 3
+                }
+                else -> index++
             }
         }
-        if (pairs.isEmpty()) return ""
+        if (exchanges.isEmpty()) return ""
         return buildString {
             appendLine("## Recent Conversation")
-            pairs.takeLast(maxPairs).forEach { (user, assistant) ->
+            exchanges.takeLast(maxPairs).forEach { exchange ->
+                val user = exchange.first()
+                val assistant = exchange.last()
                 appendLine("User: ${user.content}")
+                assistant.questionAsked?.let { question ->
+                    appendLine("Assistant asked: \"$question\"")
+                    if (exchange.size == 3) {
+                        appendLine("User answered: \"${exchange[1].content}\"")
+                    }
+                }
                 appendLine("Assistant: ${assistant.content}")
             }
         }.trimEnd()

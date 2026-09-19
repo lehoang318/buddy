@@ -111,6 +111,8 @@ class ResourceAppConfig(private val values: ResourceValues) : AppConfig {
         override val noToolsInstruction get() = values.string("agentic_no_tools_instruction")
         override val webSearchToolDescription get() = values.string("web_search_tool_description")
         override val fetchUrlToolDescription get() = values.string("fetch_url_tool_description")
+        override val askUserInstruction get() = values.string("agentic_ask_user_instruction")
+        override val askUserToolDescription get() = values.string("ask_user_tool_description")
     }
 
     override val debugLogging = true

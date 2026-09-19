@@ -49,7 +49,7 @@ private class CliApplication {
                         if (line.startsWith('/')) {
                             if (!handleCommand(line, input)) return
                         } else {
-                            sendMessage(line)
+                            sendMessage(line, input)
                         }
                     }
                 }
@@ -226,7 +226,7 @@ private class CliApplication {
         println("Attached ${file.name} for the next query.")
     }
 
-    private suspend fun sendMessage(text: String) {
+    private suspend fun sendMessage(text: String, input: TerminalInput) {
         val attachment = pendingAttachment
         pendingAttachment = null
         var responseStarted = false
@@ -238,6 +238,14 @@ private class CliApplication {
                 ConversationEvent.SearchStarted -> println("Searching the web...")
                 is ConversationEvent.SearchQueriesPlanned -> println("Queries: ${event.queries.joinToString(" | ")}")
                 is ConversationEvent.SearchFinished -> event.outcome.errorMessage?.let { println("Web search: $it") }
+                is ConversationEvent.QuestionAsked -> {
+                    if (responseStarted) println()
+                    println("Buddy asks: ${event.question}")
+                    event.options.forEachIndexed { index, option -> println("  ${index + 1}. $option") }
+                    val answer = readText(input, "You (answer)> ")
+                    engine.answerPendingQuestion(answer.orEmpty())
+                }
+                ConversationEvent.ClarificationAnswered -> println("Answer sent.")
                 is ConversationEvent.AssistantStarted -> {
                     responseStarted = true
                     print("Buddy> ")

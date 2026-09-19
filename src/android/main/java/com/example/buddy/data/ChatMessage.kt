@@ -17,5 +17,7 @@ data class ChatMessage(
     val webSearchQueries: List<String> = emptyList(),
     val agentThoughts: String = "",
     val thoughtsStreaming: Boolean = false,
+    val questionAsked: String? = null,
+    val questionAnswer: String? = null,
     val timestamp: Long = System.currentTimeMillis()
 )

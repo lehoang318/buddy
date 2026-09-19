@@ -119,6 +119,8 @@ interface AgenticConfig {
     val noToolsInstruction: String
     val webSearchToolDescription: String
     val fetchUrlToolDescription: String
+    val askUserInstruction: String
+    val askUserToolDescription: String
 }
 
 interface ProvidersConfig {

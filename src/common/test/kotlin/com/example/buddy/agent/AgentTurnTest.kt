@@ -27,6 +27,7 @@ class AgentTurnTest {
     private class ScriptedClient(private val scripts: List<List<LlmStreamEvent>>) : LlmClient {
         var calls = 0
         val toolsByCall = mutableListOf<List<LlmTool>?>()
+        val messagesByCall = mutableListOf<List<LlmMessage>>()
 
         override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> =
             flow { emit("unused") }
@@ -38,6 +39,7 @@ class AgentTurnTest {
             tools: List<LlmTool>?
         ): Flow<LlmStreamEvent> = flow {
             toolsByCall += tools
+            messagesByCall += messages
             val script = scripts.getOrElse(calls) { emptyList() }
             calls++
             script.forEach { emit(it) }
@@ -96,7 +98,7 @@ class AgentTurnTest {
 
         assertEquals("The answer", (events.last() as AgentTurnEvent.Completed).fullText)
         assertEquals(2, client.calls)
-        assertEquals("web_search", client.toolsByCall.first()?.single()?.name)
+        assertEquals(listOf("web_search", "ask_user"), client.toolsByCall.first()?.map { it.name })
     }
 
     @Test
@@ -116,7 +118,117 @@ class AgentTurnTest {
         ).collect { events += it }
 
         assertEquals("No tools", (events.last() as AgentTurnEvent.Completed).fullText)
-        assertEquals(null, client.toolsByCall.first())
+        assertEquals(listOf("ask_user"), client.toolsByCall.first()?.map { it.name })
+    }
+
+    @Test
+    fun waitsForUserAnswerThenFinishes() = runBlocking {
+        val client = ScriptedClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ToolCalls(
+                        listOf(
+                            LlmToolCall(
+                                id = "c1",
+                                name = "ask_user",
+                                arguments = "{\"question\":\"Which city?\",\"options\":[\"Paris\",\"Rome\"]}"
+                            )
+                        )
+                    ),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(
+                    LlmStreamEvent.TextDelta("Paris it is"),
+                    LlmStreamEvent.Finished("stop")
+                )
+            )
+        )
+        val bridge = QuestionBridge()
+        val events = mutableListOf<AgentTurnEvent>()
+
+        AgentTurn(client, webSearch = null, urlFetcher = null, webSearchEnabled = false, questionBridge = bridge).run(
+            userMessage = "book me a trip",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "book me a trip")),
+            summaries = emptyList()
+        ).collect { event ->
+            events += event
+            if (event is AgentTurnEvent.ToolCallStarted && event.name == "ask_user") {
+                assertTrue(bridge.send("Paris"))
+            }
+        }
+
+        val started = events.filterIsInstance<AgentTurnEvent.ToolCallStarted>().single()
+        assertEquals("ask_user", started.name)
+        assertEquals("Which city?", started.args["question"])
+
+        val finished = events.filterIsInstance<AgentTurnEvent.ToolCallFinished>().single()
+        assertEquals("ask_user", finished.name)
+        assertEquals("Paris", finished.result["answer"])
+
+        assertEquals("Paris it is", (events.last() as AgentTurnEvent.Completed).fullText)
+        assertEquals(2, client.calls)
+    }
+
+    @Test
+    fun replayIncludesClarifyingQuestionAndAnswer() = runBlocking {
+        val client = ScriptedClient(
+            listOf(
+                listOf(LlmStreamEvent.TextDelta("Fresh answer"), LlmStreamEvent.Finished("stop"))
+            )
+        )
+        val history = listOf(
+            ConversationMessage(Role.USER, "book me a trip"),
+            ConversationMessage(Role.USER, "Paris"),
+            ConversationMessage(Role.ASSISTANT, "Paris it is", questionAsked = "Which city?")
+        )
+
+        AgentTurn(client, webSearch = null, urlFetcher = null, webSearchEnabled = false).run(
+            userMessage = "and hotels?",
+            imageBase64 = null,
+            history = history,
+            summaries = emptyList()
+        ).collect { }
+
+        val system = client.messagesByCall.first().joinToString("\n") { it.content }
+        assertTrue(system.contains("User: book me a trip"))
+        assertTrue(system.contains("Assistant asked: \"Which city?\""))
+        assertTrue(system.contains("User answered: \"Paris\""))
+        assertTrue(system.contains("Assistant: Paris it is"))
+    }
+
+    @Test
+    fun blankAnswerUsesSkipSentinel() = runBlocking {
+        val client = ScriptedClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "ask_user", arguments = "{\"question\":\"Which city?\"}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(
+                    LlmStreamEvent.TextDelta("I'll pick for you"),
+                    LlmStreamEvent.Finished("stop")
+                )
+            )
+        )
+        val bridge = QuestionBridge()
+        val events = mutableListOf<AgentTurnEvent>()
+
+        AgentTurn(client, webSearch = null, urlFetcher = null, webSearchEnabled = false, questionBridge = bridge).run(
+            userMessage = "book me a trip",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "book me a trip")),
+            summaries = emptyList()
+        ).collect { event ->
+            events += event
+            if (event is AgentTurnEvent.ToolCallStarted && event.name == "ask_user") {
+                bridge.send("")
+            }
+        }
+
+        val finished = events.filterIsInstance<AgentTurnEvent.ToolCallFinished>().single()
+        assertTrue((finished.result["answer"] as? String)?.contains("did not provide") == true)
+        assertEquals("I'll pick for you", (events.last() as AgentTurnEvent.Completed).fullText)
     }
 
     @Test

@@ -76,6 +76,7 @@ fun InputBar(
     isOffline: Boolean,
     isProcessing: Boolean,
     isCancelling: Boolean,
+    answeringQuestion: Boolean,
     reasoningEffort: ReasoningEffort?,
     onToggleReasoning: () -> Unit,
     onTextChange: (String) -> Unit,
@@ -168,7 +169,16 @@ fun InputBar(
                 value = text,
                 onValueChange = onTextChange,
                 enabled = !isOffline,
-                placeholder = { Text(if (isOffline) "Offline mode" else "Message Buddy...", color = OnSurfaceVariant) },
+                placeholder = {
+                    Text(
+                        when {
+                            answeringQuestion -> "Type your answer..."
+                            isOffline -> "Offline mode"
+                            else -> "Message Buddy..."
+                        },
+                        color = OnSurfaceVariant
+                    )
+                },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -296,8 +306,10 @@ fun InputBar(
                 IconButton(
                     onClick = {
                         when {
-                            isProcessing && !isCancelling -> onCancel()
-                            !isProcessing -> onSend()
+                            isCancelling -> Unit
+                            answeringQuestion -> if (canSend) onSend() else onCancel()
+                            isProcessing -> onCancel()
+                            else -> onSend()
                         }
                     },
                     enabled = !isOffline && (isProcessing || canSend) && !isCancelling,
@@ -306,6 +318,7 @@ fun InputBar(
                         .background(
                             when {
                                 isCancelling -> Outline
+                                answeringQuestion && canSend -> SendButton
                                 isProcessing -> SendButton
                                 canSend && !isOffline -> SendButton
                                 else -> Outline
@@ -318,6 +331,12 @@ fun InputBar(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                             color = TextColor
+                        )
+                        answeringQuestion && canSend -> Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                         isProcessing -> Icon(
                             Icons.Default.Stop,

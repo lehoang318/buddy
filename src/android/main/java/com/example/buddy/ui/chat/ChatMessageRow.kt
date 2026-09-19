@@ -11,6 +11,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -52,6 +53,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -61,6 +64,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
+import com.example.buddy.agent.ASK_USER_SKIP_ANSWER
 import com.example.buddy.chat.MessageSegment
 import com.example.buddy.chat.splitIntoSegments
 import com.example.buddy.data.ChatMessage
@@ -77,7 +81,12 @@ import com.example.buddy.ui.theme.VintageBackground
 private const val THOUGHT_PREVIEW_LINES = 3
 
 @Composable
-fun MessageRow(message: ChatMessage) {
+fun MessageRow(
+    message: ChatMessage,
+    pendingOptions: List<String> = emptyList(),
+    onAnswerOption: (String) -> Unit = {},
+    onSkipAnswer: () -> Unit = {}
+) {
     val isUser = message.role == Role.USER
     val windowInfo = LocalWindowInfo.current
     val screenWidth = with(LocalDensity.current) { windowInfo.containerSize.width.toDp() }
@@ -91,6 +100,7 @@ fun MessageRow(message: ChatMessage) {
         animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
         label = "glow_alpha"
     )
+    val hasQa = !message.questionAsked.isNullOrBlank() || !message.questionAnswer.isNullOrBlank()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -104,8 +114,8 @@ fun MessageRow(message: ChatMessage) {
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            if (message.webSearchUsed) WebSearchPills(message.webSearchQueries)
-            if (message.webSearchSkipped) WebSearchSkippedPill()
+            if (!hasQa && message.webSearchUsed) WebSearchPills(message.webSearchQueries)
+            if (!hasQa && message.webSearchSkipped) WebSearchSkippedPill()
 
             message.imageBase64?.let { base64 ->
                 val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
@@ -139,9 +149,9 @@ fun MessageRow(message: ChatMessage) {
                 Spacer(Modifier.height(4.dp))
             }
 
-            if (message.content.isNotEmpty()) {
-                if (isUser) {
-                    val shape = RoundedCornerShape(8.dp)
+            if (isUser) {
+                if (message.content.isNotEmpty()) {
+                    val shape = RoundedCornerShape(8.dp, 8.dp, 0.dp, 8.dp)
                     Surface(
                         color = UserBubble,
                         shape = shape,
@@ -156,27 +166,76 @@ fun MessageRow(message: ChatMessage) {
                             )
                         }
                     }
-                } else {
-                    val segments = remember(message.content) { splitIntoSegments(message.content) }
-                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        segments.forEachIndexed { index, segment ->
-                            val isLast = index == segments.lastIndex
-                            val streaming = message.isStreaming && isLast
-                            when (segment) {
-                                is MessageSegment.Text -> TextSegmentBubble(
-                                    text = segment.content,
-                                    markdown = !streaming,
-                                    streaming = streaming,
+                }
+            } else {
+                val question = message.questionAsked?.takeIf { it.isNotBlank() }
+                val answer = message.questionAnswer?.takeIf { it.isNotBlank() }
+                val segments = remember(message.content) { splitIntoSegments(message.content) }
+                if (question != null || answer != null || segments.isNotEmpty()) {
+                    Column {
+                        if (question != null) {
+                            TextSegmentBubble(
+                                text = question,
+                                markdown = false,
+                                streaming = false,
+                                maxWidth = maxBubbleWidth,
+                                glowAlpha = glowAlpha,
+                                shape = segmentShape(0, 1)
+                            )
+                            if (pendingOptions.isNotEmpty()) {
+                                Spacer(Modifier.height(6.dp))
+                                QuestionOptions(
+                                    options = pendingOptions,
                                     maxWidth = maxBubbleWidth,
-                                    glowAlpha = glowAlpha
+                                    onAnswerOption = onAnswerOption,
+                                    onSkipAnswer = onSkipAnswer
                                 )
-                                is MessageSegment.Code -> CodeSegmentBubble(
-                                    lang = segment.lang,
-                                    code = segment.code,
-                                    streaming = streaming,
-                                    maxWidth = maxBubbleWidth,
-                                    glowAlpha = glowAlpha
-                                )
+                            }
+                        }
+                        if (answer != null) {
+                            Spacer(Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                AnswerBubble(text = answer, maxWidth = maxBubbleWidth)
+                            }
+                        }
+                        if (hasQa && (message.webSearchUsed || message.webSearchSkipped)) {
+                            Spacer(Modifier.height(6.dp))
+                            if (message.webSearchUsed) WebSearchPills(message.webSearchQueries)
+                            if (message.webSearchSkipped) WebSearchSkippedPill()
+                        }
+                        if (segments.isNotEmpty()) {
+                            if ((question != null || answer != null) &&
+                                !message.webSearchUsed && !message.webSearchSkipped
+                            ) {
+                                Spacer(Modifier.height(6.dp))
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                segments.forEachIndexed { index, segment ->
+                                    val isLast = index == segments.lastIndex
+                                    val streaming = message.isStreaming && isLast
+                                    val shape = segmentShape(index, segments.size)
+                                    when (segment) {
+                                        is MessageSegment.Text -> TextSegmentBubble(
+                                            text = segment.content,
+                                            markdown = !streaming,
+                                            streaming = streaming,
+                                            maxWidth = maxBubbleWidth,
+                                            glowAlpha = glowAlpha,
+                                            shape = shape
+                                        )
+                                        is MessageSegment.Code -> CodeSegmentBubble(
+                                            lang = segment.lang,
+                                            code = segment.code,
+                                            streaming = streaming,
+                                            maxWidth = maxBubbleWidth,
+                                            glowAlpha = glowAlpha,
+                                            shape = shape
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -230,6 +289,62 @@ fun MessageRow(message: ChatMessage) {
             }
         }
         if (!isUser) Spacer(Modifier.width(6.dp))
+    }
+}
+
+@Composable
+private fun AnswerBubble(text: String, maxWidth: Dp) {
+    val display = if (text == ASK_USER_SKIP_ANSWER) "(skipped)" else text
+    Surface(
+        color = UserBubble,
+        shape = RoundedCornerShape(8.dp, 8.dp, 0.dp, 8.dp),
+        modifier = Modifier.width(maxWidth)
+    ) {
+        SelectionContainer {
+            Text(
+                text = display,
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuestionOptions(
+    options: List<String>,
+    maxWidth: Dp,
+    onAnswerOption: (String) -> Unit,
+    onSkipAnswer: () -> Unit
+) {
+    Column(
+        modifier = Modifier.width(maxWidth),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        options.forEach { option ->
+            OptionPill(label = option, onClick = { onAnswerOption(option) })
+        }
+        OptionPill(label = "Skip", onClick = onSkipAnswer)
+    }
+}
+
+@Composable
+private fun OptionPill(label: String, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = SurfaceVariant,
+        border = BorderStroke(1.dp, Outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = label,
+            color = SendButton,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
     }
 }
 
@@ -297,12 +412,12 @@ private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlp
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .clickable { userCollapsed = false }
                 ) {
                     Surface(
                         color = VintageBackground,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(2.dp)
                     ) {
                         Text(
                             text = text.lines().take(THOUGHT_PREVIEW_LINES).joinToString("\n"),
@@ -328,7 +443,7 @@ private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlp
             } else {
                 Surface(
                     color = VintageBackground,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(2.dp)
                 ) {
                     val bodyModifier = Modifier.padding(10.dp)
                     if (streaming) {
@@ -342,15 +457,22 @@ private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlp
     }
 }
 
+private fun segmentShape(index: Int, count: Int): Shape = when {
+    count == 1 -> RoundedCornerShape(8.dp, 8.dp, 8.dp, 0.dp)
+    index == 0 -> RoundedCornerShape(8.dp, 8.dp, 0.dp, 0.dp)
+    index == count - 1 -> RoundedCornerShape(0.dp, 0.dp, 8.dp, 0.dp)
+    else -> RectangleShape
+}
+
 @Composable
 private fun TextSegmentBubble(
     text: String,
     markdown: Boolean,
     streaming: Boolean,
     maxWidth: Dp,
-    glowAlpha: Float
+    glowAlpha: Float,
+    shape: Shape
 ) {
-    val shape = RoundedCornerShape(8.dp)
     Surface(
         color = SurfaceVariant,
         shape = shape,

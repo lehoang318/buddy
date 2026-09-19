@@ -38,7 +38,9 @@ class BuddyAgentFactoryTest {
                 fetchUrlInstruction,
                 noToolsInstruction,
                 webSearchToolDescription,
-                fetchUrlToolDescription
+                fetchUrlToolDescription,
+                askUserInstruction,
+                askUserToolDescription
             ).forEach { value ->
                 assertFalse(value.contains('{'))
                 assertFalse(value.contains('}'))

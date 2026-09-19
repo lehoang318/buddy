@@ -117,6 +117,8 @@ class AndroidAppConfig(context: Context) : AppConfig {
         override val noToolsInstruction get() = res.getString(R.string.agentic_no_tools_instruction)
         override val webSearchToolDescription get() = res.getString(R.string.web_search_tool_description)
         override val fetchUrlToolDescription get() = res.getString(R.string.fetch_url_tool_description)
+        override val askUserInstruction get() = res.getString(R.string.agentic_ask_user_instruction)
+        override val askUserToolDescription get() = res.getString(R.string.ask_user_tool_description)
     }
 
     override val debugLogging = BuildConfig.DEBUG

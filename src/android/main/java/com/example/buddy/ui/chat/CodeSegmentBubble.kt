@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
@@ -79,7 +80,8 @@ fun CodeSegmentBubble(
     code: String,
     streaming: Boolean,
     maxWidth: Dp,
-    glowAlpha: Float
+    glowAlpha: Float,
+    shape: Shape
 ) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -90,7 +92,6 @@ fun CodeSegmentBubble(
     var userCollapsed by remember { mutableStateOf<Boolean?>(null) }
     val lineCount = code.lines().size
     val collapsed = userCollapsed ?: (!streaming && lineCount > COLLAPSE_LINE_THRESHOLD)
-    val shape = RoundedCornerShape(8.dp)
 
     Surface(
         color = SurfaceVariant,
@@ -187,12 +188,12 @@ fun CodeSegmentBubble(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .clickable { userCollapsed = false }
                 ) {
                     Surface(
                         color = VintageBackground,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(2.dp)
                     ) {
                         Text(
                             text = code.lines().take(COLLAPSED_PREVIEW_LINES).joinToString("\n"),
@@ -219,7 +220,7 @@ fun CodeSegmentBubble(
             } else {
                 Surface(
                     color = VintageBackground,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(2.dp)
                 ) {
                     SelectionContainer {
                         Text(
