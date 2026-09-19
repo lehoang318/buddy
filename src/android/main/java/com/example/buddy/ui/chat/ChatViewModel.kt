@@ -22,6 +22,7 @@ import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionMessage
 import com.example.buddy.data.SessionRepository
+import com.example.buddy.data.SettingsRepository
 import com.example.buddy.data.Summary
 import com.example.buddy.fetch.UrlFetcher
 import com.example.buddy.llm.LlmClient
@@ -56,6 +57,7 @@ data class ChatUiState(
     val pendingImageBase64: String? = null,
     val pendingFileUri: Uri? = null,
     val pendingFileName: String? = null,
+    val agenticMode: Boolean = false,
     val availableModels: List<LlmModel> = emptyList(),
     val selectedModel: String = "",
     val isOffline: Boolean = false,
@@ -78,6 +80,7 @@ class ChatViewModel(
 
     private val sessionManager = ChatSessionManager(SessionRepository(application))
     private val sessionImageStore = SessionImageStore(application)
+    private val settingsRepository = SettingsRepository(application)
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -129,15 +132,26 @@ class ChatViewModel(
     }
 
     fun updateSettings(settings: LlmSettings) {
+        conversationEngine.agenticMode = settings.agenticMode
         _uiState.update {
-            it.copy(generationConfig = LlmGenerationConfig(
-                temperature = settings.temperature.takeIf { v -> v > 0f },
-                topP = settings.topP.takeIf { v -> v > 0f },
-                topK = settings.topK.takeIf { v -> v > 0 },
-                maxTokens = settings.maxTokens.takeIf { v -> v > 0 },
-                reasoningEffort = it.generationConfig.reasoningEffort
-            ))
+            it.copy(
+                agenticMode = settings.agenticMode,
+                generationConfig = LlmGenerationConfig(
+                    temperature = settings.temperature.takeIf { v -> v > 0f },
+                    topP = settings.topP.takeIf { v -> v > 0f },
+                    topK = settings.topK.takeIf { v -> v > 0 },
+                    maxTokens = settings.maxTokens.takeIf { v -> v > 0 },
+                    reasoningEffort = it.generationConfig.reasoningEffort
+                )
+            )
         }
+    }
+
+    fun toggleAgenticMode() {
+        val next = !_uiState.value.agenticMode
+        conversationEngine.agenticMode = next
+        _uiState.update { it.copy(agenticMode = next) }
+        viewModelScope.launch { settingsRepository.updateAll(agenticMode = next) }
     }
 
     fun clearChat() {
@@ -405,6 +419,7 @@ class ChatViewModel(
 
         currentJob = viewModelScope.launch {
             var assistantId: String? = null
+            var plannedSearchQueries: List<String> = emptyList()
             try {
                 conversationEngine.webSearchEnabled = state.webSearchEnabled
                 val attachment = fileText?.let { TextAttachment(savedFileName ?: "unknown", it) }
@@ -444,6 +459,16 @@ class ChatViewModel(
                             ServiceHelper.onOperationStart(application)
                             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
                         }
+                        is ConversationEvent.SearchQueriesPlanned -> {
+                            plannedSearchQueries = event.queries
+                            assistantId?.let { id ->
+                                _uiState.update { current ->
+                                    current.copy(messages = current.messages.map { message ->
+                                        if (message.id == id) message.copy(webSearchUsed = true, webSearchQueries = event.queries) else message
+                                    })
+                                }
+                            }
+                        }
                         is ConversationEvent.SearchFinished -> {
                             event.outcome.errorMessage?.let { error ->
                                 val errorMsg = when {
@@ -465,9 +490,9 @@ class ChatViewModel(
                                         role = Role.ASSISTANT,
                                         content = "",
                                         isStreaming = true,
-                                        webSearchUsed = event.searchOutcome?.rawResults?.isNotEmpty() == true,
+                                        webSearchUsed = event.searchOutcome?.rawResults?.isNotEmpty() == true || plannedSearchQueries.isNotEmpty(),
                                         webSearchSkipped = event.searchOutcome?.skipped == true,
-                                        webSearchQueries = event.searchOutcome?.queries.orEmpty()
+                                        webSearchQueries = plannedSearchQueries.ifEmpty { event.searchOutcome?.queries.orEmpty() }
                                     ),
                                     isLoading = false,
                                     isStreaming = true
@@ -478,7 +503,21 @@ class ChatViewModel(
                         }
                         is ConversationEvent.Token -> _uiState.update { current ->
                             current.copy(messages = current.messages.map { message ->
-                                if (message.id == assistantId) message.copy(content = message.content + event.text) else message
+                                if (message.id == assistantId) message.copy(content = message.content + event.text, thoughtsStreaming = false) else message
+                            })
+                        }
+                        is ConversationEvent.ThoughtsDelta -> _uiState.update { current ->
+                            current.copy(messages = current.messages.map { message ->
+                                if (message.id == assistantId) message.copy(agentThoughts = message.agentThoughts + event.text, thoughtsStreaming = true) else message
+                            })
+                        }
+                        is ConversationEvent.AnswerReset -> _uiState.update { current ->
+                            current.copy(messages = current.messages.map { message ->
+                                if (message.id == assistantId) {
+                                    val thoughts = if (message.agentThoughts.isBlank()) event.retractedText
+                                    else message.agentThoughts + "\n\n" + event.retractedText
+                                    message.copy(content = "", agentThoughts = thoughts)
+                                } else message
                             })
                         }
                         is ConversationEvent.Completed -> {

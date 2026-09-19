@@ -44,6 +44,20 @@ android {
         buildConfig = true
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/io.netty.versions.properties"
+            )
+        }
+    }
+
     sourceSets {
         getByName("main") {
             java.directories.add("$rootDir/src/android/main/java")
@@ -122,4 +136,7 @@ dependencies {
 
     // WorkManager — Battery-optimized background scheduling
     implementation(libs.androidx.work.runtime.ktx)
+
+    // Agent Development Kit (ADK) for Kotlin — Android variant
+    implementation(libs.google.adk.kotlin.core.android)
 }

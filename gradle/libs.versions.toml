@@ -1,4 +1,5 @@
 [versions]
+adk = "1.0.0"
 agp = "9.1.1"
 coilCompose = "2.7.0"
 coreKtx = "1.18.0"
@@ -22,6 +23,8 @@ jline = "3.25.1"
 
 [libraries]
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
+google-adk-kotlin-core-android = { module = "com.google.adk:google-adk-kotlin-core-android", version.ref = "adk" }
+google-adk-kotlin-core-jvm = { module = "com.google.adk:google-adk-kotlin-core-jvm", version.ref = "adk" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }

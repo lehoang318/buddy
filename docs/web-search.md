@@ -33,6 +33,8 @@ sequenceDiagram
 
 Entry point: `WebSearchHelper.search()` (`src/common/main/kotlin/com/example/buddy/search/WebSearchHelper.kt`). Called from `ConversationEngine` before `MessageBuilder`, inside the same mutex-guarded turn described in [context-management.md](./context-management.md). Android and CLI consumers render the resulting engine events.
 
+Two execution modes feed the same display: the prompt-plan path above, and agentic mode where the model calls the `web_search` tool with its own query list. Both surface planned queries through `ConversationEvent.SearchQueriesPlanned` — the plan path via the optional `onQueriesPlanned` callback (invoked before fan-out), the agentic path from the `web_search` tool-call arguments.
+
 ## Step 1 — Query Plan Generation
 
 `LlmClient.generateSearchQuery()` (`src/common/main/kotlin/com/example/buddy/llm/LlmClient.kt`) asks the active model to convert the user's message into a plan:
@@ -94,7 +96,7 @@ Query validation deliberately stays narrow (length + line structure + multi-sent
 2. **Dedupe + clean**: the existing `cleanResults()` drops blank results and dedupes by `domain + title`, trims each result's content to `search_result_content_max_chars` (2000).
 3. **Cap**: the merged list is capped at `search_total_max_results` (10) — bounds the worst case (3 queries × 6 results = 18) down to a manageable prompt size.
 4. **Answer composition**: each provider that returns a native synthesized answer (see capability table below) contributes one. A single query's answer passes through unchanged; multiple queries' answers are joined as `**query text:** answer` paragraphs so the `### Search Engine Summary` section and the UI pill need no format-specific handling.
-5. **Query display**: the UI shows one pill per query (first reads "Searched: `<query>`", the rest show the bare query text) so multi-query searches don't get truncated behind a single ellipsized pill. EventLog still logs the full list joined with " · " for quick scanning.
+5. **Query display**: `ConversationEngine` emits `ConversationEvent.SearchQueriesPlanned` as soon as the plan is known — before fan-out in the prompt-plan path (`onQueriesPlanned`) and at `web_search` tool-call start in agentic mode. Android renders one pill per planned query on the assistant bubble (live during an agentic search), and the CLI prints `Queries: a | b`. Pills show the **planned** set (including queries that later fail or return nothing), falling back to the succeeded subset when no plan was emitted. EventLog still logs the full list joined with " · " for quick scanning.
 
 ## Recency → Provider Parameter Mapping
 

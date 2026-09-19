@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -90,13 +90,13 @@ fun CodeSegmentBubble(
     var userCollapsed by remember { mutableStateOf<Boolean?>(null) }
     val lineCount = code.lines().size
     val collapsed = userCollapsed ?: (!streaming && lineCount > COLLAPSE_LINE_THRESHOLD)
-    val shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
+    val shape = RoundedCornerShape(8.dp)
 
     Surface(
         color = SurfaceVariant,
         shape = shape,
         modifier = Modifier
-            .widthIn(max = maxWidth)
+            .width(maxWidth)
             .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {

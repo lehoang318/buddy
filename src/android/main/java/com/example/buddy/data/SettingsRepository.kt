@@ -3,6 +3,7 @@ package com.example.buddy.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -31,6 +32,7 @@ object SettingsKeys {
     val REASONING_EFFORT = stringPreferencesKey("llm_reasoning_effort")
     val SYSTEM_MESSAGE = stringPreferencesKey("llm_system_message")
     val WEBSEARCH_PROVIDER = stringPreferencesKey("websearch_provider")
+    val AGENTIC_MODE = booleanPreferencesKey("agentic_mode")
     val CUSTOM_LLM_PROVIDERS = stringPreferencesKey("custom_llm_providers")
     val CUSTOM_WEBSEARCH_PROVIDERS = stringPreferencesKey("custom_websearch_providers")
 }
@@ -49,6 +51,7 @@ class SettingsRepository(private val context: Context) {
             reasoningEffort = prefs[SettingsKeys.REASONING_EFFORT] ?: "",
             systemMessage = prefs[SettingsKeys.SYSTEM_MESSAGE] ?: AppConfigProvider.current.llm.defaultSystemMessage,
             webSearchProvider = prefs[SettingsKeys.WEBSEARCH_PROVIDER] ?: "",
+            agenticMode = prefs[SettingsKeys.AGENTIC_MODE] ?: AppConfigProvider.current.agentic.enabledByDefault,
             customLlmProvidersJson = prefs[SettingsKeys.CUSTOM_LLM_PROVIDERS] ?: "",
             customWebSearchProvidersJson = prefs[SettingsKeys.CUSTOM_WEBSEARCH_PROVIDERS] ?: ""
         )
@@ -63,7 +66,8 @@ class SettingsRepository(private val context: Context) {
         maxTokens: Int? = null,
         reasoningEffort: String? = null,
         systemMessage: String? = null,
-        webSearchProvider: String? = null
+        webSearchProvider: String? = null,
+        agenticMode: Boolean? = null
     ) {
         dataStore.edit { prefs ->
             provider?.let { prefs[SettingsKeys.PROVIDER] = it }
@@ -75,6 +79,7 @@ class SettingsRepository(private val context: Context) {
             reasoningEffort?.let { prefs[SettingsKeys.REASONING_EFFORT] = it }
             systemMessage?.let { prefs[SettingsKeys.SYSTEM_MESSAGE] = it }
             webSearchProvider?.let { prefs[SettingsKeys.WEBSEARCH_PROVIDER] = it }
+            agenticMode?.let { prefs[SettingsKeys.AGENTIC_MODE] = it }
         }
     }
 

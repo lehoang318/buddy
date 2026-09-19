@@ -2,6 +2,7 @@ package com.example.buddy.ui.parameters
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -28,7 +30,9 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +47,7 @@ import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
+import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -57,6 +62,7 @@ fun ParametersScreen(
 ) {
     val context = LocalContext.current
     val settingsRepository = remember { SettingsRepository(context) }
+    val scope = rememberCoroutineScope()
 
     val savedSettings by settingsRepository.settings.collectAsState(initial = initialSettings ?: LlmSettings())
     val effectiveInitial = initialSettings ?: savedSettings
@@ -146,6 +152,26 @@ fun ParametersScreen(
                 onValueChangeFinished = { onSaveParameters(temperature, topP, topK, systemMessage) },
                 valueDisplay = topK.toString()
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Agentic mode", color = TextColor, style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        "Let the model choose web search and URL fetching via tools",
+                        color = OnSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Switch(
+                    checked = savedSettings.agenticMode,
+                    onCheckedChange = { value ->
+                        scope.launch { settingsRepository.updateAll(agenticMode = value) }
+                    }
+                )
+            }
 
             OutlinedTextField(
                 value = systemMessage,

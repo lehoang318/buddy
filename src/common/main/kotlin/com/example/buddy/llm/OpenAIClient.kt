@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,6 +35,18 @@ private const val TAG = "LLM"
 
 private fun currentDateString(): String =
     LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy", Locale.US))
+
+private val REASONING_DELTA_KEYS = listOf("reasoning_content", "reasoning")
+
+internal fun reasoningTextFromDelta(delta: JsonObject): String? {
+    for (key in REASONING_DELTA_KEYS) {
+        val value = delta.get(key) ?: continue
+        if (value.isJsonNull || !value.isJsonPrimitive || !value.asJsonPrimitive.isString) continue
+        val text = value.asString
+        if (!text.isNullOrEmpty()) return text
+    }
+    return null
+}
 
 open class OpenAIClient internal constructor(
     protected val baseUrl: String,
@@ -51,7 +64,12 @@ open class OpenAIClient internal constructor(
         if (length != null && length > 0) contextLengths[modelId] = length else contextLengths.remove(modelId)
     }
 
-    internal open fun buildChatRequestBody(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): JsonObject {
+    internal open fun buildChatRequestBody(
+        messages: List<LlmMessage>,
+        model: String,
+        config: LlmGenerationConfig,
+        tools: List<LlmTool>? = null
+    ): JsonObject {
         val llmConfig = AppConfigProvider.current.llm
         val statedMaxTokens = config.maxTokens ?: llmConfig.maxTokens
         val hardMaxTokens = clampToContextWindow(
@@ -60,16 +78,7 @@ open class OpenAIClient internal constructor(
             maxTokens = statedMaxTokens * llmConfig.responseLimitMultiplier,
             minTokens = llmConfig.minResponseTokens
         )
-        val apiMessages = messages.map { msg ->
-            val messageObj = JsonObject()
-            messageObj.addProperty("role", msg.role.toApiRole())
-            if (msg.imageBase64 != null && msg.content.isNotBlank()) {
-                messageObj.add("content", buildMessageContent(msg.content, msg.imageBase64))
-            } else {
-                messageObj.addProperty("content", msg.content)
-            }
-            messageObj
-        }
+        val apiMessages = messages.map { msg -> buildApiMessage(msg) }
         return JsonObject().apply {
             addProperty("model", model)
             add("messages", JsonArray().apply { apiMessages.forEach { add(it) } })
@@ -79,6 +88,49 @@ open class OpenAIClient internal constructor(
             addProperty("top_k", config.topK ?: llmConfig.topK)
             addReasoningParameter(this, config.reasoningEffort, forSearchQuery = false)
             addProperty("stream", true)
+            if (!tools.isNullOrEmpty()) {
+                add("tools", JsonArray().apply {
+                    tools.forEach { tool ->
+                        add(JsonObject().apply {
+                            addProperty("type", "function")
+                            add("function", JsonObject().apply {
+                                addProperty("name", tool.name)
+                                addProperty("description", tool.description)
+                                add("parameters", tool.parameters)
+                            })
+                        })
+                    }
+                })
+                addProperty("tool_choice", "auto")
+            }
+        }
+    }
+
+    private fun buildApiMessage(msg: LlmMessage): JsonObject = JsonObject().apply {
+        addProperty("role", msg.role.toApiRole())
+        when {
+            msg.role == Role.TOOL -> {
+                addProperty("content", msg.content)
+                msg.toolCallId?.let { addProperty("tool_call_id", it) }
+            }
+            !msg.toolCalls.isNullOrEmpty() -> {
+                if (msg.content.isNotBlank()) addProperty("content", msg.content) else add("content", null)
+                add("tool_calls", JsonArray().apply {
+                    msg.toolCalls.forEach { call ->
+                        add(JsonObject().apply {
+                            addProperty("id", call.id)
+                            addProperty("type", "function")
+                            add("function", JsonObject().apply {
+                                addProperty("name", call.name)
+                                addProperty("arguments", call.arguments)
+                            })
+                        })
+                    }
+                })
+            }
+            msg.imageBase64 != null && msg.content.isNotBlank() ->
+                add("content", buildMessageContent(msg.content, msg.imageBase64))
+            else -> addProperty("content", msg.content)
         }
     }
 
@@ -177,8 +229,18 @@ open class OpenAIClient internal constructor(
         }
     }
 
-    override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> = flow {
-        val requestBody = buildChatRequestBody(messages, model, config)
+    override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> =
+        streamEvents(messages, model, config, tools = null).transform { event ->
+            if (event is LlmStreamEvent.TextDelta) emit(event.text)
+        }
+
+    override fun streamEvents(
+        messages: List<LlmMessage>,
+        model: String,
+        config: LlmGenerationConfig,
+        tools: List<LlmTool>?
+    ): Flow<LlmStreamEvent> = flow {
+        val requestBody = buildChatRequestBody(messages, model, config, tools)
 
         val request = Request.Builder()
             .url("$normalizedBaseUrl/chat/completions")
@@ -190,7 +252,7 @@ open class OpenAIClient internal constructor(
         var retryCount = 0
         var currentCall: Call? = null
         currentCoroutineContext()[Job]?.invokeOnCompletion { currentCall?.cancel() }
-        
+
         while (true) {
             try {
                 currentCall = httpClient.newCall(request)
@@ -199,6 +261,8 @@ open class OpenAIClient internal constructor(
                         throw Exception("API error ${response.code}: ${response.body?.string()}")
                     }
                     val source: BufferedSource = response.body!!.source()
+                    val toolCalls = sortedMapOf<Int, ToolCallAccumulator>()
+                    var finishReason: String? = null
                     while (!source.exhausted()) {
                         val line = source.readUtf8Line()?.trim() ?: break
                         if (line.isEmpty() || !line.startsWith("data:")) continue
@@ -208,11 +272,22 @@ open class OpenAIClient internal constructor(
                             val json = gson.fromJson(data, JsonObject::class.java)
                             val choices = json.getAsJsonArray("choices")
                             if (choices != null && choices.size() > 0) {
-                                val delta = choices[0].asJsonObject.getAsJsonObject("delta")
-                                if (delta != null && delta.has("content") && !delta.get("content").isJsonNull) {
+                                val choice = choices[0].asJsonObject
+                                choice.get("finish_reason")?.takeIf { !it.isJsonNull }?.asString?.let { finishReason = it }
+                                val delta = choice.getAsJsonObject("delta") ?: continue
+                                if (delta.has("content") && !delta.get("content").isJsonNull) {
                                     val content = delta.get("content").asString
-                                    if (!content.isNullOrEmpty()) {
-                                        emit(content)
+                                    if (!content.isNullOrEmpty()) emit(LlmStreamEvent.TextDelta(content))
+                                }
+                                reasoningTextFromDelta(delta)?.let { emit(LlmStreamEvent.ReasoningDelta(it)) }
+                                delta.getAsJsonArray("tool_calls")?.forEach { element ->
+                                    val obj = element.asJsonObject
+                                    val index = obj.get("index")?.takeIf { it.isJsonPrimitive }?.asInt ?: toolCalls.size
+                                    val accumulator = toolCalls.getOrPut(index) { ToolCallAccumulator() }
+                                    obj.get("id")?.takeIf { !it.isJsonNull }?.asString?.let { accumulator.id = it }
+                                    obj.getAsJsonObject("function")?.let { fn ->
+                                        fn.get("name")?.takeIf { !it.isJsonNull }?.asString?.let { accumulator.name = it }
+                                        fn.get("arguments")?.takeIf { !it.isJsonNull }?.asString?.let { accumulator.arguments.append(it) }
                                     }
                                 }
                             }
@@ -220,6 +295,10 @@ open class OpenAIClient internal constructor(
                             Log.warning(TAG, "SSE parse failed", e.message)
                         }
                     }
+                    if (toolCalls.isNotEmpty()) {
+                        emit(LlmStreamEvent.ToolCalls(toolCalls.values.map { it.toToolCall() }))
+                    }
+                    emit(LlmStreamEvent.Finished(finishReason))
                 }
                 break
             } catch (e: CancellationException) {
@@ -235,6 +314,18 @@ open class OpenAIClient internal constructor(
             }
         }
     }.flowOn(Dispatchers.IO)
+
+    private class ToolCallAccumulator {
+        var id: String = ""
+        var name: String = ""
+        val arguments = StringBuilder()
+
+        fun toToolCall(): LlmToolCall = LlmToolCall(
+            id = id.ifBlank { "call_${java.util.UUID.randomUUID()}" },
+            name = name,
+            arguments = arguments.toString().ifBlank { "{}" }
+        )
+    }
 
     protected open fun addReasoningParameter(requestBody: JsonObject, effort: ReasoningEffort?, forSearchQuery: Boolean = false) {
     }
@@ -656,6 +747,7 @@ open class OpenAIClient internal constructor(
             Role.USER -> "user"
             Role.ASSISTANT -> "assistant"
             Role.SYSTEM -> "system"
+            Role.TOOL -> "tool"
         }
     }
 

@@ -14,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -68,6 +72,9 @@ import com.example.buddy.ui.theme.SecondaryIcons
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.UserBubble
+import com.example.buddy.ui.theme.VintageBackground
+
+private const val THOUGHT_PREVIEW_LINES = 3
 
 @Composable
 fun MessageRow(message: ChatMessage) {
@@ -78,6 +85,12 @@ fun MessageRow(message: ChatMessage) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     var copied by remember { mutableStateOf(false) }
+    val infiniteTransition = rememberInfiniteTransition(label = "glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+        label = "glow_alpha"
+    )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -116,13 +129,23 @@ fun MessageRow(message: ChatMessage) {
                 Spacer(Modifier.height(4.dp))
             }
 
+            if (!isUser && message.agentThoughts.isNotBlank()) {
+                ThoughtsCard(
+                    text = message.agentThoughts,
+                    maxWidth = maxBubbleWidth,
+                    streaming = message.thoughtsStreaming,
+                    glowAlpha = glowAlpha
+                )
+                Spacer(Modifier.height(4.dp))
+            }
+
             if (message.content.isNotEmpty()) {
                 if (isUser) {
-                    val shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
+                    val shape = RoundedCornerShape(8.dp)
                     Surface(
                         color = UserBubble,
                         shape = shape,
-                        modifier = Modifier.widthIn(max = maxBubbleWidth)
+                        modifier = Modifier.width(maxBubbleWidth)
                     ) {
                         SelectionContainer {
                             Text(
@@ -135,12 +158,6 @@ fun MessageRow(message: ChatMessage) {
                     }
                 } else {
                     val segments = remember(message.content) { splitIntoSegments(message.content) }
-                    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-                    val glowAlpha by infiniteTransition.animateFloat(
-                        initialValue = 0.3f, targetValue = 0.8f,
-                        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
-                        label = "glow_alpha"
-                    )
                     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         segments.forEachIndexed { index, segment ->
                             val isLast = index == segments.lastIndex
@@ -217,6 +234,115 @@ fun MessageRow(message: ChatMessage) {
 }
 
 @Composable
+private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlpha: Float) {
+    val context = LocalContext.current
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    var copied by remember { mutableStateOf(false) }
+    var userCollapsed by remember { mutableStateOf<Boolean?>(null) }
+    val collapsed = userCollapsed ?: true
+    val wordCount = remember(text) { text.trim().split(Regex("\\s+")).count { it.isNotEmpty() } }
+    val shape = RoundedCornerShape(8.dp)
+
+    Surface(
+        color = SurfaceVariant,
+        shape = shape,
+        modifier = Modifier
+            .width(maxWidth)
+            .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Thoughts",
+                    color = OnSurfaceVariant,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                if (collapsed) {
+                    Text(
+                        text = "$wordCount words",
+                        color = OnSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = { userCollapsed = !collapsed },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = if (collapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                        contentDescription = if (collapsed) "Expand thoughts" else "Collapse thoughts",
+                        tint = SecondaryIcons,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("copied thoughts", text))
+                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                        copied = true
+                    },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = "Copy thoughts",
+                        tint = if (copied) UserBubble else SecondaryIcons,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            if (collapsed) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { userCollapsed = false }
+                ) {
+                    Surface(
+                        color = VintageBackground,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = text.lines().take(THOUGHT_PREVIEW_LINES).joinToString("\n"),
+                            color = OnSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.Transparent,
+                                        VintageBackground
+                                    )
+                                )
+                            )
+                    )
+                }
+            } else {
+                Surface(
+                    color = VintageBackground,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    val bodyModifier = Modifier.padding(10.dp)
+                    if (streaming) {
+                        RawTextRenderer(text = text, modifier = bodyModifier, textColor = OnSurfaceVariant)
+                    } else {
+                        MarkdownRenderer(markdown = text, modifier = bodyModifier, textColor = OnSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TextSegmentBubble(
     text: String,
     markdown: Boolean,
@@ -224,12 +350,12 @@ private fun TextSegmentBubble(
     maxWidth: Dp,
     glowAlpha: Float
 ) {
-    val shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
+    val shape = RoundedCornerShape(8.dp)
     Surface(
         color = SurfaceVariant,
         shape = shape,
         modifier = Modifier
-            .widthIn(max = maxWidth)
+            .width(maxWidth)
             .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
         val innerModifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)

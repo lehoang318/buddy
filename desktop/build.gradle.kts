@@ -41,6 +41,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.jline)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.google.adk.kotlin.core.jvm)
     runtimeOnly(libs.logback.classic)
 
     testImplementation(libs.junit)

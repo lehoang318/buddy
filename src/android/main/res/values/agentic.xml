@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="agentic_enabled_default">true</bool>
+    <string name="agent_name">buddy</string>
+    <string name="agent_description">A helpful assistant that can search the web and fetch URLs.</string>
+    <integer name="agent_max_steps">6</integer>
+
+    <string name="agentic_base_instruction"><![CDATA[## Instructions
+%1$s
+
+When you need to use a tool, call it without writing any prose first. Do not narrate your tool use. Reserve all text for the final answer after the tool calls are complete.
+
+Current date: %2$s
+Your response may not exceed %3$s tokens.]]></string>
+
+    <string name="agentic_web_search_instruction"><![CDATA[## Web Search
+You have a `web_search` tool. Use it whenever answering correctly needs current or external facts (news, prices, scores, weather, recent events, or any up-to-date information). Decide the queries yourself: use exactly one query for a simple question and 2-3 only when the question has genuinely independent parts. Keep each query short, keyword-like, and strip all personal data (names, emails, keys, account IDs). Prefer the tool over guessing for time-sensitive claims.]]></string>
+
+    <string name="agentic_fetch_url_instruction"><![CDATA[## Fetching URLs
+You have a `fetch_url` tool. Use it when the user gives you a link whose contents you need, or when a search result points to a page you must read in full. Cite the URL when you use its content.]]></string>
+
+    <string name="agentic_no_tools_instruction"><![CDATA[No external tools are available in this session. Answer from your own knowledge and say so plainly when you are unsure or when current information would be required.]]></string>
+
+    <string name="web_search_tool_description"><![CDATA[Search the web for current or external information. Provide 1-3 short keyword queries. Returns merged results with sources.]]></string>
+
+    <string name="fetch_url_tool_description"><![CDATA[Fetch the text content of a single http(s) URL and return it for analysis.]]></string>
+</resources>

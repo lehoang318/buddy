@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.History
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.NoteAdd
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -63,8 +65,10 @@ fun BuddyChatTopBar(
     isOffline: Boolean,
     webSearchEnabled: Boolean,
     webSearchAvailable: Boolean,
+    agenticMode: Boolean,
     onModelSelect: (String) -> Unit,
     onToggleWeb: () -> Unit,
+    onToggleAgentic: () -> Unit,
     onProviders: () -> Unit,
     onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
@@ -146,6 +150,23 @@ fun BuddyChatTopBar(
                         onClick = {
                             menuExpanded = false
                             onParameters()
+                        }
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.SmartToy,
+                                null,
+                                tint = if (agenticMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        text = { Text("Agentic mode", color = MaterialTheme.colorScheme.onSurface) },
+                        trailingIcon = {
+                            if (agenticMode) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleAgentic()
                         }
                     )
                     DropdownMenuItem(

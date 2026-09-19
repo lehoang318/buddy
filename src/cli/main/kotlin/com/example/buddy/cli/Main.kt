@@ -30,7 +30,9 @@ fun main() = runBlocking {
 
 private class CliApplication {
     private val keyProvider = EnvKeyProvider()
-    private val engine = ConversationEngine(urlFetcher = JsoupUrlFetcher())
+    private val engine = ConversationEngine(urlFetcher = JsoupUrlFetcher()).apply {
+        agenticMode = AppConfigProvider.current.agentic.enabledByDefault
+    }
     private val providers = AppConfigProvider.current.providers
     private var pendingAttachment: TextAttachment? = null
 
@@ -88,6 +90,11 @@ private class CliApplication {
                     engine.webSearchEnabled = !engine.webSearchEnabled
                     println("Web search ${if (engine.webSearchEnabled) "enabled" else "disabled"}.")
                 }
+                true
+            }
+            "/agent" -> {
+                engine.agenticMode = !engine.agenticMode
+                println("Agentic mode ${if (engine.agenticMode) "enabled" else "disabled"}.")
                 true
             }
             "/attach" -> {
@@ -229,6 +236,7 @@ private class CliApplication {
                 is ConversationEvent.UrlFetchFinished -> event.result.warnings.forEach { println("Warning: $it") }
                 is ConversationEvent.UserMessageAccepted -> Unit
                 ConversationEvent.SearchStarted -> println("Searching the web...")
+                is ConversationEvent.SearchQueriesPlanned -> println("Queries: ${event.queries.joinToString(" | ")}")
                 is ConversationEvent.SearchFinished -> event.outcome.errorMessage?.let { println("Web search: $it") }
                 is ConversationEvent.AssistantStarted -> {
                     responseStarted = true
@@ -239,6 +247,11 @@ private class CliApplication {
                     print(event.text)
                     System.out.flush()
                 }
+                is ConversationEvent.ThoughtsDelta -> {
+                    print(event.text)
+                    System.out.flush()
+                }
+                is ConversationEvent.AnswerReset -> println()
                 is ConversationEvent.Completed -> println()
                 is ConversationEvent.Failed -> {
                     if (responseStarted) println()
@@ -258,6 +271,7 @@ private class CliApplication {
         println("Available commands:")
         println("  /provider       Select LLM or web-search provider")
         println("  /web            Toggle web search on/off")
+        println("  /agent          Toggle agentic mode on/off")
         println("  /attach <path>  Attach a text file for the next query")
         println("  /help           Show this help message")
         println("  /exit           Exit the application")

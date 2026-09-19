@@ -26,6 +26,16 @@ class ResourceConfigLoadTest {
     }
 
     @Test
+    fun loadsAgenticConfig() {
+        assertTrue(config.agentic.enabledByDefault)
+        assertEquals("buddy", config.agentic.agentName)
+        assertEquals(6, config.agentic.maxSteps)
+        assertTrue(config.agentic.baseInstruction.contains("%1\$s"))
+        assertTrue(config.agentic.webSearchToolDescription.isNotBlank())
+        assertTrue(config.agentic.fetchUrlToolDescription.isNotBlank())
+    }
+
+    @Test
     fun loadsProviders() {
         assertEquals(
             listOf("fireworks", "together", "ollama", "openrouter", "siliconflow"),
@@ -53,5 +63,6 @@ class ResourceConfigLoadTest {
         config.defaults.run { reasoningChatLow; reasoningChatHigh; reasoningSearch }
         config.providers.llm.isNotEmpty()
         config.providers.webSearch.isNotEmpty()
+        config.agentic.run { enabledByDefault; agentName; agentDescription; maxSteps; baseInstruction; webSearchInstruction; fetchUrlInstruction; noToolsInstruction; webSearchToolDescription; fetchUrlToolDescription }
     }
 }

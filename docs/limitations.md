@@ -105,6 +105,23 @@ This document outlines the current technical limitations and constraints of the 
 - Providers that do not support reasoning will ignore the parameter
 - Current reasoning effort levels: **Low** and **High**
 
+### Agent Thoughts
+
+In agentic mode the model's reasoning is shown in a collapsible **Thoughts** bubble on the assistant bubble (styled like the code-segment bubbles) rather than leaking into the answer. It renders as raw text while deltas stream in and switches to markdown once reasoning stops. It is captured from two sources: provider reasoning deltas (`delta.reasoning_content` / `delta.reasoning`, emitted as ADK thought parts) and inline `<think>...</think>` blocks in streamed text (split out by `ThinkTagSplitter`). Pre-tool prose is retracted into the same bubble by `AnswerReset`.
+
+Known constraints (see [context-management.md](./context-management.md)):
+
+| Aspect | Limitation |
+|--------|------------|
+| **Non-reasoning models show no bubble** | Thoughts appear only if the active model streams a reasoning field or inline `<think>` blocks; a model that thinks silently or not at all produces nothing to display |
+| **Provider field names vary** | Only `reasoning_content` (DeepSeek, SiliconFlow, vLLM) and `reasoning` (OpenRouter) are read; a provider that emits reasoning under a different key would not be captured |
+| **Thoughts are ephemeral** | `agentThoughts` is UI-only and never persisted to a saved session, so the bubble is empty after resuming a chat |
+| **Reasoning is not replayed** | Thought parts are stripped when building the next model request, so the model does not see its previous turn's reasoning |
+
+### Agentic Instruction Templating
+
+ADK scans the agent instruction for `{variable}` placeholders and substitutes them from session state, throwing `Context variable not found: \`variable\`` when a placeholder is missing. Dynamic instruction content (system message, summaries, fetched page text, recent conversation) can contain arbitrary braces — for example `{style_block}` in fetched CSS/JS — so `BuddyAgentFactory` replaces `{`/`}` with fullwidth `｛`/`｝` before assembling the instruction. The model still reads the braces, but ADK no longer treats them as state placeholders. Static strings in `agentic.xml` are verified brace-free and are left untouched so literal braces remain usable there.
+
 ### Provider Architecture
 
 - All built-in and custom providers use the **OpenAI-compatible API** format

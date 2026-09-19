@@ -10,6 +10,9 @@ import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
 import com.example.buddy.llm.LlmMessage
 import com.example.buddy.llm.LlmModel
+import com.example.buddy.llm.LlmStreamEvent
+import com.example.buddy.llm.LlmTool
+import com.example.buddy.llm.LlmToolCall
 import com.example.buddy.llm.RawSearchResponse
 import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.search.SearchResponse
@@ -17,6 +20,7 @@ import com.example.buddy.search.SearchRecency
 import com.example.buddy.search.SearchResult
 import com.example.buddy.search.WebSearch
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.toList
@@ -65,6 +69,30 @@ class ConversationEngineTest {
 
         assertTrue(events.any { it is ConversationEvent.UrlFetchFinished })
         assertTrue(events.filterIsInstance<ConversationEvent.SearchFinished>().single().outcome.rawResults.isNotEmpty())
+        assertEquals(listOf("Buddy"), events.filterIsInstance<ConversationEvent.SearchQueriesPlanned>().single().queries)
+    }
+
+    @Test
+    fun `agentic turn surfaces planned web search queries`() = runBlocking {
+        val client = AgenticClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ReasoningDelta("thinking"),
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "web_search", arguments = """{"queries":["buddy"],"recency":"any"}"""))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(LlmStreamEvent.TextDelta("Done"), LlmStreamEvent.Finished("stop"))
+            )
+        )
+        val engine = ConversationEngine(client = client, webSearch = FakeWebSearch())
+        engine.agenticMode = true
+
+        val events = engine.send("search buddy", correlationId = "offline-test").toList()
+
+        assertEquals(listOf("buddy"), events.filterIsInstance<ConversationEvent.SearchQueriesPlanned>().single().queries)
+        assertTrue(events.any { it is ConversationEvent.SearchFinished })
+        assertEquals("thinking", events.filterIsInstance<ConversationEvent.ThoughtsDelta>().joinToString("") { it.text })
+        assertEquals("Done", events.filterIsInstance<ConversationEvent.Token>().joinToString("") { it.text })
     }
 
     @Test
@@ -107,6 +135,42 @@ class ConversationEngineTest {
             Summary("Compressed", listOf(SummaryPoint(summariesToCompress.joinToString { it.question })))
 
         override fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort = ReasoningEffort.HIGH
+    }
+
+    private class AgenticClient(private val scripts: List<List<LlmStreamEvent>>) : LlmClient {
+        private var calls = 0
+
+        override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> =
+            flowOf("unused")
+
+        override fun streamEvents(
+            messages: List<LlmMessage>,
+            model: String,
+            config: LlmGenerationConfig,
+            tools: List<LlmTool>?
+        ): Flow<LlmStreamEvent> = flow {
+            scripts.getOrElse(calls) { emptyList() }.forEach { emit(it) }
+            calls++
+        }
+
+        override suspend fun getModels(): List<LlmModel> = emptyList()
+
+        override suspend fun testConnection(): Boolean = true
+
+        override suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary>, correlationId: String?, imageBase64: String?): RawSearchResponse =
+            RawSearchResponse(null, null)
+
+        override suspend fun generateSummary(userQuestion: String, assistantResponse: String, model: String?, imageBase64: String?): Summary =
+            Summary(userQuestion, listOf(SummaryPoint(assistantResponse)))
+
+        override suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String?): Summary =
+            Summary("Compressed", listOf(SummaryPoint(summariesToCompress.joinToString { it.question })))
+
+        override fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort = ReasoningEffort.HIGH
+
+        override val defaultModel: String = "offline-model"
+        override var activeModel: String = defaultModel
+        override val isReasoningSupported: Boolean = false
     }
 
     private class FakeUrlFetcher : UrlFetcher {

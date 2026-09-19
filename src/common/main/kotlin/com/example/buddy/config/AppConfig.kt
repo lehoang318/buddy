@@ -108,6 +108,19 @@ interface EventsConfig {
     val maxDataLength: Int
 }
 
+interface AgenticConfig {
+    val enabledByDefault: Boolean
+    val agentName: String
+    val agentDescription: String
+    val maxSteps: Int
+    val baseInstruction: String
+    val webSearchInstruction: String
+    val fetchUrlInstruction: String
+    val noToolsInstruction: String
+    val webSearchToolDescription: String
+    val fetchUrlToolDescription: String
+}
+
 interface ProvidersConfig {
     val llm: List<LlmProvider>
     val webSearch: List<WebSearchProvider>
@@ -123,6 +136,7 @@ interface AppConfig {
     val defaults: ReasoningDefaultsConfig
     val events: EventsConfig
     val providers: ProvidersConfig
+    val agentic: AgenticConfig
     val debugLogging: Boolean
 }
 
