@@ -105,6 +105,8 @@ class ResourceAppConfig(private val values: ResourceValues) : AppConfig {
         override val agentName get() = values.string("agent_name")
         override val agentDescription get() = values.string("agent_description")
         override val maxSteps get() = values.integer("agent_max_steps")
+        override val standardSearchRounds get() = values.integer("agent_standard_search_rounds")
+        override val deepResearchSearchRounds get() = values.integer("agent_deep_research_search_rounds")
         override val baseInstruction get() = values.string("agentic_base_instruction")
         override val webSearchInstruction get() = values.string("agentic_web_search_instruction")
         override val fetchUrlInstruction get() = values.string("agentic_fetch_url_instruction")

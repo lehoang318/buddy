@@ -10,6 +10,7 @@ import com.example.buddy.llm.LlmStreamEvent
 import com.example.buddy.llm.LlmTool
 import com.example.buddy.llm.LlmToolCall
 import com.example.buddy.llm.RawSearchResponse
+import com.example.buddy.llm.ReasoningEffort
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
@@ -34,6 +35,7 @@ class OpenAICompatibleModelTest {
     private class CapturingClient : LlmClient {
         var lastMessages: List<LlmMessage> = emptyList()
         var lastTools: List<LlmTool>? = null
+        var lastConfig: LlmGenerationConfig? = null
         var scripted: List<LlmStreamEvent> = emptyList()
 
         override fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig): Flow<String> =
@@ -47,6 +49,7 @@ class OpenAICompatibleModelTest {
         ): Flow<LlmStreamEvent> = flow {
             lastMessages = messages
             lastTools = tools
+            lastConfig = config
             scripted.forEach { emit(it) }
         }
 
@@ -123,8 +126,7 @@ class OpenAICompatibleModelTest {
     }
 
     @Test
-    fun mapsStreamingTextAndToolCallsToLlmResponses() = runBlocking {
-        val client = CapturingClient().apply {
+    fun mapsStreamingTextAndToolCallsToLlmResponses() = runBlocking {        val client = CapturingClient().apply {
             scripted = listOf(
                 LlmStreamEvent.TextDelta("Hel"),
                 LlmStreamEvent.TextDelta("lo"),
@@ -146,5 +148,17 @@ class OpenAICompatibleModelTest {
         assertNotNull(call)
         assertEquals("web_search", call?.name)
         assertEquals("c9", call?.id)
+    }
+
+    @Test
+    fun passesReasoningEffortToClientConfig() = runBlocking {
+        val client = CapturingClient().apply {
+            scripted = listOf(LlmStreamEvent.TextDelta("hi"), LlmStreamEvent.Finished("stop"))
+        }
+        val model = OpenAICompatibleModel(client, "test-model", reasoningEffort = ReasoningEffort.DEEP)
+
+        model.generateContent(request(), stream = true).toList()
+
+        assertEquals(ReasoningEffort.DEEP, client.lastConfig?.reasoningEffort)
     }
 }

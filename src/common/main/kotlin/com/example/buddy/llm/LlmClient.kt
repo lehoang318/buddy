@@ -250,20 +250,12 @@ interface LlmClient {
             }
     }
 
-    fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort {
-        val next = when (current) {
-            ReasoningEffort.LOW -> ReasoningEffort.HIGH
-            ReasoningEffort.HIGH -> ReasoningEffort.LOW
-            else -> ReasoningEffort.HIGH
-        }
-        val effortStr = when (next) {
-            ReasoningEffort.LOW -> "low"
-            ReasoningEffort.HIGH -> "high"
-        }
+    fun toggleReasoning(current: ReasoningEffort?, webSearchEnabled: Boolean, agenticMode: Boolean): ReasoningEffort {
+        val next = current.cycle(webSearchEnabled && agenticMode)
         val message = if (isReasoningSupported) {
-            "Reasoning effort set: $effortStr"
+            "Reasoning effort set: ${next.label()}"
         } else {
-            "Reasoning effort set: $effortStr (not supported)"
+            "Reasoning effort set: ${next.label()} (not supported)"
         }
         Log.info(TAG_LLM, message)
         return next

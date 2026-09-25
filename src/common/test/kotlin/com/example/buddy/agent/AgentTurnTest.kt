@@ -122,6 +122,65 @@ class AgentTurnTest {
     }
 
     @Test
+    fun enforcesSearchRoundCap() = runBlocking {
+        var searchCalls = 0
+        val countingSearch = object : WebSearch {
+            override suspend fun search(query: String, recency: SearchRecency): SearchResponse {
+                searchCalls++
+                return SearchResponse(results = listOf(SearchResult(title = query, url = "https://example.com/$query", content = "content for $query")))
+            }
+            override fun isAvailable(): Boolean = true
+        }
+        val client = ScriptedClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "web_search", arguments = "{\"queries\":[\"one\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c2", name = "web_search", arguments = "{\"queries\":[\"two\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c3", name = "web_search", arguments = "{\"queries\":[\"three\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(LlmStreamEvent.TextDelta("Done"), LlmStreamEvent.Finished("stop"))
+            )
+        )
+
+        val events = mutableListOf<AgentTurnEvent>()
+        AgentTurn(client, countingSearch, urlFetcher = null, webSearchEnabled = true, searchRoundCap = 2).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { events += it }
+
+        val finished = events.filterIsInstance<AgentTurnEvent.ToolCallFinished>()
+        assertEquals(3, finished.size)
+        assertTrue((finished[2].result["error"] as? String)?.contains("round cap") == true)
+        assertEquals(2, searchCalls)
+    }
+
+    @Test
+    fun includesSearchCapHintInInstruction() = runBlocking {
+        val client = ScriptedClient(
+            listOf(listOf(LlmStreamEvent.TextDelta("No tools"), LlmStreamEvent.Finished("stop")))
+        )
+
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = true, searchRoundCap = 2).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { }
+
+        val instruction = client.messagesByCall.first().first().content
+        assertTrue(instruction.contains("at most 2 web_search calls"))
+    }
+
+    @Test
     fun waitsForUserAnswerThenFinishes() = runBlocking {
         val client = ScriptedClient(
             listOf(

@@ -16,7 +16,7 @@ class OllamaCloudClient(
         val effortStr = when {
             forSearchQuery -> AppConfigProvider.current.defaults.reasoningSearch
             effort == ReasoningEffort.LOW -> AppConfigProvider.current.defaults.reasoningChatLow
-            effort == ReasoningEffort.HIGH -> AppConfigProvider.current.defaults.reasoningChatHigh
+            effort == ReasoningEffort.HIGH || effort == ReasoningEffort.DEEP -> AppConfigProvider.current.defaults.reasoningChatHigh
             else -> return
         }
         requestBody.addProperty("reasoning_effort", effortStr)

@@ -2,9 +2,11 @@ package com.example.buddy.ui.chat
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -26,11 +29,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -41,7 +44,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +59,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -65,6 +73,9 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import com.example.buddy.ui.theme.VintageBackground
+import kotlinx.coroutines.delay
+
+private const val REASONING_LOCK_MS = 1_000L
 
 @Composable
 fun InputBar(
@@ -96,6 +107,21 @@ fun InputBar(
 ) {
     val canSend = text.isNotBlank()
     val imageOnly = pendingImage != null && text.isBlank()
+
+    val context = LocalContext.current
+    var lastReasoning by remember { mutableStateOf(reasoningEffort) }
+    var reasoningLocked by remember { mutableStateOf(false) }
+    LaunchedEffect(reasoningEffort) {
+        if (reasoningEffort == ReasoningEffort.DEEP && reasoningEffort != lastReasoning) {
+            val toast = Toast.makeText(context, "Reasoning: deep research", Toast.LENGTH_SHORT)
+            toast.show()
+            reasoningLocked = true
+            delay(REASONING_LOCK_MS)
+            toast.cancel()
+            reasoningLocked = false
+        }
+        lastReasoning = reasoningEffort
+    }
 
     Column(
         modifier = Modifier
@@ -284,23 +310,44 @@ fun InputBar(
 
             Row(
                 modifier = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onToggleReasoning,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
+                Box(
+                    modifier = Modifier.width(44.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Lightbulb,
-                        contentDescription = "Toggle Reasoning",
-                        tint = when {
-                            isOffline -> OnSurfaceVariant
-                            reasoningEffort == ReasoningEffort.HIGH -> SendButton
-                            else -> SecondaryIcons
+                    if (reasoningEffort == ReasoningEffort.DEEP) {
+                        IconButton(
+                            onClick = onToggleReasoning,
+                            enabled = !isOffline && !reasoningLocked,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.AllInclusive,
+                                contentDescription = "Reasoning: deep research",
+                                tint = if (isOffline) OnSurfaceVariant else SendButton
+                            )
                         }
-                    )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !isOffline && !reasoningLocked, onClick = onToggleReasoning)
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (reasoningEffort == ReasoningEffort.HIGH) "High" else "Low",
+                                color = when {
+                                    isOffline -> OnSurfaceVariant
+                                    reasoningEffort == ReasoningEffort.HIGH -> SendButton
+                                    else -> SecondaryIcons
+                                },
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
 
                 IconButton(

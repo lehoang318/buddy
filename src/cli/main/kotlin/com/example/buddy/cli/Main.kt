@@ -13,6 +13,9 @@ import com.example.buddy.data.WebSearchProvider
 import com.example.buddy.fetch.JsoupUrlFetcher
 import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmClientFactory
+import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.llm.cycle
+import com.example.buddy.llm.label
 import com.example.buddy.search.WebSearch
 import com.example.buddy.search.WebSearchFactory
 import com.example.buddy.logging.DesktopLogger
@@ -88,13 +91,31 @@ private class CliApplication {
                     println("Select a web provider first with /provider.")
                 } else {
                     engine.webSearchEnabled = !engine.webSearchEnabled
+                    if (!engine.webSearchEnabled && engine.reasoningEffort == ReasoningEffort.DEEP) {
+                        engine.reasoningEffort = ReasoningEffort.HIGH
+                    }
                     println("Web search ${if (engine.webSearchEnabled) "enabled" else "disabled"}.")
                 }
                 true
             }
             "/agent" -> {
                 engine.agenticMode = !engine.agenticMode
+                if (!engine.agenticMode && engine.reasoningEffort == ReasoningEffort.DEEP) {
+                    engine.reasoningEffort = ReasoningEffort.HIGH
+                }
                 println("Agentic mode ${if (engine.agenticMode) "enabled" else "disabled"}.")
+                true
+            }
+            "/reasoning" -> {
+                val deepAvailable = engine.webSearchEnabled && engine.agenticMode
+                engine.reasoningEffort = engine.reasoningEffort.cycle(deepAvailable)
+                val roundInfo = when {
+                    !engine.webSearchEnabled -> "web search disabled"
+                    engine.reasoningEffort == ReasoningEffort.DEEP ->
+                        "${AppConfigProvider.current.agentic.deepResearchSearchRounds} search rounds"
+                    else -> "${AppConfigProvider.current.agentic.standardSearchRounds} search rounds"
+                }
+                println("Reasoning: ${engine.reasoningEffort.label()} ($roundInfo).")
                 true
             }
             "/attach" -> {
@@ -280,6 +301,7 @@ private class CliApplication {
         println("  /provider       Select LLM or web-search provider")
         println("  /web            Toggle web search on/off")
         println("  /agent          Toggle agentic mode on/off")
+        println("  /reasoning      Cycle reasoning: low / high / deep research")
         println("  /attach <path>  Attach a text file for the next query")
         println("  /help           Show this help message")
         println("  /exit           Exit the application")

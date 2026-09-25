@@ -7,6 +7,7 @@ import com.example.buddy.llm.LlmMessage
 import com.example.buddy.llm.LlmStreamEvent
 import com.example.buddy.llm.LlmTool
 import com.example.buddy.llm.LlmToolCall
+import com.example.buddy.llm.ReasoningEffort
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
@@ -81,7 +82,8 @@ internal fun dataUriToBlob(dataUri: String): Blob? {
  */
 class OpenAICompatibleModel(
     private val client: LlmClient,
-    override val name: String
+    override val name: String,
+    private val reasoningEffort: ReasoningEffort? = null
 ) : Model {
     private val gson = Gson()
 
@@ -101,7 +103,8 @@ class OpenAICompatibleModel(
             temperature = request.config.temperature,
             topP = request.config.topP,
             topK = request.config.topK,
-            maxTokens = request.config.maxOutputTokens
+            maxTokens = request.config.maxOutputTokens,
+            reasoningEffort = reasoningEffort
         )
 
         val text = StringBuilder()

@@ -7,6 +7,7 @@ import com.example.buddy.data.Summary
 import com.example.buddy.fetch.FetchedUrl
 import com.example.buddy.fetch.UrlFetcher
 import com.example.buddy.llm.LlmClient
+import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.search.WebSearch
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
@@ -45,7 +46,9 @@ class AgentTurn(
     private val webSearch: WebSearch?,
     private val urlFetcher: UrlFetcher?,
     private val webSearchEnabled: Boolean,
-    private val questionBridge: QuestionBridge = QuestionBridge()
+    private val questionBridge: QuestionBridge = QuestionBridge(),
+    private val reasoningEffort: ReasoningEffort? = null,
+    private val searchRoundCap: Int? = null
 ) {
 
     fun run(
@@ -60,7 +63,7 @@ class AgentTurn(
 
         val tools = buildList {
             if (webSearchEnabled && webSearch != null) {
-                add(WebSearchTool(webSearch, agentic.webSearchToolDescription))
+                add(WebSearchTool(webSearch, agentic.webSearchToolDescription, roundCap = searchRoundCap))
             }
             if (urlFetcher != null) {
                 add(FetchUrlTool(urlFetcher, agentic.fetchUrlToolDescription))
@@ -70,7 +73,12 @@ class AgentTurn(
         val toolInstruction = when {
             tools.any { it.name == "web_search" } || tools.any { it.name == "fetch_url" } ->
                 buildList {
-                    if (tools.any { it.name == "web_search" }) add(agentic.webSearchInstruction)
+                    if (tools.any { it.name == "web_search" }) {
+                        add(agentic.webSearchInstruction)
+                        searchRoundCap?.let {
+                            add("You may run at most $it web_search calls this turn. Once the cap is reached, answer using the results already collected.")
+                        }
+                    }
                     if (tools.any { it.name == "fetch_url" }) add(agentic.fetchUrlInstruction)
                     if (tools.any { it.name == "ask_user" }) add(agentic.askUserInstruction)
                 }.joinToString("\n\n")
@@ -88,7 +96,7 @@ class AgentTurn(
             toolInstruction = toolInstruction
         )
 
-        val model = OpenAICompatibleModel(client, client.activeModel)
+        val model = OpenAICompatibleModel(client, client.activeModel, reasoningEffort = reasoningEffort)
         val agent = BuddyAgentFactory.buildRootAgent(model, instruction, tools, agentic)
 
         val parts = mutableListOf(Part(text = userMessage))

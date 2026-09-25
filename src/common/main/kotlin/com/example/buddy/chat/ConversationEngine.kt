@@ -14,6 +14,7 @@ import com.example.buddy.fetch.extractUrls
 import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
 import com.example.buddy.llm.LlmMessage
+import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.logging.Log
 import com.example.buddy.search.SearchResult
 import com.example.buddy.search.WebSearch
@@ -76,6 +77,7 @@ class ConversationEngine(
         private set
     var webSearchEnabled: Boolean = true
     var agenticMode: Boolean = false
+    var reasoningEffort: ReasoningEffort? = null
 
     fun updateDependencies(client: LlmClient?, webSearch: WebSearch?, urlFetcher: UrlFetcher?) {
         this.client = client
@@ -131,7 +133,7 @@ class ConversationEngine(
             }
 
             if (agenticMode) {
-                runAgenticTurn(activeClient, userMessage, fetchedUrls, correlationId)
+                runAgenticTurn(activeClient, userMessage, fetchedUrls, generationConfig, correlationId)
             } else {
                 runLegacyTurn(activeClient, searchProvider, userMessage, fetchedUrls, generationConfig, correlationId)
             }
@@ -146,6 +148,7 @@ class ConversationEngine(
         generationConfig: LlmGenerationConfig,
         correlationId: String
     ) {
+        val config = generationConfig.copy(reasoningEffort = reasoningEffort ?: generationConfig.reasoningEffort)
         val searchOutcome = if (webSearchEnabled && searchProvider != null && userMessage.content.isNotBlank()) {
             emit(ConversationEvent.SearchStarted)
             val outcome = WebSearchHelper(activeClient, searchProvider).search(
@@ -170,14 +173,14 @@ class ConversationEngine(
             searchResults = searchOutcome?.rawResults.orEmpty(),
             fetchedUrls = fetchedUrls,
             searchAnswer = searchOutcome?.answer,
-            outputLimit = generationConfig.maxTokens
+            outputLimit = config.maxTokens
         )
         val response = StringBuilder()
         try {
             activeClient.streamCompletionWithLogging(
                 messages,
                 activeClient.activeModel,
-                generationConfig,
+                config,
                 correlationId
             ).collect { token ->
                 response.append(token)
@@ -200,11 +203,19 @@ class ConversationEngine(
         activeClient: LlmClient,
         userMessage: ConversationMessage,
         fetchedUrls: List<FetchedUrl>,
+        generationConfig: LlmGenerationConfig,
         correlationId: String
     ) {
         val assistantId = UUID.randomUUID().toString()
         emit(ConversationEvent.AssistantStarted(assistantId, null, fetchedUrls))
 
+        val effort = reasoningEffort ?: generationConfig.reasoningEffort
+        val searchRoundCap = if (webSearchEnabled) {
+            if (effort == ReasoningEffort.DEEP) AppConfigProvider.current.agentic.deepResearchSearchRounds
+            else AppConfigProvider.current.agentic.standardSearchRounds
+        } else {
+            null
+        }
         val response = StringBuilder()
         var failed = false
         var askedQuestion: String? = null
@@ -215,7 +226,9 @@ class ConversationEngine(
             webSearch = webSearch,
             urlFetcher = urlFetcher,
             webSearchEnabled = webSearchEnabled,
-            questionBridge = questionBridge
+            questionBridge = questionBridge,
+            reasoningEffort = effort,
+            searchRoundCap = searchRoundCap
         )
         val agentUserText = buildString {
             userMessage.attachment?.let { append("[File: ${it.name}]\n${it.text}\n\n") }

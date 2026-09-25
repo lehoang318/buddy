@@ -131,8 +131,10 @@ class ChatViewModel(
     }
 
     fun toggleReasoningEffort() {
-        val current = _uiState.value.generationConfig.reasoningEffort
-        val next = llmClient?.toggleReasoning(current) ?: ReasoningEffort.HIGH
+        val state = _uiState.value
+        val current = state.generationConfig.reasoningEffort
+        val next = llmClient?.toggleReasoning(current, state.webSearchEnabled, state.agenticMode)
+            ?: ReasoningEffort.HIGH
         _uiState.update {
             it.copy(generationConfig = it.generationConfig.copy(reasoningEffort = next))
         }
@@ -157,7 +159,17 @@ class ChatViewModel(
     fun toggleAgenticMode() {
         val next = !_uiState.value.agenticMode
         conversationEngine.agenticMode = next
-        _uiState.update { it.copy(agenticMode = next) }
+        _uiState.update {
+            val effort = if (!next && it.generationConfig.reasoningEffort == ReasoningEffort.DEEP) {
+                ReasoningEffort.HIGH
+            } else {
+                it.generationConfig.reasoningEffort
+            }
+            it.copy(
+                agenticMode = next,
+                generationConfig = it.generationConfig.copy(reasoningEffort = effort)
+            )
+        }
         viewModelScope.launch { settingsRepository.updateAll(agenticMode = next) }
     }
 
@@ -408,7 +420,18 @@ class ChatViewModel(
     }
 
     fun toggleWebSearch() {
-        _uiState.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
+        _uiState.update {
+            val enabled = !it.webSearchEnabled
+            val effort = if (!enabled && it.generationConfig.reasoningEffort == ReasoningEffort.DEEP) {
+                ReasoningEffort.HIGH
+            } else {
+                it.generationConfig.reasoningEffort
+            }
+            it.copy(
+                webSearchEnabled = enabled,
+                generationConfig = it.generationConfig.copy(reasoningEffort = effort)
+            )
+        }
     }
 
     fun cancelRequest() {

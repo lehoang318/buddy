@@ -111,6 +111,8 @@ class AndroidAppConfig(context: Context) : AppConfig {
         override val agentName get() = res.getString(R.string.agent_name)
         override val agentDescription get() = res.getString(R.string.agent_description)
         override val maxSteps get() = res.getInteger(R.integer.agent_max_steps)
+        override val standardSearchRounds get() = res.getInteger(R.integer.agent_standard_search_rounds)
+        override val deepResearchSearchRounds get() = res.getInteger(R.integer.agent_deep_research_search_rounds)
         override val baseInstruction get() = res.getString(R.string.agentic_base_instruction)
         override val webSearchInstruction get() = res.getString(R.string.agentic_web_search_instruction)
         override val fetchUrlInstruction get() = res.getString(R.string.agentic_fetch_url_instruction)

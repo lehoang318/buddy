@@ -134,7 +134,7 @@ class ConversationEngineTest {
         override suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String?): Summary =
             Summary("Compressed", listOf(SummaryPoint(summariesToCompress.joinToString { it.question })))
 
-        override fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort = ReasoningEffort.HIGH
+        override fun toggleReasoning(current: ReasoningEffort?, webSearchEnabled: Boolean, agenticMode: Boolean): ReasoningEffort = ReasoningEffort.HIGH
     }
 
     private class AgenticClient(private val scripts: List<List<LlmStreamEvent>>) : LlmClient {
@@ -166,7 +166,7 @@ class ConversationEngineTest {
         override suspend fun compressSummaries(summariesToCompress: List<Summary>, model: String?): Summary =
             Summary("Compressed", listOf(SummaryPoint(summariesToCompress.joinToString { it.question })))
 
-        override fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort = ReasoningEffort.HIGH
+        override fun toggleReasoning(current: ReasoningEffort?, webSearchEnabled: Boolean, agenticMode: Boolean): ReasoningEffort = ReasoningEffort.HIGH
 
         override val defaultModel: String = "offline-model"
         override var activeModel: String = defaultModel

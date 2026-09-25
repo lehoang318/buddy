@@ -20,8 +20,11 @@ const val ASK_USER_SKIP_ANSWER = "(The user did not provide an answer.)"
  */
 class WebSearchTool(
     private val webSearch: WebSearch,
-    description: String
+    description: String,
+    private val roundCap: Int? = null
 ) : FunctionTool(name = "web_search", description = description) {
+
+    private var rounds = 0
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
         name = "web_search",
@@ -47,6 +50,10 @@ class WebSearchTool(
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
         val queries = (args["queries"] as? List<*>)?.mapNotNull { it as? String }?.filter { it.isNotBlank() }.orEmpty()
         if (queries.isEmpty()) return mapOf("error" to "No queries provided")
+        if (roundCap != null && rounds >= roundCap) {
+            return mapOf("error" to "Web search round cap of $roundCap reached. Answer using the results collected so far.")
+        }
+        rounds++
 
         val outcome = WebSearchHelper.searchQueries(webSearch, queries, parseRecency(args["recency"] as? String))
         val result = linkedMapOf<String, Any?>()

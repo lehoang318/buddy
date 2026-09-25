@@ -30,6 +30,8 @@ class ResourceConfigLoadTest {
         assertTrue(config.agentic.enabledByDefault)
         assertEquals("buddy", config.agentic.agentName)
         assertEquals(6, config.agentic.maxSteps)
+        assertEquals(2, config.agentic.standardSearchRounds)
+        assertEquals(5, config.agentic.deepResearchSearchRounds)
         assertTrue(config.agentic.baseInstruction.contains("%1\$s"))
         assertTrue(config.agentic.webSearchToolDescription.isNotBlank())
         assertTrue(config.agentic.fetchUrlToolDescription.isNotBlank())
@@ -63,6 +65,6 @@ class ResourceConfigLoadTest {
         config.defaults.run { reasoningChatLow; reasoningChatHigh; reasoningSearch }
         config.providers.llm.isNotEmpty()
         config.providers.webSearch.isNotEmpty()
-        config.agentic.run { enabledByDefault; agentName; agentDescription; maxSteps; baseInstruction; webSearchInstruction; fetchUrlInstruction; noToolsInstruction; webSearchToolDescription; fetchUrlToolDescription; askUserInstruction; askUserToolDescription }
+        config.agentic.run { enabledByDefault; agentName; agentDescription; maxSteps; standardSearchRounds; deepResearchSearchRounds; baseInstruction; webSearchInstruction; fetchUrlInstruction; noToolsInstruction; webSearchToolDescription; fetchUrlToolDescription; askUserInstruction; askUserToolDescription }
     }
 }

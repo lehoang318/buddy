@@ -113,6 +113,8 @@ interface AgenticConfig {
     val agentName: String
     val agentDescription: String
     val maxSteps: Int
+    val standardSearchRounds: Int
+    val deepResearchSearchRounds: Int
     val baseInstruction: String
     val webSearchInstruction: String
     val fetchUrlInstruction: String
