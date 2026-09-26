@@ -29,13 +29,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +68,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.ui.theme.OnSurfaceVariant
@@ -90,6 +95,9 @@ fun InputBar(
     answeringQuestion: Boolean,
     reasoningEffort: ReasoningEffort?,
     onToggleReasoning: () -> Unit,
+    webSearchEnabled: Boolean,
+    webSearchAvailable: Boolean,
+    onToggleWebSearch: () -> Unit,
     onTextChange: (String) -> Unit,
     onClearImage: () -> Unit,
     onClearFile: () -> Unit,
@@ -111,6 +119,7 @@ fun InputBar(
     val context = LocalContext.current
     var lastReasoning by remember { mutableStateOf(reasoningEffort) }
     var reasoningLocked by remember { mutableStateOf(false) }
+    var showAddMenu by remember { mutableStateOf(false) }
     LaunchedEffect(reasoningEffort) {
         if (reasoningEffort == ReasoningEffort.DEEP && reasoningEffort != lastReasoning) {
             val toast = Toast.makeText(context, "Reasoning: deep research", Toast.LENGTH_SHORT)
@@ -241,28 +250,77 @@ fun InputBar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onPickAttachment,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AttachFile,
-                        contentDescription = "Attach",
-                        tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
-                    )
+                Box {
+                    IconButton(
+                        onClick = { showAddMenu = true },
+                        enabled = !isOffline,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add",
+                            tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showAddMenu,
+                        onDismissRequest = { showAddMenu = false },
+                        offset = DpOffset(0.dp, 36.dp)
+                    ) {
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.AttachFile,
+                                    null,
+                                    tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                                )
+                            },
+                            text = {
+                                Text(
+                                    "Attach file",
+                                    color = if (isOffline) OnSurfaceVariant else TextColor
+                                )
+                            },
+                            enabled = !isOffline,
+                            onClick = {
+                                showAddMenu = false
+                                onPickAttachment()
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    null,
+                                    tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                                )
+                            },
+                            text = {
+                                Text(
+                                    "Take photo",
+                                    color = if (isOffline) OnSurfaceVariant else TextColor
+                                )
+                            },
+                            enabled = !isOffline,
+                            onClick = {
+                                showAddMenu = false
+                                onTakePhoto()
+                            }
+                        )
+                    }
                 }
-
-                IconButton(
-                    onClick = onTakePhoto,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = "Take Photo",
-                        tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
-                    )
+                Box {
+                    IconButton(
+                        onClick = { onToggleWebSearch() },
+                        enabled = webSearchAvailable && !isOffline,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = "Web search",
+                            tint = if (isOffline || !webSearchAvailable) OnSurfaceVariant else if (webSearchEnabled) SendButton else SecondaryIcons
+                        )
+                    }
                 }
             }
 

@@ -75,8 +75,8 @@ This document outlines the current technical limitations and constraints of the 
 
 ### Attachment Workflow
 
-1. **Select Attachment**: Tap the paperclip icon to choose from gallery or file browser
-2. **Camera Capture**: Tap the camera icon to take a photo (images only)
+1. **Select Attachment**: Tap the `+` button and choose "Attach file" to pick from gallery or file browser
+2. **Camera Capture**: Tap the `+` button and choose "Take photo" to capture an image (images only)
 3. **Review**: Attachment appears as a chip with filename
 4. **Replace**: Selecting a new attachment automatically removes the previous one
 5. **Send**: Attachment is included with your message

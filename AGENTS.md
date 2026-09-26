@@ -57,7 +57,7 @@
 
 | Screen | File | Notes |
 |--------|------|-------|
-| ChatScreen | `ui/chat/ChatScreen.kt` | Top bar has model selector (clickable name opens ModelSelectionDialog), web search toggle, Buddy logo menu |
+| ChatScreen | `ui/chat/ChatScreen.kt` | Top bar has model selector (clickable name opens ModelSelectionDialog) and Buddy logo menu; input bar's `+` button opens an add dialog (web search toggle, attach file, take photo) |
 | ProvidersScreen | `ui/providers/ProvidersScreen.kt` | Default Model is readOnly OutlinedTextField; clicking opens ModelSelectionDialog (AlertDialog) |
 | ModelSelectionScreen | `ui/providers/ModelSelectionScreen.kt` | Two variants: full-screen `ModelSelectionScreen` + `ModelSelectionDialog` (AlertDialog); both use LazyColumn + real-time search |
 | HistoryScreen | `ui/history/HistoryScreen.kt` | Saved chat sessions; filter chips (All/7/30 days), tag filter chips (AND), auto-delete toggle + confirmation dialog, bulk delete, tag labels on rows |
