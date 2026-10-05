@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.buddy.LocalLlmClient
@@ -211,12 +211,13 @@ fun ChatScreen(
             )
         }
     ) { padding ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 12.dp)
         ) {
+            val imagePreviewMaxHeight = maxHeight * 0.4f
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -227,9 +228,7 @@ fun ChatScreen(
                     DayLabel("Today")
                 }
                 items(state.messages, key = { it.id }) { msg ->
-                    val isAsking = msg.role == Role.ASSISTANT &&
-                        !msg.questionAsked.isNullOrBlank() &&
-                        msg.questionAnswer == null
+                    val isAsking = msg.role == Role.ASSISTANT && state.pendingQuestion?.messageId == msg.id
                     MessageRow(
                         message = msg,
                         pendingOptions = if (isAsking) state.pendingQuestion?.options.orEmpty() else emptyList(),
@@ -240,7 +239,8 @@ fun ChatScreen(
                         onSkipAnswer = {
                             keyboard?.hide()
                             vm.skipPendingQuestion()
-                        }
+                        },
+                        imagePreviewMaxHeight = imagePreviewMaxHeight
                     )
                 }
                 if (state.isLoading) {

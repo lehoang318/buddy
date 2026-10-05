@@ -144,8 +144,9 @@ fun InputBar(
             val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
             if (bitmap != null) {
                 Box(modifier = Modifier.padding(bottom = 6.dp)) {
+                    val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
                     Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = imageBitmap,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier

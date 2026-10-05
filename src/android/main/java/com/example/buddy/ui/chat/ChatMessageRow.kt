@@ -3,8 +3,6 @@ package com.example.buddy.ui.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.util.Base64
 import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -21,14 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -55,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
@@ -63,6 +60,7 @@ import com.example.buddy.chat.MessageSegment
 import com.example.buddy.chat.splitIntoSegments
 import com.example.buddy.data.ChatMessage
 import com.example.buddy.data.Role
+import com.example.buddy.data.TurnEventKind
 import com.example.buddy.ui.icons.Check
 import com.example.buddy.ui.icons.ContentCopy
 import com.example.buddy.ui.icons.Icons
@@ -77,14 +75,17 @@ import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.UserBubble
 import com.example.buddy.ui.theme.VintageBackground
 
-private const val THOUGHT_PREVIEW_LINES = 3
+private const val THOUGHT_PREVIEW_LINES = 2
+
+private val IMAGE_PREVIEW_WIDTH = 200.dp
 
 @Composable
 fun MessageRow(
     message: ChatMessage,
     pendingOptions: List<String> = emptyList(),
     onAnswerOption: (String) -> Unit = {},
-    onSkipAnswer: () -> Unit = {}
+    onSkipAnswer: () -> Unit = {},
+    imagePreviewMaxHeight: Dp = 280.dp
 ) {
     val isUser = message.role == Role.USER
     val windowInfo = LocalWindowInfo.current
@@ -93,13 +94,14 @@ fun MessageRow(
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     var copied by remember { mutableStateOf(false) }
-    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f, targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
-        label = "glow_alpha"
-    )
-    val hasQa = !message.questionAsked.isNullOrBlank() || !message.questionAnswer.isNullOrBlank()
+    val glowAlpha = if (message.isStreaming || message.thoughtsStreaming) {
+        val glow by rememberInfiniteTransition(label = "glow").animateFloat(
+            initialValue = 0.3f, targetValue = 0.8f,
+            animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
+            label = "glow_alpha"
+        )
+        glow
+    } else 0f
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
@@ -113,38 +115,37 @@ fun MessageRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            if (!hasQa && message.webSearchUsed) WebSearchPills(message.webSearchQueries)
-            if (!hasQa && message.webSearchSkipped) WebSearchSkippedPill()
-
             message.imageBase64?.let { base64 ->
-                val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
+                val bitmap = remember(message.id, base64) { ImageBitmapCache.get(message.id, base64) }
                 if (bitmap != null) {
+                    val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
+                    val naturalHeight = IMAGE_PREVIEW_WIDTH * (bitmap.height.toFloat() / bitmap.width.toFloat())
+                    val previewHeight = minOf(naturalHeight, imagePreviewMaxHeight)
+                    var showFullImage by remember { mutableStateOf(false) }
                     Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = imageBitmap,
                         contentDescription = "Attached image",
                         contentScale = ContentScale.Crop,
+                        alignment = Alignment.TopCenter,
                         modifier = Modifier
-                            .widthIn(max = 200.dp)
-                            .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
+                            .width(IMAGE_PREVIEW_WIDTH)
+                            .height(previewHeight)
                             .clip(RoundedCornerShape(14.dp))
                             .border(1.dp, Outline, RoundedCornerShape(14.dp))
+                            .clickable { showFullImage = true }
                     )
+                    if (showFullImage) {
+                        FullImageDialog(
+                            imageBitmap = imageBitmap,
+                            onDismiss = { showFullImage = false }
+                        )
+                    }
                     Spacer(Modifier.height(4.dp))
                 }
             }
 
             message.attachedFileName?.let { fileName ->
                 FileChip(fileName = fileName)
-                Spacer(Modifier.height(4.dp))
-            }
-
-            if (!isUser && message.agentThoughts.isNotBlank()) {
-                ThoughtsCard(
-                    text = message.agentThoughts,
-                    maxWidth = maxBubbleWidth,
-                    streaming = message.thoughtsStreaming,
-                    glowAlpha = glowAlpha
-                )
                 Spacer(Modifier.height(4.dp))
             }
 
@@ -167,48 +168,55 @@ fun MessageRow(
                     }
                 }
             } else {
-                val question = message.questionAsked?.takeIf { it.isNotBlank() }
-                val answer = message.questionAnswer?.takeIf { it.isNotBlank() }
                 val segments = remember(message.content) { splitIntoSegments(message.content) }
-                if (question != null || answer != null || segments.isNotEmpty()) {
+                val events = message.turnEvents
+                if (events.isNotEmpty() || segments.isNotEmpty()) {
                     Column {
-                        if (question != null) {
-                            TextSegmentBubble(
-                                text = question,
-                                markdown = false,
-                                streaming = false,
-                                maxWidth = maxBubbleWidth,
-                                glowAlpha = glowAlpha,
-                                shape = segmentShape(0, 1)
-                            )
-                            if (pendingOptions.isNotEmpty()) {
-                                Spacer(Modifier.height(6.dp))
-                                QuestionOptions(
-                                    options = pendingOptions,
-                                    maxWidth = maxBubbleWidth,
-                                    onAnswerOption = onAnswerOption,
-                                    onSkipAnswer = onSkipAnswer
-                                )
+                        events.forEachIndexed { index, event ->
+                            if (index > 0) Spacer(Modifier.height(if (event.kind == TurnEventKind.SEARCH) 4.dp else 6.dp))
+                            when (event.kind) {
+                                TurnEventKind.THOUGHTS -> {
+                                    ThoughtsCard(
+                                        text = event.text,
+                                        maxWidth = maxBubbleWidth,
+                                        streaming = message.thoughtsStreaming && index == events.lastIndex,
+                                        glowAlpha = glowAlpha
+                                    )
+                                }
+                                TurnEventKind.SEARCH -> {
+                                    if (event.skipped) WebSearchSkippedPill() else WebSearchPills(event.queries)
+                                }
+                                TurnEventKind.QUESTION -> {
+                                    TextSegmentBubble(
+                                        text = event.text,
+                                        markdown = false,
+                                        streaming = false,
+                                        maxWidth = maxBubbleWidth,
+                                        glowAlpha = glowAlpha,
+                                        shape = segmentShape(0, 1)
+                                    )
+                                    if (index == events.lastIndex && pendingOptions.isNotEmpty()) {
+                                        Spacer(Modifier.height(6.dp))
+                                        QuestionOptions(
+                                            options = pendingOptions,
+                                            maxWidth = maxBubbleWidth,
+                                            onAnswerOption = onAnswerOption,
+                                            onSkipAnswer = onSkipAnswer
+                                        )
+                                    }
+                                }
+                                TurnEventKind.ANSWER -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
+                                    ) {
+                                        AnswerBubble(text = event.text, maxWidth = maxBubbleWidth)
+                                    }
+                                }
                             }
-                        }
-                        if (answer != null) {
-                            Spacer(Modifier.height(6.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                AnswerBubble(text = answer, maxWidth = maxBubbleWidth)
-                            }
-                        }
-                        if (hasQa && (message.webSearchUsed || message.webSearchSkipped)) {
-                            Spacer(Modifier.height(6.dp))
-                            if (message.webSearchUsed) WebSearchPills(message.webSearchQueries)
-                            if (message.webSearchSkipped) WebSearchSkippedPill()
                         }
                         if (segments.isNotEmpty()) {
-                            if ((question != null || answer != null) &&
-                                !message.webSearchUsed && !message.webSearchSkipped
-                            ) {
+                            if (events.isNotEmpty()) {
                                 Spacer(Modifier.height(6.dp))
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -422,6 +430,8 @@ private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlp
                             text = text.lines().take(THOUGHT_PREVIEW_LINES).joinToString("\n"),
                             color = OnSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
+                            maxLines = THOUGHT_PREVIEW_LINES,
+                            overflow = TextOverflow.Clip,
                             modifier = Modifier.padding(10.dp)
                         )
                     }
@@ -430,11 +440,8 @@ private fun ThoughtsCard(text: String, maxWidth: Dp, streaming: Boolean, glowAlp
                             .matchParentSize()
                             .background(
                                 Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Transparent,
-                                        VintageBackground
-                                    )
+                                    0f to Color.Transparent,
+                                    1f to VintageBackground
                                 )
                             )
                     )
@@ -506,12 +513,3 @@ fun AvatarCircle() {
     }
 }
 
-fun decodeBase64ToBitmap(base64: String): android.graphics.Bitmap? {
-    return try {
-        val base64Data = if (base64.contains(",")) base64.substringAfter(",") else base64
-        val bytes = Base64.decode(base64Data, Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-    } catch (e: Exception) {
-        null
-    }
-}

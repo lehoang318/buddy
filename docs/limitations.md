@@ -115,8 +115,11 @@ Known constraints (see [context-management.md](./context-management.md)):
 |--------|------------|
 | **Non-reasoning models show no bubble** | Thoughts appear only if the active model streams a reasoning field or inline `<think>` blocks; a model that thinks silently or not at all produces nothing to display |
 | **Provider field names vary** | Only `reasoning_content` (DeepSeek, SiliconFlow, vLLM) and `reasoning` (OpenRouter) are read; a provider that emits reasoning under a different key would not be captured |
-| **Thoughts are ephemeral** | `agentThoughts` is UI-only and never persisted to a saved session, so the bubble is empty after resuming a chat |
 | **Reasoning is not replayed** | Thought parts are stripped when building the next model request, so the model does not see its previous turn's reasoning |
+
+### Clarifying Questions
+
+- **Multiple clarifications in one turn are not fully replayed**: on session restore, engine history is rebuilt from the single scalar `questionAnswer`, and `AgentTurn.formatRecentConversation` recognizes only one clarification answer between a USER and ASSISTANT pair — extra `ask_user` rounds in the same turn don't reach the model context (the UI timeline still shows all of them)
 
 ### Agentic Instruction Templating
 

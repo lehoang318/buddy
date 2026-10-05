@@ -94,6 +94,74 @@ class SessionRepositoryTest {
     }
 
     @Test
+    fun `legacy json missing turnEvents is normalized`() = runBlocking {
+        val legacyJson = """[
+            {
+              "id": "s3",
+              "title": "Legacy timeline",
+              "createdAt": 4000,
+              "raw": [
+                {"role": "ASSISTANT", "content": "hi", "webSearchQueries": ["q"]}
+              ],
+              "summaries": []
+            }
+        ]"""
+
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = legacyJson }
+        val repository = SessionRepository(storage)
+        val message = repository.sessions.first().single().raw.single()
+
+        assertNotNull(message.turnEvents)
+        assertTrue(message.turnEvents.isEmpty())
+    }
+
+    @Test
+    fun `turnEvents round-trip through the repository`() = runBlocking {
+        val storage = FakeSessionStorage()
+        val repository = SessionRepository(storage)
+        val events = listOf(
+            TurnEvent(TurnEventKind.THOUGHTS, text = "thinking"),
+            TurnEvent(TurnEventKind.SEARCH, queries = listOf("a", "b")),
+            TurnEvent(TurnEventKind.QUESTION, text = "Which?"),
+            TurnEvent(TurnEventKind.ANSWER, text = "That")
+        )
+        repository.addSession(
+            SavedSession(
+                id = "timeline",
+                title = "Timeline",
+                createdAt = 5000,
+                updatedAt = 5000,
+                raw = listOf(SessionMessage(role = Role.ASSISTANT, content = "done", turnEvents = events)),
+                summaries = emptyList()
+            )
+        )
+
+        val restored = repository.sessions.first().single { it.id == "timeline" }
+        assertEquals(events, restored.raw.single().turnEvents)
+    }
+
+    @Test
+    fun `malformed nested turn events are sanitized on load`() = runBlocking {
+        val json = """[
+            {
+              "id": "s4",
+              "title": "Malformed timeline",
+              "createdAt": 6000,
+              "raw": [
+                {"role": "ASSISTANT", "content": "hi", "turnEvents": [{"kind":"BOGUS"}, {"kind":"THOUGHTS","text":"ok"}, null]}
+              ],
+              "summaries": []
+            }
+        ]"""
+
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = json }
+        val repository = SessionRepository(storage)
+        val message = repository.sessions.first().single().raw.single()
+
+        assertEquals(listOf(TurnEvent(TurnEventKind.THOUGHTS, text = "ok")), message.turnEvents)
+    }
+
+    @Test
     fun `purgeOlderThan returns removed session ids`() = runBlocking {
         val storage = FakeSessionStorage()
         val repository = SessionRepository(storage)

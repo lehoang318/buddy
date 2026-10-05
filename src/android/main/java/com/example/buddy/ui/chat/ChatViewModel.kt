@@ -25,6 +25,10 @@ import com.example.buddy.data.SessionMessage
 import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.data.Summary
+import com.example.buddy.data.TurnEvent
+import com.example.buddy.data.TurnEventKind
+import com.example.buddy.data.appendThoughtsEvent
+import com.example.buddy.data.reconstructTurnEvents
 import com.example.buddy.fetch.UrlFetcher
 import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
@@ -52,7 +56,8 @@ private const val TAG = "Chat"
 
 data class PendingQuestion(
     val question: String,
-    val options: List<String>
+    val options: List<String>,
+    val messageId: String
 )
 
 data class ChatUiState(
@@ -216,6 +221,7 @@ class ChatViewModel(
                 webSearchUsed = m.webSearchUsed,
                 webSearchSkipped = m.webSearchSkipped,
                 webSearchQueries = m.webSearchQueries,
+                turnEvents = m.turnEvents,
                 questionAsked = m.questionAsked,
                 questionAnswer = m.questionAnswer,
                 timestamp = m.timestamp
@@ -258,6 +264,9 @@ class ChatViewModel(
                 webSearchUsed = m.webSearchUsed,
                 webSearchSkipped = m.webSearchSkipped,
                 webSearchQueries = m.webSearchQueries,
+                turnEvents = m.turnEvents.ifEmpty {
+                    reconstructTurnEvents(m.webSearchUsed, m.webSearchSkipped, m.webSearchQueries, m.questionAsked, m.questionAnswer)
+                },
                 questionAsked = m.questionAsked,
                 questionAnswer = m.questionAnswer,
                 timestamp = m.timestamp,
@@ -458,22 +467,18 @@ class ChatViewModel(
             return
         }
         EventLog.info(TAG, "Clarification answered", "${answer.length} chars")
+        val answerText = answer.ifEmpty { ASK_USER_SKIP_ANSWER }
         _uiState.update { current ->
-            val questionIndex = current.messages.indexOfLast { message ->
-                message.role == Role.ASSISTANT &&
-                    !message.questionAsked.isNullOrBlank() &&
-                    message.questionAnswer == null
-            }
-            val answerText = answer.ifEmpty { ASK_USER_SKIP_ANSWER }
+            val pendingId = current.pendingQuestion?.messageId
             current.copy(
                 inputText = "",
                 pendingQuestion = null,
-                messages = if (questionIndex < 0) {
-                    current.messages
-                } else {
-                    current.messages.mapIndexed { index, message ->
-                        if (index == questionIndex) message.copy(questionAnswer = answerText) else message
-                    }
+                messages = if (pendingId == null) current.messages
+                else current.messages.map { message ->
+                    if (message.id == pendingId) message.copy(
+                        questionAnswer = answerText,
+                        turnEvents = message.turnEvents + TurnEvent(TurnEventKind.ANSWER, text = answerText)
+                    ) else message
                 }
             )
         }
@@ -573,7 +578,12 @@ class ChatViewModel(
                             assistantId?.let { id ->
                                 _uiState.update { current ->
                                     current.copy(messages = current.messages.map { message ->
-                                        if (message.id == id) message.copy(webSearchUsed = true, webSearchQueries = event.queries) else message
+                                        if (message.id == id) message.copy(
+                                            webSearchUsed = true,
+                                            webSearchQueries = message.webSearchQueries + event.queries,
+                                            turnEvents = message.turnEvents + TurnEvent(TurnEventKind.SEARCH, queries = event.queries),
+                                            thoughtsStreaming = false
+                                        ) else message
                                     })
                                 }
                             }
@@ -598,15 +608,22 @@ class ChatViewModel(
                             _uiState.update { current ->
                                 current.copy(
                                     messages = current.messages.map { message ->
-                                        if (message.id == assistantId) message.copy(questionAsked = event.question) else message
+                                        if (message.id == assistantId) message.copy(
+                                            questionAsked = event.question,
+                                            turnEvents = message.turnEvents + TurnEvent(TurnEventKind.QUESTION, text = event.question),
+                                            thoughtsStreaming = false
+                                        ) else message
                                     },
-                                    pendingQuestion = PendingQuestion(event.question, event.options)
+                                    pendingQuestion = PendingQuestion(event.question, event.options, messageId = assistantId.orEmpty())
                                 )
                             }
                             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.LLM_STREAMING, "Waiting for your answer...")
                         }
                         is ConversationEvent.AssistantStarted -> {
                             assistantId = event.id
+                            val searchUsed = event.searchOutcome?.rawResults?.isNotEmpty() == true || plannedSearchQueries.isNotEmpty()
+                            val searchSkipped = event.searchOutcome?.skipped == true
+                            val searchQueries = plannedSearchQueries.ifEmpty { event.searchOutcome?.queries.orEmpty() }
                             _uiState.update {
                                 it.copy(
                                     messages = it.messages + UiChatMessage(
@@ -614,9 +631,14 @@ class ChatViewModel(
                                         role = Role.ASSISTANT,
                                         content = "",
                                         isStreaming = true,
-                                        webSearchUsed = event.searchOutcome?.rawResults?.isNotEmpty() == true || plannedSearchQueries.isNotEmpty(),
-                                        webSearchSkipped = event.searchOutcome?.skipped == true,
-                                        webSearchQueries = plannedSearchQueries.ifEmpty { event.searchOutcome?.queries.orEmpty() }
+                                        webSearchUsed = searchUsed,
+                                        webSearchSkipped = searchSkipped,
+                                        webSearchQueries = searchQueries,
+                                        turnEvents = when {
+                                            searchUsed -> listOf(TurnEvent(TurnEventKind.SEARCH, queries = searchQueries))
+                                            searchSkipped -> listOf(TurnEvent(TurnEventKind.SEARCH, skipped = true))
+                                            else -> emptyList()
+                                        }
                                     ),
                                     isLoading = false,
                                     isStreaming = true
@@ -632,23 +654,26 @@ class ChatViewModel(
                         }
                         is ConversationEvent.ThoughtsDelta -> _uiState.update { current ->
                             current.copy(messages = current.messages.map { message ->
-                                if (message.id == assistantId) message.copy(agentThoughts = message.agentThoughts + event.text, thoughtsStreaming = true) else message
+                                if (message.id == assistantId) message.copy(
+                                    turnEvents = appendThoughtsEvent(message.turnEvents, event.text),
+                                    thoughtsStreaming = true
+                                ) else message
                             })
                         }
                         is ConversationEvent.AnswerReset -> _uiState.update { current ->
                             current.copy(messages = current.messages.map { message ->
-                                if (message.id == assistantId) {
-                                    val thoughts = if (message.agentThoughts.isBlank()) event.retractedText
-                                    else message.agentThoughts + "\n\n" + event.retractedText
-                                    message.copy(content = "", agentThoughts = thoughts)
-                                } else message
+                                if (message.id == assistantId) message.copy(
+                                    content = "",
+                                    turnEvents = appendThoughtsEvent(message.turnEvents, event.retractedText, separator = "\n\n"),
+                                    thoughtsStreaming = true
+                                ) else message
                             })
                         }
                         is ConversationEvent.Completed -> {
                             _uiState.update { current ->
                                 current.copy(
                                     messages = current.messages.map { message ->
-                                        if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true) else message
+                                        if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true, thoughtsStreaming = false) else message
                                     },
                                     isStreaming = false,
                                     pendingQuestion = null,
@@ -661,7 +686,7 @@ class ChatViewModel(
                             _uiState.update { current ->
                                 current.copy(
                                     messages = if (assistantId == null) current.messages else current.messages.map { message ->
-                                        if (message.id == assistantId) message.copy(content = "Error: ${event.error.message}", isStreaming = false, isComplete = true) else message
+                                        if (message.id == assistantId) message.copy(content = "Error: ${event.error.message}", isStreaming = false, isComplete = true, thoughtsStreaming = false) else message
                                     },
                                     isLoading = false,
                                     isStreaming = false,
@@ -677,7 +702,7 @@ class ChatViewModel(
                 _uiState.update { current ->
                     current.copy(
                         messages = current.messages.map { message ->
-                            if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true) else message
+                            if (message.id == assistantId) message.copy(isStreaming = false, isComplete = true, thoughtsStreaming = false) else message
                         },
                         isStreaming = false,
                         isCancelling = false,

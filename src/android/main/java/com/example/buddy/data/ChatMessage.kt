@@ -15,7 +15,7 @@ data class ChatMessage(
     val webSearchUsed: Boolean = false,
     val webSearchSkipped: Boolean = false,
     val webSearchQueries: List<String> = emptyList(),
-    val agentThoughts: String = "",
+    val turnEvents: List<TurnEvent> = emptyList(),
     val thoughtsStreaming: Boolean = false,
     val questionAsked: String? = null,
     val questionAnswer: String? = null,

@@ -39,7 +39,6 @@ fun WebSearchPills(queries: List<String>) {
             WebSearchQueryPill(query)
         }
     }
-    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
@@ -101,7 +100,6 @@ fun WebSearchSkippedPill() {
             Text(stringResource(R.string.web_search_skipped), color = SendButton, style = MaterialTheme.typography.labelSmall)
         }
     }
-    Spacer(Modifier.height(6.dp))
 }
 
 @Composable

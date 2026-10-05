@@ -14,6 +14,7 @@ data class SessionMessage(
     val webSearchUsed: Boolean = false,
     val webSearchSkipped: Boolean = false,
     val webSearchQueries: List<String> = emptyList(),
+    val turnEvents: List<TurnEvent> = emptyList(),
     val questionAsked: String? = null,
     val questionAnswer: String? = null,
     val timestamp: Long = System.currentTimeMillis()
