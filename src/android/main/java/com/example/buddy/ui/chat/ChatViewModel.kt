@@ -67,7 +67,7 @@ data class ChatUiState(
     val availableModels: List<LlmModel> = emptyList(),
     val selectedModel: String = "",
     val isOffline: Boolean = false,
-    val generationConfig: LlmGenerationConfig = LlmGenerationConfig(),
+    val generationConfig: LlmGenerationConfig = LlmGenerationConfig(reasoningEffort = ReasoningEffort.HIGH),
     val webSearchError: String? = null,
     val webSearchCancelled: Boolean = false,
     val attachmentError: String? = null,

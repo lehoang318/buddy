@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -51,6 +48,9 @@ import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionImageStore
 import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SessionTags
+import com.example.buddy.ui.icons.ArrowBack
+import com.example.buddy.ui.icons.Delete
+import com.example.buddy.ui.icons.Icons
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor

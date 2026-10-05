@@ -9,11 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +20,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
+import com.example.buddy.ui.icons.Block
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Search
+import com.example.buddy.ui.icons.Stop
+import com.example.buddy.ui.icons.Warning
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant

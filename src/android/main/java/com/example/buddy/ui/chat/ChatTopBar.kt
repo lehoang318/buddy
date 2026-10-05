@@ -11,17 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NoteAdd
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +39,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
 import com.example.buddy.llm.LlmModel
+import com.example.buddy.ui.icons.AutoFixHigh
+import com.example.buddy.ui.icons.Check
+import com.example.buddy.ui.icons.Dns
+import com.example.buddy.ui.icons.Event
+import com.example.buddy.ui.icons.History
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Image
+import com.example.buddy.ui.icons.Info
+import com.example.buddy.ui.icons.NoteAdd
+import com.example.buddy.ui.icons.SmartToy
+import com.example.buddy.ui.icons.Tune
 import com.example.buddy.ui.providers.ModelSelectionDialog
 import com.example.buddy.ui.theme.Dimens
 

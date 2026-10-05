@@ -14,13 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +36,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.example.buddy.R
+import com.example.buddy.ui.icons.ArrowBack
+import com.example.buddy.ui.icons.ChevronRight
+import com.example.buddy.ui.icons.Code
+import com.example.buddy.ui.icons.Email
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Person
+import com.example.buddy.ui.icons.Work
 import com.example.buddy.ui.theme.Dimens
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline

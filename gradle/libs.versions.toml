@@ -22,7 +22,6 @@ coroutines = "1.10.2"
 jline = "3.25.1"
 
 [libraries]
-androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 google-adk-kotlin-core-android = { module = "com.google.adk:google-adk-kotlin-core-android", version.ref = "adk" }
 google-adk-kotlin-core-jvm = { module = "com.google.adk:google-adk-kotlin-core-jvm", version.ref = "adk" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

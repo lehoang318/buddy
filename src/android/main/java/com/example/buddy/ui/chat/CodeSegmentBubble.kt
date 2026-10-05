@@ -23,13 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +47,13 @@ import androidx.compose.ui.unit.dp
 import com.example.buddy.chat.codeFileName
 import com.example.buddy.chat.extensionForLang
 import com.example.buddy.data.EventLog
+import com.example.buddy.ui.icons.Check
+import com.example.buddy.ui.icons.ContentCopy
+import com.example.buddy.ui.icons.Download
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.KeyboardArrowDown
+import com.example.buddy.ui.icons.KeyboardArrowUp
+import com.example.buddy.ui.icons.Visibility
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.SecondaryIcons
 import com.example.buddy.ui.theme.SendButton

@@ -20,23 +20,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.NavigateBefore
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AllInclusive
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -71,6 +58,20 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.ui.icons.Add
+import com.example.buddy.ui.icons.AllInclusive
+import com.example.buddy.ui.icons.AttachFile
+import com.example.buddy.ui.icons.CameraAlt
+import com.example.buddy.ui.icons.Close
+import com.example.buddy.ui.icons.Counter0
+import com.example.buddy.ui.icons.Counter1
+import com.example.buddy.ui.icons.Description
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Language
+import com.example.buddy.ui.icons.NavigateBefore
+import com.example.buddy.ui.icons.NavigateNext
+import com.example.buddy.ui.icons.Send
+import com.example.buddy.ui.icons.Stop
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SecondaryIcons
@@ -281,6 +282,7 @@ fun InputBar(
                                     color = if (isOffline) OnSurfaceVariant else TextColor
                                 )
                             },
+                            modifier = Modifier.height(40.dp),
                             enabled = !isOffline,
                             onClick = {
                                 showAddMenu = false
@@ -301,6 +303,7 @@ fun InputBar(
                                     color = if (isOffline) OnSurfaceVariant else TextColor
                                 )
                             },
+                            modifier = Modifier.height(40.dp),
                             enabled = !isOffline,
                             onClick = {
                                 showAddMenu = false
@@ -372,40 +375,29 @@ fun InputBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.width(44.dp),
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable(enabled = !isOffline && !reasoningLocked, onClick = onToggleReasoning),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (reasoningEffort == ReasoningEffort.DEEP) {
-                        IconButton(
-                            onClick = onToggleReasoning,
-                            enabled = !isOffline && !reasoningLocked,
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.AllInclusive,
-                                contentDescription = "Reasoning: deep research",
-                                tint = if (isOffline) OnSurfaceVariant else SendButton
-                            )
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(enabled = !isOffline && !reasoningLocked, onClick = onToggleReasoning)
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (reasoningEffort == ReasoningEffort.HIGH) "High" else "Low",
-                                color = when {
-                                    isOffline -> OnSurfaceVariant
-                                    reasoningEffort == ReasoningEffort.HIGH -> SendButton
-                                    else -> SecondaryIcons
-                                },
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+                    Icon(
+                        imageVector = when (reasoningEffort) {
+                            ReasoningEffort.DEEP -> Icons.Filled.AllInclusive
+                            ReasoningEffort.HIGH -> Icons.Filled.Counter1
+                            else -> Icons.Filled.Counter0
+                        },
+                        contentDescription = when (reasoningEffort) {
+                            ReasoningEffort.DEEP -> "Reasoning: deep research"
+                            ReasoningEffort.HIGH -> "Reasoning: high"
+                            else -> "Reasoning: low"
+                        },
+                        tint = when {
+                            isOffline -> OnSurfaceVariant
+                            reasoningEffort == ReasoningEffort.HIGH || reasoningEffort == ReasoningEffort.DEEP -> SendButton
+                            else -> SecondaryIcons
+                        },
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
 
                 IconButton(

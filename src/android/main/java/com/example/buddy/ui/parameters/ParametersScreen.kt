@@ -9,9 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +39,9 @@ import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.LlmSettings
 import com.example.buddy.data.SettingsRepository
 import com.example.buddy.ui.components.SliderWithLabel
+import com.example.buddy.ui.icons.ArrowBack
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Refresh
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SendButton

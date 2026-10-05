@@ -11,6 +11,8 @@
 
 ## Architecture
 
+UI icons are vendored Material Symbols glyphs (outline style, 24dp) in `ui/icons/` as extension properties on the local `Icons` object; no androidx icons artifact is used; new icons must be vendored there.
+
 ### Single Activity, State-Based Navigation
 - `MainActivity` is the only Activity — no Jetpack Navigation, no Fragments
 - Navigation is conditional rendering in `MainContent` (`MainActivity.kt:157`):
