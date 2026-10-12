@@ -17,8 +17,8 @@ This document provides a concise overview of the external libraries used in the 
 | Library | Category | Version | Purpose |
 | :--- | :--- | :--- | :--- |
 | `androidx.core:core-ktx` | Core | 1.18.0 | Kotlin extensions for Android core |
-| `androidx.compose.*` | UI Framework | BOM 2026.05.00 | Declarative UI toolkit (Material 3, Graphics, Tooling, icons) |
-| `androidx.compose.material:material-icons-extended` | UI Framework | via BOM | Extended icon set used across screens |
+| `androidx.compose.*` | UI Framework | BOM 2026.05.00 | Declarative UI toolkit (Material 3, Graphics, Tooling) |
+| `androidx.compose.material:material-icons-extended` | UI Framework | removed | Discontinued by Google (final frozen release 1.7.8) and dropped from the build; icons are now vendored Material Symbols glyphs (outline style) in `ui/icons/` |
 | `androidx.lifecycle:lifecycle-runtime-ktx` | Lifecycle | 2.10.0 | Lifecycle-aware components |
 | `androidx.lifecycle:lifecycle-viewmodel-compose` | Lifecycle | 2.10.0 | ViewModel integration for Compose |
 | `androidx.activity:activity-compose` | Lifecycle | 1.13.0 | Activity integration for Compose |

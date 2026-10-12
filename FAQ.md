@@ -210,7 +210,7 @@ You can ask Buddy almost anything! Here are some examples:
 <details>
   <summary>🌐 How do I use web search?</summary>
 
-1. **Enable web search** in the top bar (looks like a globe icon)
+1. **Enable web search** via the `+` button at the bottom-left of the input bar (web search toggle in the add dialog)
 2. Ask questions about current events, weather, or recent information
 3. Buddy will search the web and provide up-to-date answers
 
@@ -230,7 +230,7 @@ Yes! Buddy supports:
 - **Code files**: .json, .xml, .html, .py, .js
 - **Web pages**: Paste any URL to analyze the content
 
-Just tap the paperclip icon to attach files or use the camera icon to take photos.
+Just tap the `+` button at the bottom-left of the input bar and choose "Attach file" or "Take photo".
 </details>
 
 ### How do I preview HTML code?
@@ -365,7 +365,7 @@ Make sure:
 Web search requires:
 - A separate web search API key (like Tavily)
 - Internet connection
-- Web search enabled in the top bar
+- Web search enabled in the add dialog
 </details>
 
 ## 📱 App Features

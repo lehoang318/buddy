@@ -10,6 +10,7 @@ data class LlmSettings(
     val reasoningEffort: String = "",
     val systemMessage: String = "",
     val webSearchProvider: String = "",
+    val agenticMode: Boolean = false,
     val customLlmProvidersJson: String = "",
     val customWebSearchProvidersJson: String = ""
 )

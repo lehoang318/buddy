@@ -19,7 +19,7 @@ class SiliconFlowClient(
             val budget = when {
                 forSearchQuery -> AppConfigProvider.current.siliconflow.reasoningSearch
                 effort == ReasoningEffort.LOW -> AppConfigProvider.current.siliconflow.reasoningChatLow
-                effort == ReasoningEffort.HIGH -> AppConfigProvider.current.siliconflow.reasoningChatHigh
+                effort == ReasoningEffort.HIGH || effort == ReasoningEffort.DEEP -> AppConfigProvider.current.siliconflow.reasoningChatHigh
                 else -> return
             }
             requestBody.addProperty("thinking_budget", budget)
@@ -28,7 +28,7 @@ class SiliconFlowClient(
                 forSearchQuery || effort == ReasoningEffort.LOW -> {
                     requestBody.addProperty("enable_thinking", AppConfigProvider.current.siliconflow.hybridChatLow)
                 }
-                effort == ReasoningEffort.HIGH -> {
+                effort == ReasoningEffort.HIGH || effort == ReasoningEffort.DEEP -> {
                     requestBody.addProperty("thinking_budget", AppConfigProvider.current.siliconflow.hybridChatHigh)
                 }
             }

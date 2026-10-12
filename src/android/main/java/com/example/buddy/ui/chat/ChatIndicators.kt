@@ -44,7 +44,7 @@ fun BlinkingCursor() {
 fun TypingIndicator() {
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         AvatarCircle()
-        Surface(color = SurfaceVariant, shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)) {
+        Surface(color = SurfaceVariant, shape = RoundedCornerShape(8.dp)) {
             Row(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),

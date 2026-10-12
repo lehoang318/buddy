@@ -30,7 +30,7 @@ class TogetherAIClient(
                 } else if (effort != null) {
                     val effortStr = when (effort) {
                         ReasoningEffort.LOW -> AppConfigProvider.current.togetherAi.effortChatLow
-                        ReasoningEffort.HIGH -> AppConfigProvider.current.togetherAi.effortChatHigh
+                        ReasoningEffort.HIGH, ReasoningEffort.DEEP -> AppConfigProvider.current.togetherAi.effortChatHigh
                     }
                     requestBody.addProperty("reasoning_effort", effortStr)
                 }
@@ -39,7 +39,7 @@ class TogetherAIClient(
                 val enabled = when {
                     forSearchQuery -> AppConfigProvider.current.togetherAi.hybridSearch
                     effort == ReasoningEffort.LOW -> AppConfigProvider.current.togetherAi.hybridChatLow
-                    effort == ReasoningEffort.HIGH -> AppConfigProvider.current.togetherAi.hybridChatHigh
+                    effort == ReasoningEffort.HIGH || effort == ReasoningEffort.DEEP -> AppConfigProvider.current.togetherAi.hybridChatHigh
                     else -> false
                 }
                 requestBody.add("reasoning", JsonObject().apply {

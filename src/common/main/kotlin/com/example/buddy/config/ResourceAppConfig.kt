@@ -100,5 +100,22 @@ class ResourceAppConfig(private val values: ResourceValues) : AppConfig {
             }
     }
 
+    override val agentic = object : AgenticConfig {
+        override val enabledByDefault get() = values.bool("agentic_enabled_default")
+        override val agentName get() = values.string("agent_name")
+        override val agentDescription get() = values.string("agent_description")
+        override val maxSteps get() = values.integer("agent_max_steps")
+        override val standardSearchRounds get() = values.integer("agent_standard_search_rounds")
+        override val deepResearchSearchRounds get() = values.integer("agent_deep_research_search_rounds")
+        override val baseInstruction get() = values.string("agentic_base_instruction")
+        override val webSearchInstruction get() = values.string("agentic_web_search_instruction")
+        override val fetchUrlInstruction get() = values.string("agentic_fetch_url_instruction")
+        override val noToolsInstruction get() = values.string("agentic_no_tools_instruction")
+        override val webSearchToolDescription get() = values.string("web_search_tool_description")
+        override val fetchUrlToolDescription get() = values.string("fetch_url_tool_description")
+        override val askUserInstruction get() = values.string("agentic_ask_user_instruction")
+        override val askUserToolDescription get() = values.string("ask_user_tool_description")
+    }
+
     override val debugLogging = true
 }

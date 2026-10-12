@@ -75,8 +75,8 @@ This document outlines the current technical limitations and constraints of the 
 
 ### Attachment Workflow
 
-1. **Select Attachment**: Tap the paperclip icon to choose from gallery or file browser
-2. **Camera Capture**: Tap the camera icon to take a photo (images only)
+1. **Select Attachment**: Tap the `+` button and choose "Attach file" to pick from gallery or file browser
+2. **Camera Capture**: Tap the `+` button and choose "Take photo" to capture an image (images only)
 3. **Review**: Attachment appears as a chip with filename
 4. **Replace**: Selecting a new attachment automatically removes the previous one
 5. **Send**: Attachment is included with your message
@@ -104,6 +104,26 @@ This document outlines the current technical limitations and constraints of the 
 - The reasoning toggle (💡 icon) in the chat input bar sends reasoning parameters to all OpenAI-compatible providers
 - Providers that do not support reasoning will ignore the parameter
 - Current reasoning effort levels: **Low** and **High**
+
+### Agent Thoughts
+
+In agentic mode the model's reasoning is shown in a collapsible **Thoughts** bubble on the assistant bubble (styled like the code-segment bubbles) rather than leaking into the answer. It renders as raw text while deltas stream in and switches to markdown once reasoning stops. It is captured from two sources: provider reasoning deltas (`delta.reasoning_content` / `delta.reasoning`, emitted as ADK thought parts) and inline `<think>...</think>` blocks in streamed text (split out by `ThinkTagSplitter`). Pre-tool prose is retracted into the same bubble by `AnswerReset`.
+
+Known constraints (see [context-management.md](./context-management.md)):
+
+| Aspect | Limitation |
+|--------|------------|
+| **Non-reasoning models show no bubble** | Thoughts appear only if the active model streams a reasoning field or inline `<think>` blocks; a model that thinks silently or not at all produces nothing to display |
+| **Provider field names vary** | Only `reasoning_content` (DeepSeek, SiliconFlow, vLLM) and `reasoning` (OpenRouter) are read; a provider that emits reasoning under a different key would not be captured |
+| **Reasoning is not replayed** | Thought parts are stripped when building the next model request, so the model does not see its previous turn's reasoning |
+
+### Clarifying Questions
+
+- **Multiple clarifications in one turn are not fully replayed**: on session restore, engine history is rebuilt from the single scalar `questionAnswer`, and `AgentTurn.formatRecentConversation` recognizes only one clarification answer between a USER and ASSISTANT pair — extra `ask_user` rounds in the same turn don't reach the model context (the UI timeline still shows all of them)
+
+### Agentic Instruction Templating
+
+ADK scans the agent instruction for `{variable}` placeholders and substitutes them from session state, throwing `Context variable not found: \`variable\`` when a placeholder is missing. Dynamic instruction content (system message, summaries, fetched page text, recent conversation) can contain arbitrary braces — for example `{style_block}` in fetched CSS/JS — so `BuddyAgentFactory` replaces `{`/`}` with fullwidth `｛`/`｝` before assembling the instruction. The model still reads the braces, but ADK no longer treats them as state placeholders. Static strings in `agentic.xml` are verified brace-free and are left untouched so literal braces remain usable there.
 
 ### Provider Architecture
 

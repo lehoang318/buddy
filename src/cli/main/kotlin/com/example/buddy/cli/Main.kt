@@ -13,6 +13,9 @@ import com.example.buddy.data.WebSearchProvider
 import com.example.buddy.fetch.JsoupUrlFetcher
 import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmClientFactory
+import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.llm.cycle
+import com.example.buddy.llm.label
 import com.example.buddy.search.WebSearch
 import com.example.buddy.search.WebSearchFactory
 import com.example.buddy.logging.DesktopLogger
@@ -30,7 +33,9 @@ fun main() = runBlocking {
 
 private class CliApplication {
     private val keyProvider = EnvKeyProvider()
-    private val engine = ConversationEngine(urlFetcher = JsoupUrlFetcher())
+    private val engine = ConversationEngine(urlFetcher = JsoupUrlFetcher()).apply {
+        agenticMode = AppConfigProvider.current.agentic.enabledByDefault
+    }
     private val providers = AppConfigProvider.current.providers
     private var pendingAttachment: TextAttachment? = null
 
@@ -47,7 +52,7 @@ private class CliApplication {
                         if (line.startsWith('/')) {
                             if (!handleCommand(line, input)) return
                         } else {
-                            sendMessage(line)
+                            sendMessage(line, input)
                         }
                     }
                 }
@@ -86,8 +91,31 @@ private class CliApplication {
                     println("Select a web provider first with /provider.")
                 } else {
                     engine.webSearchEnabled = !engine.webSearchEnabled
+                    if (!engine.webSearchEnabled && engine.reasoningEffort == ReasoningEffort.DEEP) {
+                        engine.reasoningEffort = ReasoningEffort.HIGH
+                    }
                     println("Web search ${if (engine.webSearchEnabled) "enabled" else "disabled"}.")
                 }
+                true
+            }
+            "/agent" -> {
+                engine.agenticMode = !engine.agenticMode
+                if (!engine.agenticMode && engine.reasoningEffort == ReasoningEffort.DEEP) {
+                    engine.reasoningEffort = ReasoningEffort.HIGH
+                }
+                println("Agentic mode ${if (engine.agenticMode) "enabled" else "disabled"}.")
+                true
+            }
+            "/reasoning" -> {
+                val deepAvailable = engine.webSearchEnabled && engine.agenticMode
+                engine.reasoningEffort = engine.reasoningEffort.cycle(deepAvailable)
+                val roundInfo = when {
+                    !engine.webSearchEnabled -> "web search disabled"
+                    engine.reasoningEffort == ReasoningEffort.DEEP ->
+                        "${AppConfigProvider.current.agentic.deepResearchSearchRounds} search rounds"
+                    else -> "${AppConfigProvider.current.agentic.standardSearchRounds} search rounds"
+                }
+                println("Reasoning: ${engine.reasoningEffort.label()} ($roundInfo).")
                 true
             }
             "/attach" -> {
@@ -219,7 +247,7 @@ private class CliApplication {
         println("Attached ${file.name} for the next query.")
     }
 
-    private suspend fun sendMessage(text: String) {
+    private suspend fun sendMessage(text: String, input: TerminalInput) {
         val attachment = pendingAttachment
         pendingAttachment = null
         var responseStarted = false
@@ -229,7 +257,16 @@ private class CliApplication {
                 is ConversationEvent.UrlFetchFinished -> event.result.warnings.forEach { println("Warning: $it") }
                 is ConversationEvent.UserMessageAccepted -> Unit
                 ConversationEvent.SearchStarted -> println("Searching the web...")
+                is ConversationEvent.SearchQueriesPlanned -> println("Queries: ${event.queries.joinToString(" | ")}")
                 is ConversationEvent.SearchFinished -> event.outcome.errorMessage?.let { println("Web search: $it") }
+                is ConversationEvent.QuestionAsked -> {
+                    if (responseStarted) println()
+                    println("Buddy asks: ${event.question}")
+                    event.options.forEachIndexed { index, option -> println("  ${index + 1}. $option") }
+                    val answer = readText(input, "You (answer)> ")
+                    engine.answerPendingQuestion(answer.orEmpty())
+                }
+                ConversationEvent.ClarificationAnswered -> println("Answer sent.")
                 is ConversationEvent.AssistantStarted -> {
                     responseStarted = true
                     print("Buddy> ")
@@ -239,6 +276,11 @@ private class CliApplication {
                     print(event.text)
                     System.out.flush()
                 }
+                is ConversationEvent.ThoughtsDelta -> {
+                    print(event.text)
+                    System.out.flush()
+                }
+                is ConversationEvent.AnswerReset -> println()
                 is ConversationEvent.Completed -> println()
                 is ConversationEvent.Failed -> {
                     if (responseStarted) println()
@@ -258,6 +300,8 @@ private class CliApplication {
         println("Available commands:")
         println("  /provider       Select LLM or web-search provider")
         println("  /web            Toggle web search on/off")
+        println("  /agent          Toggle agentic mode on/off")
+        println("  /reasoning      Cycle reasoning: low / high / deep research")
         println("  /attach <path>  Attach a text file for the next query")
         println("  /help           Show this help message")
         println("  /exit           Exit the application")

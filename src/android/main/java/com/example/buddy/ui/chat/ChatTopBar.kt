@@ -6,29 +6,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.NoteAdd
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,6 +39,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.buddy.R
 import com.example.buddy.llm.LlmModel
+import com.example.buddy.ui.icons.AutoFixHigh
+import com.example.buddy.ui.icons.Check
+import com.example.buddy.ui.icons.Dns
+import com.example.buddy.ui.icons.Event
+import com.example.buddy.ui.icons.History
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Image
+import com.example.buddy.ui.icons.Info
+import com.example.buddy.ui.icons.NoteAdd
+import com.example.buddy.ui.icons.SmartToy
+import com.example.buddy.ui.icons.Tune
 import com.example.buddy.ui.providers.ModelSelectionDialog
 import com.example.buddy.ui.theme.Dimens
 
@@ -61,10 +59,9 @@ fun BuddyChatTopBar(
     selectedModel: String,
     availableModels: List<LlmModel>,
     isOffline: Boolean,
-    webSearchEnabled: Boolean,
-    webSearchAvailable: Boolean,
+    agenticMode: Boolean,
     onModelSelect: (String) -> Unit,
-    onToggleWeb: () -> Unit,
+    onToggleAgentic: () -> Unit,
     onProviders: () -> Unit,
     onParameters: () -> Unit = {},
     onEvents: () -> Unit = {},
@@ -84,12 +81,10 @@ fun BuddyChatTopBar(
     val titleTextGap = 10.dp
     val clearanceAfterTitle = 12.dp
     val multimodalIconWidth = 14.dp
-    val webSearchIconWidth = 48.dp
-    val clearanceBetweenIcons = 8.dp
     val rightPadding = 16.dp
 
     val fixedSpace = titleIconWidth + titleTextGap + clearanceAfterTitle +
-                     multimodalIconWidth + clearanceBetweenIcons + webSearchIconWidth + rightPadding
+                     multimodalIconWidth + rightPadding
     val availableWidth = screenWidth - titleWidthDp - fixedSpace
     val minDropdownWidth = (availableWidth * 0.5f).coerceAtLeast(80.dp)
     val maxDropdownWidth = (availableWidth * 0.8f).coerceAtLeast(80.dp)
@@ -146,6 +141,23 @@ fun BuddyChatTopBar(
                         onClick = {
                             menuExpanded = false
                             onParameters()
+                        }
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.SmartToy,
+                                null,
+                                tint = if (agenticMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        text = { Text("Agentic mode", color = MaterialTheme.colorScheme.onSurface) },
+                        trailingIcon = {
+                            if (agenticMode) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleAgentic()
                         }
                     )
                     DropdownMenuItem(
@@ -244,20 +256,6 @@ fun BuddyChatTopBar(
                         )
                     }
                 }
-            }
-            Spacer(Modifier.width(8.dp))
-            IconButton(
-                onClick = if (webSearchAvailable) onToggleWeb else onProviders
-            ) {
-                Icon(
-                    Icons.Default.Language,
-                    contentDescription = "Web Search",
-                    tint = when {
-                        webSearchEnabled && webSearchAvailable && !isOffline -> MaterialTheme.colorScheme.primary
-                        webSearchAvailable && !isOffline -> MaterialTheme.colorScheme.onSurfaceVariant
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                    }
-                )
             }
         }
     )

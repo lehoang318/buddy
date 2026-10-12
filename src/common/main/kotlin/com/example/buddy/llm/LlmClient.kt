@@ -10,6 +10,7 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.transform
 
 private const val TAG_LLM = "LLM"
 
@@ -156,6 +157,13 @@ internal fun parseQueryPlan(cleaned: String, correlationId: String? = null): Sea
 
 interface LlmClient {
     fun streamCompletion(messages: List<LlmMessage>, model: String, config: LlmGenerationConfig = LlmGenerationConfig()): Flow<String>
+
+    fun streamEvents(
+        messages: List<LlmMessage>,
+        model: String,
+        config: LlmGenerationConfig = LlmGenerationConfig(),
+        tools: List<LlmTool>? = null
+    ): Flow<LlmStreamEvent> = streamCompletion(messages, model, config).transform { emit(LlmStreamEvent.TextDelta(it)) }
     suspend fun getModels(): List<LlmModel>
     suspend fun testConnection(): Boolean
     suspend fun generateSearchQueryRaw(userMessage: String, summaries: List<Summary> = emptyList(), correlationId: String? = null, imageBase64: String? = null): RawSearchResponse
@@ -242,20 +250,12 @@ interface LlmClient {
             }
     }
 
-    fun toggleReasoning(current: ReasoningEffort?): ReasoningEffort {
-        val next = when (current) {
-            ReasoningEffort.LOW -> ReasoningEffort.HIGH
-            ReasoningEffort.HIGH -> ReasoningEffort.LOW
-            else -> ReasoningEffort.HIGH
-        }
-        val effortStr = when (next) {
-            ReasoningEffort.LOW -> "low"
-            ReasoningEffort.HIGH -> "high"
-        }
+    fun toggleReasoning(current: ReasoningEffort?, webSearchEnabled: Boolean, agenticMode: Boolean): ReasoningEffort {
+        val next = current.cycle(webSearchEnabled && agenticMode)
         val message = if (isReasoningSupported) {
-            "Reasoning effort set: $effortStr"
+            "Reasoning effort set: ${next.label()}"
         } else {
-            "Reasoning effort set: $effortStr (not supported)"
+            "Reasoning effort set: ${next.label()} (not supported)"
         }
         Log.info(TAG_LLM, message)
         return next

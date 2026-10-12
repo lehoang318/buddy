@@ -375,4 +375,37 @@ sequenceDiagram
 
 ---
 
+### 12. Agentic Clarification (ask_user)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant ChatScreen
+    participant ViewModel
+    participant Engine as ConversationEngine
+    participant Tool as AskUserTool
+    participant Runner as ADK Runner
+
+    Note over Runner: Agentic mode; turn already streaming
+    Runner->>Engine: functionCall ask_user(question, options)
+    Engine-->>ViewModel: ConversationEvent.QuestionAsked
+    ViewModel-->>ChatScreen: pendingQuestion (chips + Skip)
+    Runner->>Tool: execute(args)
+    Tool->>Tool: bridge.receive() suspends (runner awaits inline)
+    ChatScreen-->>User: Question card on the assistant bubble
+    User->>ChatScreen: taps a chip / types an answer / Skip
+    ChatScreen->>ViewModel: answerQuestion(text) / skipPendingQuestion()
+    ViewModel->>ViewModel: append the answer as a user bubble
+    ViewModel->>Engine: answerPendingQuestion(text)
+    Engine->>Tool: bridge.send(answer)
+    Tool-->>Runner: { answer }
+    Engine-->>ViewModel: ClarificationAnswered
+    Runner->>Runner: model resumes; final answer streams into the same assistant bubble
+```
+
+- The runner awaits tool execution inside the turn flow, so the turn is paused — not ended — and no resume protocol or second runner invocation is needed.
+- A blank answer (Skip) yields a sentinel to the model; cancelling the turn cancels the suspended tool.
+
+---
+
 **Note**: These diagrams represent high-level happy path scenarios with alternative branches for common cases. Detailed error handling, retry logic, and edge cases are not shown for clarity.

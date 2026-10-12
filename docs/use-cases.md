@@ -324,7 +324,7 @@ Switch between different web search services to find current information.
 
 #### Step 5: Test Web Search
 1. Go back to the chat screen
-2. Enable web search (globe icon in top bar)
+2. Enable web search (web search toggle in the add dialog)
 3. Ask a current events question to test the new provider
 4. Verify you're getting up-to-date information
 
@@ -377,19 +377,18 @@ Toggle web search on or off to control whether Buddy searches the internet for a
 
 ### Steps
 
-#### Method 1: Using Top Bar Toggle (Quick Switch)
+#### Method 1: Using the Add Dialog (Quick Switch)
 
-1. **Locate Web Search Icon**
-   - Look at the top bar of the chat screen
-   - Find the globe icon (🌐) on the right side
+1. **Open the Add Dialog**
+   - Tap the `+` button at the bottom-left of the input bar
 
 2. **Toggle Web Search**
-   - **Tap once**: Enables web search
-   - **Tap again**: Disables web search
+   - Tap the "Web search" row or its switch
+   - **On**: Switch is enabled and the globe icon is highlighted
+   - **Off**: Switch is disabled and the globe icon is gray
 
-3. **Visual Feedback**
-   - **Enabled**: Globe icon is filled/colorful
-   - **Disabled**: Globe icon is outlined/gray
+3. **Close the Dialog**
+   - Tap outside the dialog to dismiss it
 
 4. **Test the Setting**
    - Ask a question that benefits from web search
@@ -408,8 +407,8 @@ Toggle web search on or off to control whether Buddy searches the internet for a
    - Enter API key if required
    - This sets up web search capability
 
-3. **Enable/Disable via Top Bar**
-   - Use the top bar toggle for temporary changes
+3. **Enable/Disable via the Add Dialog**
+   - Use the add dialog toggle for temporary changes
    - Providers provide the underlying capability
 
 ### Understanding Web Search Behavior

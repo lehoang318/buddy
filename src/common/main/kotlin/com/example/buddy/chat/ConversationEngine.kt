@@ -1,5 +1,9 @@
 package com.example.buddy.chat
 
+import com.example.buddy.agent.AgentTurn
+import com.example.buddy.agent.AgentTurnEvent
+import com.example.buddy.agent.QuestionBridge
+import com.example.buddy.agent.SummarizerAgent
 import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Role
 import com.example.buddy.data.Summary
@@ -10,6 +14,7 @@ import com.example.buddy.fetch.extractUrls
 import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
 import com.example.buddy.llm.LlmMessage
+import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.logging.Log
 import com.example.buddy.search.SearchResult
 import com.example.buddy.search.WebSearch
@@ -28,7 +33,8 @@ data class ConversationMessage(
     val role: Role,
     val content: String,
     val imageBase64: String? = null,
-    val attachment: TextAttachment? = null
+    val attachment: TextAttachment? = null,
+    val questionAsked: String? = null
 )
 
 sealed interface ConversationEvent {
@@ -36,13 +42,18 @@ sealed interface ConversationEvent {
     data class UrlFetchFinished(val result: UrlFetchResult) : ConversationEvent
     data class UserMessageAccepted(val message: ConversationMessage) : ConversationEvent
     data object SearchStarted : ConversationEvent
+    data class SearchQueriesPlanned(val queries: List<String>) : ConversationEvent
     data class SearchFinished(val outcome: WebSearchHelper.WebSearchOutcome) : ConversationEvent
+    data class QuestionAsked(val question: String, val options: List<String>) : ConversationEvent
+    data object ClarificationAnswered : ConversationEvent
     data class AssistantStarted(
         val id: String,
         val searchOutcome: WebSearchHelper.WebSearchOutcome?,
         val fetchedUrls: List<FetchedUrl>
     ) : ConversationEvent
     data class Token(val text: String) : ConversationEvent
+    data class ThoughtsDelta(val text: String) : ConversationEvent
+    data class AnswerReset(val retractedText: String) : ConversationEvent
     data class Completed(val assistantText: String, val summaries: List<Summary>) : ConversationEvent
     data class Failed(val error: Throwable) : ConversationEvent
 }
@@ -55,6 +66,7 @@ class ConversationEngine(
     private val processingLock = Mutex()
     private val history = mutableListOf<ConversationMessage>()
     private val _summaries = MutableStateFlow<List<Summary>>(emptyList())
+    private var activeQuestionBridge: QuestionBridge? = null
 
     val summaries = _summaries.asStateFlow()
     var client: LlmClient? = client
@@ -64,12 +76,16 @@ class ConversationEngine(
     var urlFetcher: UrlFetcher? = urlFetcher
         private set
     var webSearchEnabled: Boolean = true
+    var agenticMode: Boolean = false
+    var reasoningEffort: ReasoningEffort? = null
 
     fun updateDependencies(client: LlmClient?, webSearch: WebSearch?, urlFetcher: UrlFetcher?) {
         this.client = client
         this.webSearch = webSearch
         this.urlFetcher = urlFetcher
     }
+
+    fun answerPendingQuestion(text: String): Boolean = activeQuestionBridge?.send(text) ?: false
 
     fun clear() {
         history.clear()
@@ -116,89 +132,249 @@ class ConversationEngine(
                 return@withLock
             }
 
-            val searchOutcome = if (webSearchEnabled && searchProvider != null && userText.isNotBlank()) {
-                emit(ConversationEvent.SearchStarted)
-                val outcome = WebSearchHelper(activeClient, searchProvider).search(
-                    userText,
-                    _summaries.value,
-                    correlationId,
-                    imageBase64
-                )
-                emit(ConversationEvent.SearchFinished(outcome))
-                outcome
+            if (agenticMode) {
+                runAgenticTurn(activeClient, userMessage, fetchedUrls, generationConfig, correlationId)
             } else {
-                null
+                runLegacyTurn(activeClient, searchProvider, userMessage, fetchedUrls, generationConfig, correlationId)
             }
-
-            val assistantId = UUID.randomUUID().toString()
-            emit(ConversationEvent.AssistantStarted(assistantId, searchOutcome, fetchedUrls))
-
-            val messages = MessageBuilder.build(
-                history = history,
-                summaries = _summaries.value,
-                searchResults = searchOutcome?.rawResults.orEmpty(),
-                fetchedUrls = fetchedUrls,
-                searchAnswer = searchOutcome?.answer,
-                outputLimit = generationConfig.maxTokens
-            )
-            val response = StringBuilder()
-            try {
-                activeClient.streamCompletionWithLogging(
-                    messages,
-                    activeClient.activeModel,
-                    generationConfig,
-                    correlationId
-                ).collect { token ->
-                    response.append(token)
-                    emit(ConversationEvent.Token(token))
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                emit(ConversationEvent.Failed(e))
-                return@withLock
-            }
-
-            val assistantText = response.toString()
-            history += ConversationMessage(Role.ASSISTANT, assistantText)
-            if (assistantText.isNotBlank()) {
-                try {
-                    val summary = activeClient.generateSummary(
-                        userMessage.content,
-                        assistantText,
-                        model = activeClient.activeModel,
-                        imageBase64 = userMessage.imageBase64
-                    )
-                    val updated = _summaries.value + summary
-                    _summaries.value = if (updated.size > AppConfigProvider.current.summaries.maxSummaries) {
-                        val count = AppConfigProvider.current.summaries.maxSummaries / 2
-                        try {
-                            val compressed = activeClient.compressSummaries(
-                                updated.take(count),
-                                model = activeClient.activeModel
-                            )
-                            val preservedKeys = updated.take(count)
-                                .flatMap { it.points }
-                                .filter { it.key }
-                            val preservedTags = updated.take(count)
-                                .flatMap { it.tags }
-                                .distinct()
-                                .takeLast(AppConfigProvider.current.summaries.maxSessionTags)
-                            listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text }, preservedTags)) + updated.drop(count)
-                        } catch (e: Exception) {
-                            Log.error("Chat", "Failed to compress summaries", e.message)
-                            updated
-                        }
-                    } else {
-                        updated
-                    }
-                } catch (e: Exception) {
-                    Log.error("Chat", "Failed to generate summary", e.message)
-                }
-            }
-            emit(ConversationEvent.Completed(assistantText, _summaries.value))
         }
     }
+
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<ConversationEvent>.runLegacyTurn(
+        activeClient: LlmClient,
+        searchProvider: WebSearch?,
+        userMessage: ConversationMessage,
+        fetchedUrls: List<FetchedUrl>,
+        generationConfig: LlmGenerationConfig,
+        correlationId: String
+    ) {
+        val config = generationConfig.copy(reasoningEffort = reasoningEffort ?: generationConfig.reasoningEffort)
+        val searchOutcome = if (webSearchEnabled && searchProvider != null && userMessage.content.isNotBlank()) {
+            emit(ConversationEvent.SearchStarted)
+            val outcome = WebSearchHelper(activeClient, searchProvider).search(
+                userMessage.content,
+                _summaries.value,
+                correlationId,
+                userMessage.imageBase64,
+                onQueriesPlanned = { emit(ConversationEvent.SearchQueriesPlanned(it)) }
+            )
+            emit(ConversationEvent.SearchFinished(outcome))
+            outcome
+        } else {
+            null
+        }
+
+        val assistantId = UUID.randomUUID().toString()
+        emit(ConversationEvent.AssistantStarted(assistantId, searchOutcome, fetchedUrls))
+
+        val messages = MessageBuilder.build(
+            history = history,
+            summaries = _summaries.value,
+            searchResults = searchOutcome?.rawResults.orEmpty(),
+            fetchedUrls = fetchedUrls,
+            searchAnswer = searchOutcome?.answer,
+            outputLimit = config.maxTokens
+        )
+        val response = StringBuilder()
+        try {
+            activeClient.streamCompletionWithLogging(
+                messages,
+                activeClient.activeModel,
+                config,
+                correlationId
+            ).collect { token ->
+                response.append(token)
+                emit(ConversationEvent.Token(token))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emit(ConversationEvent.Failed(e))
+            return
+        }
+
+        val assistantText = response.toString()
+        history += ConversationMessage(Role.ASSISTANT, assistantText)
+        updateSummaries(activeClient, userMessage, assistantText)
+        emit(ConversationEvent.Completed(assistantText, _summaries.value))
+    }
+
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<ConversationEvent>.runAgenticTurn(
+        activeClient: LlmClient,
+        userMessage: ConversationMessage,
+        fetchedUrls: List<FetchedUrl>,
+        generationConfig: LlmGenerationConfig,
+        correlationId: String
+    ) {
+        val assistantId = UUID.randomUUID().toString()
+        emit(ConversationEvent.AssistantStarted(assistantId, null, fetchedUrls))
+
+        val effort = reasoningEffort ?: generationConfig.reasoningEffort
+        val searchRoundCap = if (webSearchEnabled) {
+            if (effort == ReasoningEffort.DEEP) AppConfigProvider.current.agentic.deepResearchSearchRounds
+            else AppConfigProvider.current.agentic.standardSearchRounds
+        } else {
+            null
+        }
+        val response = StringBuilder()
+        var failed = false
+        var askedQuestion: String? = null
+        val questionBridge = QuestionBridge()
+        activeQuestionBridge = questionBridge
+        val turn = AgentTurn(
+            client = activeClient,
+            webSearch = webSearch,
+            urlFetcher = urlFetcher,
+            webSearchEnabled = webSearchEnabled,
+            questionBridge = questionBridge,
+            reasoningEffort = effort,
+            searchRoundCap = searchRoundCap
+        )
+        val agentUserText = buildString {
+            userMessage.attachment?.let { append("[File: ${it.name}]\n${it.text}\n\n") }
+            append(userMessage.content)
+        }
+        try {
+            turn.run(
+                userMessage = agentUserText,
+                imageBase64 = userMessage.imageBase64,
+                history = history,
+                summaries = _summaries.value,
+                fetchedUrls = fetchedUrls
+            ).collect { event ->
+                when (event) {
+                    is AgentTurnEvent.Text -> {
+                        response.append(event.text)
+                        emit(ConversationEvent.Token(event.text))
+                    }
+                    is AgentTurnEvent.ThoughtsDelta -> emit(ConversationEvent.ThoughtsDelta(event.text))
+                    is AgentTurnEvent.AnswerReset -> {
+                        response.clear()
+                        emit(ConversationEvent.AnswerReset(event.retractedText))
+                    }
+                    is AgentTurnEvent.ToolCallStarted -> {
+                        when (event.name) {
+                            "web_search" -> {
+                                emit(ConversationEvent.SearchStarted)
+                                val queries = toolCallQueries(event.args)
+                                if (queries.isNotEmpty()) emit(ConversationEvent.SearchQueriesPlanned(queries))
+                            }
+                            "ask_user" -> {
+                                val question = (event.args["question"] as? String)?.trim().orEmpty()
+                                if (question.isNotBlank()) {
+                                    askedQuestion = question
+                                    emit(ConversationEvent.QuestionAsked(question, toolCallOptions(event.args)))
+                                }
+                            }
+                        }
+                    }
+                    is AgentTurnEvent.ToolCallFinished -> {
+                        when (event.name) {
+                            "web_search" -> emit(ConversationEvent.SearchFinished(toSearchOutcome(event.result)))
+                            "fetch_url" -> {
+                                emit(ConversationEvent.UrlFetchStarted)
+                                emit(ConversationEvent.UrlFetchFinished(toFetchResult(event.result)))
+                            }
+                            "ask_user" -> {
+                                (event.result["answer"] as? String)?.let { answer ->
+                                    history += ConversationMessage(Role.USER, answer)
+                                    emit(ConversationEvent.ClarificationAnswered)
+                                }
+                            }
+                        }
+                    }
+                    is AgentTurnEvent.Completed -> Unit
+                    is AgentTurnEvent.Failed -> {
+                        failed = true
+                        emit(ConversationEvent.Failed(event.error))
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emit(ConversationEvent.Failed(e))
+            return
+        } finally {
+            activeQuestionBridge = null
+        }
+        if (failed) return
+
+        val assistantText = response.toString()
+        history += ConversationMessage(Role.ASSISTANT, assistantText, questionAsked = askedQuestion)
+        updateSummaries(activeClient, userMessage, assistantText)
+        emit(ConversationEvent.Completed(assistantText, _summaries.value))
+    }
+
+    private suspend fun updateSummaries(
+        activeClient: LlmClient,
+        userMessage: ConversationMessage,
+        assistantText: String
+    ) {
+        if (assistantText.isBlank()) return
+        val summarizer = SummarizerAgent(activeClient)
+        try {
+            val summary = summarizer.summarize(
+                userMessage.content,
+                assistantText,
+                userMessage.imageBase64
+            )
+            val updated = _summaries.value + summary
+            _summaries.value = if (updated.size > AppConfigProvider.current.summaries.maxSummaries) {
+                val count = AppConfigProvider.current.summaries.maxSummaries / 2
+                try {
+                    val compressed = summarizer.compress(updated.take(count))
+                    val preservedKeys = updated.take(count)
+                        .flatMap { it.points }
+                        .filter { it.key }
+                    val preservedTags = updated.take(count)
+                        .flatMap { it.tags }
+                        .distinct()
+                        .takeLast(AppConfigProvider.current.summaries.maxSessionTags)
+                    listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text }, preservedTags)) + updated.drop(count)
+                } catch (e: Exception) {
+                    Log.error("Chat", "Failed to compress summaries", e.message)
+                    updated
+                }
+            } else {
+                updated
+            }
+        } catch (e: Exception) {
+            Log.error("Chat", "Failed to generate summary", e.message)
+        }
+    }
+
+    private fun toSearchOutcome(result: Map<String, Any?>): WebSearchHelper.WebSearchOutcome {
+        val resultsText = result["results"] as? String
+        val answer = result["answer"] as? String
+        val error = result["error"] as? String
+        val queries = (result["queries"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+        return WebSearchHelper.WebSearchOutcome(
+            resultsText = resultsText,
+            answer = answer,
+            queries = queries,
+            errorMessage = error
+        )
+    }
+
+    private fun toFetchResult(result: Map<String, Any?>): UrlFetchResult {
+        val url = result["url"] as? String
+        val content = result["content"] as? String
+        val error = result["error"] as? String
+        return if (url != null && content != null) {
+            UrlFetchResult(urls = listOf(FetchedUrl(url, content)))
+        } else {
+            UrlFetchResult(warnings = listOfNotNull(error ?: "Failed to fetch URL"))
+        }
+    }
+
+    private fun toolCallQueries(args: Map<String, Any?>): List<String> =
+        (args["queries"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+            .map { it.trim() }.filter { it.isNotBlank() }.distinctBy { it.lowercase() }
+
+    private fun toolCallOptions(args: Map<String, Any?>): List<String> =
+        (args["options"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+            .map { it.trim() }.filter { it.isNotBlank() }.take(4)
 }
 
 object MessageBuilder {
@@ -307,7 +483,10 @@ object MessageBuilder {
         systemMessage?.let { result += it }
         pairs.forEach { (user, assistant) ->
             result += LlmMessage(Role.USER, buildMessageContent(user), user.imageBase64)
-            result += LlmMessage(Role.ASSISTANT, assistant.content)
+            val assistantContent = assistant.questionAsked
+                ?.let { "You asked the user: \"$it\"\n\n${assistant.content}" }
+                ?: assistant.content
+            result += LlmMessage(Role.ASSISTANT, assistantContent)
         }
         finalUserMessage?.let { result += it }
         return result

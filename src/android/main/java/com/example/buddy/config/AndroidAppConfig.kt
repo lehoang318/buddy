@@ -106,5 +106,22 @@ class AndroidAppConfig(context: Context) : AppConfig {
             }
     }
 
+    override val agentic = object : AgenticConfig {
+        override val enabledByDefault get() = res.getBoolean(R.bool.agentic_enabled_default)
+        override val agentName get() = res.getString(R.string.agent_name)
+        override val agentDescription get() = res.getString(R.string.agent_description)
+        override val maxSteps get() = res.getInteger(R.integer.agent_max_steps)
+        override val standardSearchRounds get() = res.getInteger(R.integer.agent_standard_search_rounds)
+        override val deepResearchSearchRounds get() = res.getInteger(R.integer.agent_deep_research_search_rounds)
+        override val baseInstruction get() = res.getString(R.string.agentic_base_instruction)
+        override val webSearchInstruction get() = res.getString(R.string.agentic_web_search_instruction)
+        override val fetchUrlInstruction get() = res.getString(R.string.agentic_fetch_url_instruction)
+        override val noToolsInstruction get() = res.getString(R.string.agentic_no_tools_instruction)
+        override val webSearchToolDescription get() = res.getString(R.string.web_search_tool_description)
+        override val fetchUrlToolDescription get() = res.getString(R.string.fetch_url_tool_description)
+        override val askUserInstruction get() = res.getString(R.string.agentic_ask_user_instruction)
+        override val askUserToolDescription get() = res.getString(R.string.ask_user_tool_description)
+    }
+
     override val debugLogging = BuildConfig.DEBUG
 }

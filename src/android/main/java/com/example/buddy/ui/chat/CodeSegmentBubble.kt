@@ -20,16 +20,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
@@ -53,6 +47,13 @@ import androidx.compose.ui.unit.dp
 import com.example.buddy.chat.codeFileName
 import com.example.buddy.chat.extensionForLang
 import com.example.buddy.data.EventLog
+import com.example.buddy.ui.icons.Check
+import com.example.buddy.ui.icons.ContentCopy
+import com.example.buddy.ui.icons.Download
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.KeyboardArrowDown
+import com.example.buddy.ui.icons.KeyboardArrowUp
+import com.example.buddy.ui.icons.Visibility
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.SecondaryIcons
 import com.example.buddy.ui.theme.SendButton
@@ -79,7 +80,8 @@ fun CodeSegmentBubble(
     code: String,
     streaming: Boolean,
     maxWidth: Dp,
-    glowAlpha: Float
+    glowAlpha: Float,
+    shape: Shape
 ) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -90,13 +92,12 @@ fun CodeSegmentBubble(
     var userCollapsed by remember { mutableStateOf<Boolean?>(null) }
     val lineCount = code.lines().size
     val collapsed = userCollapsed ?: (!streaming && lineCount > COLLAPSE_LINE_THRESHOLD)
-    val shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp)
 
     Surface(
         color = SurfaceVariant,
         shape = shape,
         modifier = Modifier
-            .widthIn(max = maxWidth)
+            .width(maxWidth)
             .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -187,12 +188,12 @@ fun CodeSegmentBubble(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .clickable { userCollapsed = false }
                 ) {
                     Surface(
                         color = VintageBackground,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(2.dp)
                     ) {
                         Text(
                             text = code.lines().take(COLLAPSED_PREVIEW_LINES).joinToString("\n"),
@@ -219,7 +220,7 @@ fun CodeSegmentBubble(
             } else {
                 Surface(
                     color = VintageBackground,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(2.dp)
                 ) {
                     SelectionContainer {
                         Text(

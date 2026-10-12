@@ -2,9 +2,11 @@ package com.example.buddy.ui.chat
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,17 +24,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.NavigateBefore
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +35,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,12 +50,28 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.ui.icons.Add
+import com.example.buddy.ui.icons.AllInclusive
+import com.example.buddy.ui.icons.AttachFile
+import com.example.buddy.ui.icons.CameraAlt
+import com.example.buddy.ui.icons.Close
+import com.example.buddy.ui.icons.Counter0
+import com.example.buddy.ui.icons.Counter1
+import com.example.buddy.ui.icons.Description
+import com.example.buddy.ui.icons.Icons
+import com.example.buddy.ui.icons.Language
+import com.example.buddy.ui.icons.NavigateBefore
+import com.example.buddy.ui.icons.NavigateNext
+import com.example.buddy.ui.icons.Send
+import com.example.buddy.ui.icons.Stop
 import com.example.buddy.ui.theme.OnSurfaceVariant
 import com.example.buddy.ui.theme.Outline
 import com.example.buddy.ui.theme.SecondaryIcons
@@ -65,6 +79,9 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import com.example.buddy.ui.theme.VintageBackground
+import kotlinx.coroutines.delay
+
+private const val REASONING_LOCK_MS = 1_000L
 
 @Composable
 fun InputBar(
@@ -76,8 +93,12 @@ fun InputBar(
     isOffline: Boolean,
     isProcessing: Boolean,
     isCancelling: Boolean,
+    answeringQuestion: Boolean,
     reasoningEffort: ReasoningEffort?,
     onToggleReasoning: () -> Unit,
+    webSearchEnabled: Boolean,
+    webSearchAvailable: Boolean,
+    onToggleWebSearch: () -> Unit,
     onTextChange: (String) -> Unit,
     onClearImage: () -> Unit,
     onClearFile: () -> Unit,
@@ -96,6 +117,22 @@ fun InputBar(
     val canSend = text.isNotBlank()
     val imageOnly = pendingImage != null && text.isBlank()
 
+    val context = LocalContext.current
+    var lastReasoning by remember { mutableStateOf(reasoningEffort) }
+    var reasoningLocked by remember { mutableStateOf(false) }
+    var showAddMenu by remember { mutableStateOf(false) }
+    LaunchedEffect(reasoningEffort) {
+        if (reasoningEffort == ReasoningEffort.DEEP && reasoningEffort != lastReasoning) {
+            val toast = Toast.makeText(context, "Reasoning: deep research", Toast.LENGTH_SHORT)
+            toast.show()
+            reasoningLocked = true
+            delay(REASONING_LOCK_MS)
+            toast.cancel()
+            reasoningLocked = false
+        }
+        lastReasoning = reasoningEffort
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -107,8 +144,9 @@ fun InputBar(
             val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
             if (bitmap != null) {
                 Box(modifier = Modifier.padding(bottom = 6.dp)) {
+                    val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
                     Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = imageBitmap,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -168,7 +206,16 @@ fun InputBar(
                 value = text,
                 onValueChange = onTextChange,
                 enabled = !isOffline,
-                placeholder = { Text(if (isOffline) "Offline mode" else "Message Buddy...", color = OnSurfaceVariant) },
+                placeholder = {
+                    Text(
+                        when {
+                            answeringQuestion -> "Type your answer..."
+                            isOffline -> "Offline mode"
+                            else -> "Message Buddy..."
+                        },
+                        color = OnSurfaceVariant
+                    )
+                },
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
                     unfocusedContainerColor = Color.Transparent,
@@ -205,28 +252,79 @@ fun InputBar(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onPickAttachment,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AttachFile,
-                        contentDescription = "Attach",
-                        tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
-                    )
+                Box {
+                    IconButton(
+                        onClick = { showAddMenu = true },
+                        enabled = !isOffline,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Add",
+                            tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showAddMenu,
+                        onDismissRequest = { showAddMenu = false },
+                        offset = DpOffset(0.dp, 36.dp)
+                    ) {
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.AttachFile,
+                                    null,
+                                    tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                                )
+                            },
+                            text = {
+                                Text(
+                                    "Attach file",
+                                    color = if (isOffline) OnSurfaceVariant else TextColor
+                                )
+                            },
+                            modifier = Modifier.height(40.dp),
+                            enabled = !isOffline,
+                            onClick = {
+                                showAddMenu = false
+                                onPickAttachment()
+                            }
+                        )
+                        DropdownMenuItem(
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.CameraAlt,
+                                    null,
+                                    tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
+                                )
+                            },
+                            text = {
+                                Text(
+                                    "Take photo",
+                                    color = if (isOffline) OnSurfaceVariant else TextColor
+                                )
+                            },
+                            modifier = Modifier.height(40.dp),
+                            enabled = !isOffline,
+                            onClick = {
+                                showAddMenu = false
+                                onTakePhoto()
+                            }
+                        )
+                    }
                 }
-
-                IconButton(
-                    onClick = onTakePhoto,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = "Take Photo",
-                        tint = if (isOffline) OnSurfaceVariant else SecondaryIcons
-                    )
+                Box {
+                    IconButton(
+                        onClick = { onToggleWebSearch() },
+                        enabled = webSearchAvailable && !isOffline,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = "Web search",
+                            tint = if (isOffline || !webSearchAvailable) OnSurfaceVariant else if (webSearchEnabled) SendButton else SecondaryIcons
+                        )
+                    }
                 }
             }
 
@@ -274,30 +372,42 @@ fun InputBar(
 
             Row(
                 modifier = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onToggleReasoning,
-                    enabled = !isOffline,
-                    modifier = Modifier.size(36.dp)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clickable(enabled = !isOffline && !reasoningLocked, onClick = onToggleReasoning),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.Lightbulb,
-                        contentDescription = "Toggle Reasoning",
+                        imageVector = when (reasoningEffort) {
+                            ReasoningEffort.DEEP -> Icons.Filled.AllInclusive
+                            ReasoningEffort.HIGH -> Icons.Filled.Counter1
+                            else -> Icons.Filled.Counter0
+                        },
+                        contentDescription = when (reasoningEffort) {
+                            ReasoningEffort.DEEP -> "Reasoning: deep research"
+                            ReasoningEffort.HIGH -> "Reasoning: high"
+                            else -> "Reasoning: low"
+                        },
                         tint = when {
                             isOffline -> OnSurfaceVariant
-                            reasoningEffort == ReasoningEffort.HIGH -> SendButton
+                            reasoningEffort == ReasoningEffort.HIGH || reasoningEffort == ReasoningEffort.DEEP -> SendButton
                             else -> SecondaryIcons
-                        }
+                        },
+                        modifier = Modifier.size(28.dp)
                     )
                 }
 
                 IconButton(
                     onClick = {
                         when {
-                            isProcessing && !isCancelling -> onCancel()
-                            !isProcessing -> onSend()
+                            isCancelling -> Unit
+                            answeringQuestion -> if (canSend) onSend() else onCancel()
+                            isProcessing -> onCancel()
+                            else -> onSend()
                         }
                     },
                     enabled = !isOffline && (isProcessing || canSend) && !isCancelling,
@@ -306,6 +416,7 @@ fun InputBar(
                         .background(
                             when {
                                 isCancelling -> Outline
+                                answeringQuestion && canSend -> SendButton
                                 isProcessing -> SendButton
                                 canSend && !isOffline -> SendButton
                                 else -> Outline
@@ -318,6 +429,12 @@ fun InputBar(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                             color = TextColor
+                        )
+                        answeringQuestion && canSend -> Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = "Send",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                         isProcessing -> Icon(
                             Icons.Default.Stop,
