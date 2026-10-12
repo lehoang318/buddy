@@ -17,7 +17,7 @@ This document outlines the current technical limitations and constraints of the 
 
 ### Known Issues
 
-- **EXIF Orientation**: Images taken in portrait mode on some devices may appear rotated (no EXIF orientation handling)
+- **EXIF Orientation**: Orientation is normalized on import (all rotation and mirroring variants are applied), but the orientation tag itself is not preserved — the re-encoded JPEG is stored upright
 - **Animated Images**: GIF and animated WebP are converted to static JPEG of the first frame only
 - **Metadata Stripping**: All EXIF data, GPS coordinates, and camera information are removed during JPEG re-encoding
 
@@ -171,9 +171,9 @@ Known constraints of session persistence (see [sessions.md](./sessions.md)):
 
 | Aspect | Limitation |
 |--------|------------|
-| **Image attachments stored on disk** | Image bytes are written to app-private `filesDir/session_images/<sessionId>/` as JPEGs; only a filename (`imageRef`) lives in the DataStore JSON. Images are small (max 1440px, JPEG q85) but deleting the app or clearing app data removes them, so restored sessions then show the message without its thumbnail |
+| **Image attachments stored on disk** | Image bytes are written to app-private `filesDir/session_images/<sessionId>/` as JPEGs; only a filename (`imageRef`) lives in the DataStore JSON. New images use a stable content-hash filename and are written through a temp file, so re-saving the same turn does not rewrite or duplicate them. On resume only the last few exchanges are loaded back into memory as Base64; older images render lazily from disk. Images are small (max 1440px, JPEG q85) but clearing app data removes them, so restored sessions then show the message without its thumbnail |
 | **File URI not persisted** | Only the file name and extracted text are saved; the original `Uri` cannot be restored after process death |
-| **Session cap** | Oldest sessions beyond `MAX_SESSIONS` (100) are silently trimmed to bound storage growth |
+| **Session cap** | Oldest sessions beyond `MAX_SESSIONS` (100) are trimmed to bound storage growth, and their image directories are deleted at the same time. Startup also reconciles `session_images/` against the live session list and sweeps abandoned camera-capture files |
 | **Failed turns are saved** | A failed turn persists the user message plus an `Error: ...` assistant bubble, which then appears on resume |
 
 ---
@@ -209,8 +209,8 @@ See [web-search.md](./web-search.md) for the full workflow. Known constraints:
 
 | Permission | Purpose | Required For |
 |------------|---------|--------------|
-| **Camera** | Photo capture | Image attachments via camera |
-| **Storage** | File access | Selecting files from device |
+| **Camera** | Not declared | Photo capture is delegated to the system camera app via a `FileProvider` URI, so Buddy does not request `CAMERA` |
+| **Storage** | Not declared | File selection uses the Storage Access Framework (`OpenDocument`), which grants per-file access without a storage permission |
 | **Internet** | API calls | All AI and web search features |
 
 ---
@@ -230,7 +230,7 @@ See [web-search.md](./web-search.md) for the full workflow. Known constraints:
 
 - **Local Storage**: Conversations are stored locally on your device
 - **API Transmission**: Messages are sent to your chosen AI provider
-- **No Cloud Backup**: No automatic backup to external servers
+- **No Cloud Backup**: Chat sessions, session images, and API keys are explicitly excluded from Android cloud backup and device transfer (`backup_rules.xml` / `data_extraction_rules.xml`), so restores never produce chats with missing images or expose credentials
 
 ### Recommendations
 
@@ -251,7 +251,6 @@ See [web-search.md](./web-search.md) for the full workflow. Known constraints:
 - [ ] Text file preview functionality
 - [ ] Drag-and-drop support
 - [ ] Clipboard paste for images
-- [ ] EXIF orientation handling
 - [ ] Animated image support
 - [ ] Larger file size limits
 

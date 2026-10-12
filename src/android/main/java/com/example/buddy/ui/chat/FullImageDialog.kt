@@ -1,10 +1,8 @@
 package com.example.buddy.ui.chat
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,17 +16,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.example.buddy.ui.icons.Close
 import com.example.buddy.ui.icons.Icons
 import com.example.buddy.ui.theme.Outline
 
 @Composable
-fun FullImageDialog(imageBitmap: ImageBitmap, onDismiss: () -> Unit) {
+fun FullImageDialog(model: Any, onDismiss: () -> Unit) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -43,13 +41,11 @@ fun FullImageDialog(imageBitmap: ImageBitmap, onDismiss: () -> Unit) {
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                Image(
-                    bitmap = imageBitmap,
+                AsyncImage(
+                    model = model,
                     contentDescription = "Attached image",
                     contentScale = ContentScale.FillWidth,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(imageBitmap.width.toFloat() / imageBitmap.height.toFloat())
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
             IconButton(

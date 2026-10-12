@@ -35,6 +35,7 @@ import com.example.buddy.LocalLlmClient
 import com.example.buddy.LocalUrlFetcher
 import com.example.buddy.LocalWebSearch
 import com.example.buddy.data.Role
+import com.example.buddy.data.SessionImageStore
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -80,6 +81,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
 
     val context = LocalContext.current
+    val imageStore = remember { SessionImageStore(context.applicationContext) }
     val attachmentPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -93,38 +95,30 @@ fun ChatScreen(
         }
     }
 
-    val cameraTempFile = remember {
-        File.createTempFile("buddy_camera_", ".jpg", context.cacheDir)
-    }
-    val cameraTempUri = remember {
-        FileProvider.getUriForFile(
-            context.applicationContext,
-            "${context.packageName}.fileprovider",
-            cameraTempFile
-        )
-    }
-
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
-        if (success && cameraTempUri != null) {
-            vm.onImageUri(cameraTempUri)
-        }
+        vm.onCameraResult(success)
     }
 
-    val onTakePhoto = remember(cameraTempUri) {
+    val onTakePhoto = remember(vm) {
         {
-            takePictureLauncher.launch(cameraTempUri)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                cameraTempFile.delete()
-            } catch (e: Exception) {
+            val uri = vm.startCameraCapture()
+            if (uri == null) {
+                vm.onCameraLaunchFailed()
+            } else {
+                try {
+                    takePictureLauncher.launch(uri)
+                } catch (e: Exception) {
+                    vm.onCameraLaunchFailed()
+                }
             }
         }
+    }
+
+    val imageFileFor: (String) -> File? = remember(state.sessionId, imageStore) {
+        val sessionId = state.sessionId
+        { ref -> sessionId?.let { imageStore.fileFor(it, ref) } }
     }
 
     Scaffold(
@@ -153,6 +147,7 @@ fun ChatScreen(
                 pendingFile = state.pendingFileUri,
                 pendingFileName = state.pendingFileName,
                 attachmentError = state.attachmentError,
+                isAttachmentProcessing = state.isAttachmentProcessing,
                 isOffline = state.isOffline,
                 isProcessing = state.isLoading || state.isStreaming || state.urlFetchInProgress,
                 isCancelling = state.isCancelling,
@@ -240,7 +235,8 @@ fun ChatScreen(
                             keyboard?.hide()
                             vm.skipPendingQuestion()
                         },
-                        imagePreviewMaxHeight = imagePreviewMaxHeight
+                        imagePreviewMaxHeight = imagePreviewMaxHeight,
+                        imageFileFor = imageFileFor
                     )
                 }
                 if (state.isLoading) {

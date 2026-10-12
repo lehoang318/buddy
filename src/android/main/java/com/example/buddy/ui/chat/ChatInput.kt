@@ -79,6 +79,7 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.TextColor
 import com.example.buddy.ui.theme.VintageBackground
+import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
 
 private const val REASONING_LOCK_MS = 1_000L
@@ -90,6 +91,7 @@ fun InputBar(
     pendingFile: Uri?,
     pendingFileName: String?,
     attachmentError: String?,
+    isAttachmentProcessing: Boolean,
     isOffline: Boolean,
     isProcessing: Boolean,
     isCancelling: Boolean,
@@ -114,7 +116,7 @@ fun InputBar(
     onSend: () -> Unit,
     onCancel: () -> Unit
 ) {
-    val canSend = text.isNotBlank()
+    val canSend = text.isNotBlank() && !isAttachmentProcessing
     val imageOnly = pendingImage != null && text.isBlank()
 
     val context = LocalContext.current
@@ -141,31 +143,35 @@ fun InputBar(
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
         pendingImage?.let { base64 ->
-            val bitmap = remember(base64) { decodeBase64ToBitmap(base64) }
-            if (bitmap != null) {
-                Box(modifier = Modifier.padding(bottom = 6.dp)) {
-                    val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(60.dp)
-                            .aspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat())
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                    IconButton(
-                        onClick = onClearImage,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .align(Alignment.TopEnd)
-                            .offset(x = 4.dp, y = (-4).dp)
-                            .background(Outline, CircleShape)
-                    ) {
-                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(10.dp))
-                    }
+            Box(modifier = Modifier.padding(bottom = 6.dp)) {
+                AsyncImage(
+                    model = base64,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+                IconButton(
+                    onClick = onClearImage,
+                    modifier = Modifier
+                        .size(18.dp)
+                        .align(Alignment.TopEnd)
+                        .offset(x = 4.dp, y = (-4).dp)
+                        .background(Outline, CircleShape)
+                ) {
+                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(10.dp))
                 }
             }
+        }
+
+        if (isAttachmentProcessing) {
+            Text(
+                "Processing image…",
+                color = OnSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
         }
 
         pendingFileName?.let { fileName ->

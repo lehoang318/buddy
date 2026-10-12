@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,6 +75,7 @@ import com.example.buddy.ui.theme.SendButton
 import com.example.buddy.ui.theme.SurfaceVariant
 import com.example.buddy.ui.theme.UserBubble
 import com.example.buddy.ui.theme.VintageBackground
+import coil.compose.AsyncImage
 
 private const val THOUGHT_PREVIEW_LINES = 2
 
@@ -85,7 +87,8 @@ fun MessageRow(
     pendingOptions: List<String> = emptyList(),
     onAnswerOption: (String) -> Unit = {},
     onSkipAnswer: () -> Unit = {},
-    imagePreviewMaxHeight: Dp = 280.dp
+    imagePreviewMaxHeight: Dp = 280.dp,
+    imageFileFor: (String) -> java.io.File? = { null }
 ) {
     val isUser = message.role == Role.USER
     val windowInfo = LocalWindowInfo.current
@@ -115,33 +118,28 @@ fun MessageRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            message.imageBase64?.let { base64 ->
-                val bitmap = remember(message.id, base64) { ImageBitmapCache.get(message.id, base64) }
-                if (bitmap != null) {
-                    val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
-                    val naturalHeight = IMAGE_PREVIEW_WIDTH * (bitmap.height.toFloat() / bitmap.width.toFloat())
-                    val previewHeight = minOf(naturalHeight, imagePreviewMaxHeight)
-                    var showFullImage by remember { mutableStateOf(false) }
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = "Attached image",
-                        contentScale = ContentScale.Crop,
-                        alignment = Alignment.TopCenter,
-                        modifier = Modifier
-                            .width(IMAGE_PREVIEW_WIDTH)
-                            .height(previewHeight)
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, Outline, RoundedCornerShape(14.dp))
-                            .clickable { showFullImage = true }
+            val imageModel: Any? = message.imageBase64 ?: message.imageRef?.let { imageFileFor(it) }
+            if (imageModel != null) {
+                var showFullImage by remember { mutableStateOf(false) }
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = "Attached image",
+                    contentScale = ContentScale.Crop,
+                    alignment = Alignment.TopCenter,
+                    modifier = Modifier
+                        .width(IMAGE_PREVIEW_WIDTH)
+                        .heightIn(max = imagePreviewMaxHeight)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(1.dp, Outline, RoundedCornerShape(14.dp))
+                        .clickable { showFullImage = true }
+                )
+                if (showFullImage) {
+                    FullImageDialog(
+                        model = imageModel,
+                        onDismiss = { showFullImage = false }
                     )
-                    if (showFullImage) {
-                        FullImageDialog(
-                            imageBitmap = imageBitmap,
-                            onDismiss = { showFullImage = false }
-                        )
-                    }
-                    Spacer(Modifier.height(4.dp))
                 }
+                Spacer(Modifier.height(4.dp))
             }
 
             message.attachedFileName?.let { fileName ->

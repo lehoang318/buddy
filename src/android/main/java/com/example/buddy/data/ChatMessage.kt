@@ -7,6 +7,7 @@ data class ChatMessage(
     val role: Role,
     val content: String,
     val imageBase64: String? = null,
+    val imageRef: String? = null,
     val attachedFileUri: Uri? = null,
     val attachedFileName: String? = null,
     val attachedFileText: String? = null,

@@ -23,6 +23,7 @@ This document provides a concise overview of the external libraries used in the 
 | `androidx.lifecycle:lifecycle-viewmodel-compose` | Lifecycle | 2.10.0 | ViewModel integration for Compose |
 | `androidx.activity:activity-compose` | Lifecycle | 1.13.0 | Activity integration for Compose |
 | `io.coil-kt:coil-compose` | Images | 2.7.0 | Image loading and caching |
+| `androidx.exifinterface:exifinterface` | Images | 1.3.7 | Reads JPEG EXIF orientation so imported photos are rotated/mirrored correctly before re-encoding |
 | `io.noties.markwon:*` | Text | 4.6.2 | Markdown rendering with tables, strikethrough, task lists, HTML, linkify, Coil images (pinned in `android/build.gradle.kts`) |
 | `androidx.security:security-crypto` | Security | 1.0.0 | EncryptedSharedPreferences for API key storage |
 | `androidx.datastore:datastore-preferences` | Storage | 1.2.1 | Persistent app settings and saved sessions (non-sensitive) |

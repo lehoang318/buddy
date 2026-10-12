@@ -23,12 +23,27 @@ class SessionRepository(private val storage: SessionStorage) {
 
     val autoDeleteOld: Flow<Boolean> = storage.autoDeleteOldSetting
 
-    suspend fun addSession(session: SavedSession) = mutex.withLock {
+    suspend fun addSession(session: SavedSession): Set<String> = mutex.withLock {
         val list = deserialize(storage.sessionsJson.first()).toMutableList()
         list.removeAll { it.id == session.id }
         list.add(0, session)
-        while (list.size > MAX_SESSIONS) list.removeAt(list.size - 1)
+        val evicted = mutableSetOf<String>()
+        while (list.size > MAX_SESSIONS) evicted += list.removeAt(list.size - 1).id
         storage.writeSessions(serialize(list))
+        evicted
+    }
+
+    suspend fun knownSessionIds(): Set<String>? {
+        val json = storage.sessionsJson.first()
+        if (json.isBlank()) return emptySet()
+        return try {
+            gson.fromJson<List<SavedSession>>(json, object : TypeToken<List<SavedSession>>() {}.type)
+                ?.map { it.id }
+                ?.toSet()
+                ?: emptySet()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     suspend fun deleteSessions(ids: Set<String>) = mutex.withLock {

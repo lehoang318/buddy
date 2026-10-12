@@ -1,14 +1,15 @@
 package com.example.buddy.ui.chat
 
 import android.app.Application
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import androidx.core.graphics.scale
 import android.net.Uri
 import android.util.Base64
+import androidx.core.content.FileProvider
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.buddy.data.EventLog
 import com.example.buddy.data.SessionImageStore
 import com.example.buddy.agent.ASK_USER_SKIP_ANSWER
@@ -34,11 +35,13 @@ import com.example.buddy.llm.LlmClient
 import com.example.buddy.llm.LlmGenerationConfig
 import com.example.buddy.llm.LlmModel
 import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.logging.Log
 import com.example.buddy.search.WebSearch
 import com.example.buddy.service.BuddyForegroundService
 import com.example.buddy.service.ServiceHelper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -46,13 +49,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
+import java.io.File
+import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.ChatMessage as UiChatMessage
 
-private const val MAX_IMAGE_DIMENSION = 1440
-private const val JPEG_QUALITY = 85
 private const val TAG = "Chat"
+private const val KEY_PENDING_CAPTURE = "pending_camera_capture"
 
 data class PendingQuestion(
     val question: String,
@@ -68,6 +73,7 @@ data class ChatUiState(
     val pendingImageBase64: String? = null,
     val pendingFileUri: Uri? = null,
     val pendingFileName: String? = null,
+    val isAttachmentProcessing: Boolean = false,
     val agenticMode: Boolean = false,
     val availableModels: List<LlmModel> = emptyList(),
     val selectedModel: String = "",
@@ -81,11 +87,13 @@ data class ChatUiState(
     val isStreaming: Boolean = false,
     val isCancelling: Boolean = false,
     val pendingQuestion: PendingQuestion? = null,
-    val summaries: List<Summary> = emptyList()
+    val summaries: List<Summary> = emptyList(),
+    val sessionId: String? = null
 )
 
 class ChatViewModel(
     private val application: Application,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private var llmClient: LlmClient? = null
@@ -93,6 +101,9 @@ class ChatViewModel(
     private val sessionManager = ChatSessionManager(SessionRepository(application))
     private val sessionImageStore = SessionImageStore(application)
     private val settingsRepository = SettingsRepository(application)
+    private val saveMutex = Mutex()
+    private var attachmentJob: Job? = null
+    private var attachmentGeneration = 0
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
@@ -179,6 +190,9 @@ class ChatViewModel(
     }
 
     fun clearChat() {
+        attachmentGeneration++
+        attachmentJob?.cancel()
+        attachmentJob = null
         conversationEngine.clear()
         _uiState.update { state ->
             val greeting = if (llmClient != null) {
@@ -198,6 +212,7 @@ class ChatViewModel(
                 pendingImageBase64 = null,
                 pendingFileUri = null,
                 pendingFileName = null,
+                isAttachmentProcessing = false,
                 webSearchError = null,
                 webSearchCancelled = false,
                 attachmentError = null,
@@ -205,7 +220,8 @@ class ChatViewModel(
                 isLoading = false,
                 isStreaming = false,
                 urlFetchInProgress = false,
-                summaries = emptyList()
+                summaries = emptyList(),
+                sessionId = null
             )
         }
     }
@@ -216,6 +232,7 @@ class ChatViewModel(
                 role = m.role,
                 content = m.content,
                 imageBase64 = m.imageBase64,
+                imageRef = m.imageRef,
                 attachedFileName = m.attachedFileName,
                 attachedFileText = m.attachedFileText,
                 webSearchUsed = m.webSearchUsed,
@@ -229,9 +246,12 @@ class ChatViewModel(
         }
 
     private suspend fun saveCurrentSession() {
-        val state = _uiState.value
-        sessionManager.save(toSessionMessages(state), state.summaries) { session ->
-            session.copy(raw = sessionImageStore.detach(session.id, session.raw))
+        saveMutex.withLock {
+            val state = _uiState.value
+            val evicted = sessionManager.save(toSessionMessages(state), state.summaries) { session ->
+                session.copy(raw = sessionImageStore.detach(session.id, session.raw))
+            }
+            if (evicted.isNotEmpty()) sessionImageStore.delete(evicted)
         }
     }
 
@@ -248,7 +268,8 @@ class ChatViewModel(
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
             saveCurrentSession()
-            withRestoredSession(sessionImageStore.hydrate(session))
+            val keepTrailing = AppConfigProvider.current.summaries.maxQaPairs * 2 + 2
+            withRestoredSession(sessionImageStore.prepareForResume(session, keepTrailing))
         }
     }
 
@@ -259,6 +280,7 @@ class ChatViewModel(
                 role = m.role,
                 content = m.content,
                 imageBase64 = m.imageBase64,
+                imageRef = m.imageRef,
                 attachedFileName = m.attachedFileName,
                 attachedFileText = m.attachedFileText,
                 webSearchUsed = m.webSearchUsed,
@@ -298,6 +320,7 @@ class ChatViewModel(
                 pendingImageBase64 = null,
                 pendingFileUri = null,
                 pendingFileName = null,
+                isAttachmentProcessing = false,
                 webSearchError = null,
                 webSearchCancelled = false,
                 attachmentError = null,
@@ -306,7 +329,8 @@ class ChatViewModel(
                 isStreaming = false,
                 urlFetchInProgress = false,
                 pendingQuestion = null,
-                summaries = session.summaries
+                summaries = session.summaries,
+                sessionId = session.id
             )
         }
         sessionManager.bind(session)
@@ -364,17 +388,79 @@ class ChatViewModel(
 
     fun onImageUri(uri: Uri?) {
         if (uri == null) return
-        _uiState.update { it.copy(attachmentError = null) }
-        viewModelScope.launch {
-            val base64 = decodeImageToBase64(uri)
+        processAttachment {
+            withContext(Dispatchers.IO) { ImageProcessor.fromUri(application.contentResolver, uri) }
+        }
+    }
+
+    fun startCameraCapture(): Uri? {
+        return try {
+            discardPendingCapture()
+            val file = File(application.cacheDir, "buddy_camera_${java.util.UUID.randomUUID()}.jpg")
+            val uri = FileProvider.getUriForFile(
+                application,
+                "${application.packageName}.fileprovider",
+                file
+            )
+            savedStateHandle[KEY_PENDING_CAPTURE] = file.absolutePath
+            uri
+        } catch (e: Exception) {
+            Log.error(TAG, "Failed to create camera capture target", e.message)
+            null
+        }
+    }
+
+    fun onCameraLaunchFailed() {
+        discardPendingCapture()
+        _uiState.update { it.copy(attachmentError = "Could not open camera") }
+    }
+
+    fun onCameraResult(success: Boolean) {
+        val path = savedStateHandle.get<String>(KEY_PENDING_CAPTURE)
+        savedStateHandle.remove<String>(KEY_PENDING_CAPTURE)
+        if (path == null) return
+        val file = File(path)
+        if (!success) {
+            file.delete()
+            return
+        }
+        if (!file.exists() || file.length() == 0L) {
+            file.delete()
+            _uiState.update { it.copy(attachmentError = "Could not process image") }
+            return
+        }
+        processAttachment {
+            try {
+                withContext(Dispatchers.IO) { ImageProcessor.fromFile(file) }
+            } finally {
+                withContext(NonCancellable + Dispatchers.IO) { file.delete() }
+            }
+        }
+    }
+
+    private fun discardPendingCapture() {
+        savedStateHandle.get<String>(KEY_PENDING_CAPTURE)?.let { path ->
+            runCatching { File(path).delete() }
+        }
+        savedStateHandle.remove<String>(KEY_PENDING_CAPTURE)
+    }
+
+    private fun processAttachment(decode: suspend () -> String?) {
+        val generation = ++attachmentGeneration
+        attachmentJob?.cancel()
+        _uiState.update { it.copy(attachmentError = null, isAttachmentProcessing = true) }
+        attachmentJob = viewModelScope.launch {
+            val base64 = decode()
+            if (generation != attachmentGeneration) return@launch
             _uiState.update { state ->
                 if (base64 == null) {
-                    state.copy(pendingImageBase64 = null, attachmentError = "Could not process image")
+                    state.copy(pendingImageBase64 = null, isAttachmentProcessing = false, attachmentError = "Could not process image")
                 } else {
                     state.copy(
                         pendingImageBase64 = base64,
                         pendingFileUri = null,
                         pendingFileName = null,
+                        isAttachmentProcessing = false,
                         attachmentError = null
                     )
                 }
@@ -382,32 +468,11 @@ class ChatViewModel(
         }
     }
 
-    private suspend fun decodeImageToBase64(uri: Uri): String? = withContext(Dispatchers.IO) {
-        try {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            application.contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, bounds)
-            }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
-            val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
-            var inSampleSize = 1
-            while (maxDim / (inSampleSize * 2) >= MAX_IMAGE_DIMENSION) {
-                inSampleSize *= 2
-            }
-            val options = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-            val bitmap = application.contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, options)
-            } ?: return@withContext null
-            val base64 = bitmapToBase64(bitmap)
-            bitmap.recycle()
-            base64
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     fun onClearImage() {
-        _uiState.update { it.copy(pendingImageBase64 = null, attachmentError = null) }
+        attachmentGeneration++
+        attachmentJob?.cancel()
+        attachmentJob = null
+        _uiState.update { it.copy(pendingImageBase64 = null, isAttachmentProcessing = false, attachmentError = null) }
     }
 
     fun onFilePicked(uri: Uri?) {
@@ -415,13 +480,16 @@ class ChatViewModel(
             _uiState.update { it.copy(pendingFileUri = null, pendingFileName = null, attachmentError = null) }
             return
         }
+        attachmentGeneration++
+        attachmentJob?.cancel()
+        attachmentJob = null
         val fileName = getFileName(uri)
         val fileSize = getFileSize(uri)
         TextAttachmentRules.validate(fileName, fileSize)?.let { error ->
             _uiState.update { it.copy(pendingFileUri = null, pendingFileName = null, attachmentError = error) }
             return
         }
-        _uiState.update { it.copy(pendingFileUri = uri, pendingFileName = fileName, pendingImageBase64 = null, attachmentError = null) }
+        _uiState.update { it.copy(pendingFileUri = uri, pendingFileName = fileName, pendingImageBase64 = null, isAttachmentProcessing = false, attachmentError = null) }
     }
 
     fun onClearFile() {
@@ -492,6 +560,17 @@ class ChatViewModel(
         }
         val text = state.inputText.trim()
         if (text.isBlank()) return
+        if (state.isAttachmentProcessing) {
+            _uiState.update { it.copy(attachmentError = "Please wait for the image to finish processing") }
+            return
+        }
+        state.pendingImageBase64?.let { image ->
+            val known = state.availableModels.find { it.id == llmClient?.activeModel }
+            if (known != null && !known.isMultimodal) {
+                _uiState.update { it.copy(attachmentError = "Selected model does not support images") }
+                return
+            }
+        }
 
         sessionManager.markDirty()
 
@@ -524,17 +603,31 @@ class ChatViewModel(
             fileText = result.getOrNull()
         }
 
+        val userMessageId = java.util.UUID.randomUUID().toString()
         _uiState.update { it.copy(
             inputText = "",
             pendingImageBase64 = null,
             pendingFileUri = null,
-            pendingFileName = null
+            pendingFileName = null,
+            isAttachmentProcessing = false,
+            messages = it.messages + UiChatMessage(
+                id = userMessageId,
+                role = Role.USER,
+                content = text,
+                imageBase64 = savedImageBase64,
+                attachedFileUri = savedFileUri,
+                attachedFileName = savedFileName,
+                attachedFileText = fileText
+            ),
+            isLoading = true
         )}
 
         currentJob = viewModelScope.launch {
             var assistantId: String? = null
             var plannedSearchQueries: List<String> = emptyList()
             try {
+                saveCurrentSession()
+                sessionManager.markDirty()
                 conversationEngine.webSearchEnabled = state.webSearchEnabled
                 val attachment = fileText?.let { TextAttachment(savedFileName ?: "unknown", it) }
                 conversationEngine.send(
@@ -554,21 +647,7 @@ class ChatViewModel(
                             _uiState.update { it.copy(urlFetchInProgress = false, urlFetchWarnings = event.result.warnings) }
                             ServiceHelper.onOperationEnd(application)
                         }
-                        is ConversationEvent.UserMessageAccepted -> {
-                            _uiState.update {
-                                it.copy(
-                                    messages = it.messages + UiChatMessage(
-                                        role = Role.USER,
-                                        content = event.message.content,
-                                        imageBase64 = event.message.imageBase64,
-                                        attachedFileUri = savedFileUri,
-                                        attachedFileName = event.message.attachment?.name,
-                                        attachedFileText = event.message.attachment?.text
-                                    ),
-                                    isLoading = true
-                                )
-                            }
-                        }
+                        is ConversationEvent.UserMessageAccepted -> Unit
                         ConversationEvent.SearchStarted -> {
                             ServiceHelper.onOperationStart(application)
                             BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.WEB_SEARCHING, "Searching the web...")
@@ -711,6 +790,7 @@ class ChatViewModel(
                 }
                 _uiState.update { it.copy(webSearchCancelled = true) }
                 ServiceHelper.onOperationEnd(application)
+                withContext(NonCancellable) { saveCurrentSession() }
                 throw e
             } finally {
                 currentJob = null
@@ -725,30 +805,6 @@ class ChatViewModel(
                 }
                 BuddyForegroundService.updateStatus(BuddyForegroundService.OperationStatus.IDLE, "")
             }
-        }
-    }
-
-    fun bitmapToBase64(bitmap: Bitmap): String? {
-        return try {
-            val maxDim = maxOf(bitmap.width, bitmap.height)
-            val scaledBitmap = if (maxDim > MAX_IMAGE_DIMENSION) {
-                val scale = MAX_IMAGE_DIMENSION.toFloat() / maxDim
-                val newWidth = (bitmap.width * scale).toInt()
-                val newHeight = (bitmap.height * scale).toInt()
-                bitmap.scale(newWidth, newHeight)
-            } else {
-                bitmap
-            }
-            val outputStream = ByteArrayOutputStream()
-            scaledBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, outputStream)
-            if (scaledBitmap !== bitmap) {
-                scaledBitmap.recycle()
-            }
-            val bytes = outputStream.toByteArray()
-            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-            "data:image/jpeg;base64,$base64"
-        } catch (e: Exception) {
-            null
         }
     }
 
@@ -791,7 +847,7 @@ class ChatViewModelFactory(
     private val application: Application,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return ChatViewModel(application) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+        return ChatViewModel(application, extras.createSavedStateHandle()) as T
     }
 }
