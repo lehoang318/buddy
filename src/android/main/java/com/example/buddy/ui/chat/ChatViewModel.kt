@@ -564,14 +564,6 @@ class ChatViewModel(
             _uiState.update { it.copy(attachmentError = "Please wait for the image to finish processing") }
             return
         }
-        state.pendingImageBase64?.let { image ->
-            val known = state.availableModels.find { it.id == llmClient?.activeModel }
-            if (known != null && !known.isMultimodal) {
-                _uiState.update { it.copy(attachmentError = "Selected model does not support images") }
-                return
-            }
-        }
-
         sessionManager.markDirty()
 
         val correlationId = java.util.UUID.randomUUID().toString()
@@ -672,8 +664,7 @@ class ChatViewModel(
                                 val errorMsg = when {
                                     error.contains("401") || error.contains("403") -> "Invalid web search API key"
                                     error.contains("429") -> "Web search usage limit exceeded"
-                                    error == "Web search returned no results" -> error
-                                    else -> "Web search failed: $error"
+                                    else -> error
                                 }
                                 _uiState.update { it.copy(webSearchError = errorMsg) }
                             }

@@ -58,6 +58,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.example.buddy.llm.ReasoningEffort
+import com.example.buddy.logging.Log
 import com.example.buddy.ui.icons.Add
 import com.example.buddy.ui.icons.AllInclusive
 import com.example.buddy.ui.icons.AttachFile
@@ -118,6 +119,9 @@ fun InputBar(
 ) {
     val canSend = text.isNotBlank() && !isAttachmentProcessing
     val imageOnly = pendingImage != null && text.isBlank()
+    val pendingImageBytes = remember(pendingImage) {
+        pendingImage?.let { ImageProcessor.decodeBytes(it) }
+    }
 
     val context = LocalContext.current
     var lastReasoning by remember { mutableStateOf(reasoningEffort) }
@@ -142,12 +146,13 @@ fun InputBar(
             .navigationBarsPadding()
             .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        pendingImage?.let { base64 ->
+        pendingImageBytes?.let { bytes ->
             Box(modifier = Modifier.padding(bottom = 6.dp)) {
                 AsyncImage(
-                    model = base64,
+                    model = bytes,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
+                    onError = { state -> Log.warning("Images", "Draft image preview failed", state.result.throwable.message) },
                     modifier = Modifier
                         .size(60.dp)
                         .clip(RoundedCornerShape(8.dp))

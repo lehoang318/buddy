@@ -22,6 +22,13 @@ object ImageProcessor {
     fun fromFile(file: File): String? =
         process { if (file.exists()) file.inputStream() else null }
 
+    fun decodeBytes(base64: String): ByteArray? = try {
+        val payload = base64.substringAfter(',', base64)
+        Base64.decode(payload, Base64.NO_WRAP).takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null
+    }
+
     private fun process(open: () -> InputStream?): String? = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         open()?.use { BitmapFactory.decodeStream(it, null, bounds) }

@@ -11,10 +11,15 @@ import com.example.buddy.llm.ReasoningEffort
 import com.example.buddy.search.WebSearch
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
+import com.google.adk.kt.callbacks.BeforeModelCallback
+import com.google.adk.kt.callbacks.CallbackChoice
+import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.InMemorySessionService
+import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Part
+import com.google.adk.kt.types.Tool
 import com.google.adk.kt.types.Role as AdkRole
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -61,10 +66,13 @@ class AgentTurn(
         val appConfig = AppConfigProvider.current
         val agentic = appConfig.agentic
 
-        val tools = buildList {
-            if (webSearchEnabled && webSearch != null) {
-                add(WebSearchTool(webSearch, agentic.webSearchToolDescription, roundCap = searchRoundCap))
-            }
+        val webSearchTool = if (webSearchEnabled && webSearch != null) {
+            WebSearchTool(webSearch, agentic.webSearchToolDescription, roundCap = searchRoundCap)
+        } else {
+            null
+        }
+        val tools = buildList<BaseTool> {
+            webSearchTool?.let { add(it) }
             if (urlFetcher != null) {
                 add(FetchUrlTool(urlFetcher, agentic.fetchUrlToolDescription))
             }
@@ -96,8 +104,30 @@ class AgentTurn(
             toolInstruction = toolInstruction
         )
 
+        var modelCalls = 0
+        val capAwareCallbacks = BeforeModelCallback { _, request ->
+            val callIndex = modelCalls
+            modelCalls++
+            val updated = when {
+                callIndex + 1 >= agentic.maxSteps -> request
+                    .withoutFunctionDeclarations()
+                    .appendInstructions(Content(parts = listOf(Part(text = FINAL_STEP_INSTRUCTION))))
+                webSearchTool?.isCapReached == true -> request
+                    .withoutTool("web_search")
+                    .appendInstructions(Content(parts = listOf(Part(text = SEARCH_CAP_INSTRUCTION))))
+                else -> request
+            }
+            CallbackChoice.Continue(updated)
+        }
+
         val model = OpenAICompatibleModel(client, client.activeModel, reasoningEffort = reasoningEffort)
-        val agent = BuddyAgentFactory.buildRootAgent(model, instruction, tools, agentic)
+        val agent = BuddyAgentFactory.buildRootAgent(
+            model = model,
+            instruction = instruction,
+            tools = tools,
+            config = agentic,
+            beforeModelCallbacks = listOf(capAwareCallbacks)
+        )
 
         val parts = mutableListOf(Part(text = userMessage))
         if (!imageBase64.isNullOrBlank()) {
@@ -109,7 +139,6 @@ class AgentTurn(
         val emitted = StringBuilder()
         val rawReceived = StringBuilder()
         val splitter = ThinkTagSplitter()
-        var completed = false
 
         suspend fun emitSegments(segments: List<ThoughtSegment>) {
             segments.forEach { segment ->
@@ -172,19 +201,20 @@ class AgentTurn(
                         rawReceived.append(delta)
                         emitSegments(splitter.feed(delta))
                     }
-                    emitSegments(splitter.flush())
-                    completed = true
-                    emit(AgentTurnEvent.Completed(emitted.toString()))
                 }
-            }
-            if (!completed) {
-                emitSegments(splitter.flush())
-                emit(AgentTurnEvent.Completed(emitted.toString()))
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             emit(AgentTurnEvent.Failed(e))
+            return@flow
+        }
+
+        emitSegments(splitter.flush())
+        if (emitted.isNotBlank()) {
+            emit(AgentTurnEvent.Completed(emitted.toString()))
+        } else {
+            emit(AgentTurnEvent.Failed(IllegalStateException("The assistant stopped before producing an answer. Please try again.")))
         }
     }
 
@@ -246,7 +276,36 @@ class AgentTurn(
 
     private companion object {
         const val USER_ID = "buddy-user"
+
+        const val SEARCH_CAP_INSTRUCTION = "The web search round cap has been reached. Do not call web_search again. Answer the user's question now using the search results already collected. If the results are insufficient, say so explicitly."
+        const val FINAL_STEP_INSTRUCTION = "This is the final model step. Do not call any tools. Answer the user's question now using the information already collected. If the evidence is insufficient, say so explicitly."
     }
+}
+
+private fun LlmRequest.withoutTool(toolName: String): LlmRequest {
+    val tools = config.tools ?: return this
+    val remaining = tools.mapNotNull { tool ->
+        val declarations = tool.functionDeclarations ?: return@mapNotNull tool
+        val filtered = declarations.filterNot { it.name == toolName }
+        if (filtered.isEmpty()) {
+            tool.copy(functionDeclarations = null).takeIf { it != Tool() }
+        } else {
+            tool.copy(functionDeclarations = filtered)
+        }
+    }
+    return copy(config = config.copy(tools = remaining.takeIf { it.isNotEmpty() }))
+}
+
+private fun LlmRequest.withoutFunctionDeclarations(): LlmRequest {
+    val tools = config.tools ?: return this
+    val remaining = tools.mapNotNull { tool ->
+        if (tool.functionDeclarations == null) {
+            tool
+        } else {
+            tool.copy(functionDeclarations = null).takeIf { it != Tool() }
+        }
+    }
+    return copy(config = config.copy(tools = remaining.takeIf { it.isNotEmpty() }))
 }
 
 private sealed interface ThoughtSegment {

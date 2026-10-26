@@ -62,6 +62,7 @@ import com.example.buddy.chat.splitIntoSegments
 import com.example.buddy.data.ChatMessage
 import com.example.buddy.data.Role
 import com.example.buddy.data.TurnEventKind
+import com.example.buddy.logging.Log
 import com.example.buddy.ui.icons.Check
 import com.example.buddy.ui.icons.ContentCopy
 import com.example.buddy.ui.icons.Icons
@@ -118,7 +119,10 @@ fun MessageRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
-            val imageModel: Any? = message.imageBase64 ?: message.imageRef?.let { imageFileFor(it) }
+            val imageBytes = remember(message.id, message.imageBase64) {
+                message.imageBase64?.let { ImageProcessor.decodeBytes(it) }
+            }
+            val imageModel: Any? = imageBytes ?: message.imageRef?.let { imageFileFor(it) }
             if (imageModel != null) {
                 var showFullImage by remember { mutableStateOf(false) }
                 AsyncImage(
@@ -126,6 +130,7 @@ fun MessageRow(
                     contentDescription = "Attached image",
                     contentScale = ContentScale.Crop,
                     alignment = Alignment.TopCenter,
+                    onError = { state -> Log.warning("Images", "Message image preview failed", state.result.throwable.message) },
                     modifier = Modifier
                         .width(IMAGE_PREVIEW_WIDTH)
                         .heightIn(max = imagePreviewMaxHeight)

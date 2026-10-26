@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.buddy.logging.Log
 import com.example.buddy.ui.icons.Close
 import com.example.buddy.ui.icons.Icons
 import com.example.buddy.ui.theme.Outline
@@ -45,6 +46,7 @@ fun FullImageDialog(model: Any, onDismiss: () -> Unit) {
                     model = model,
                     contentDescription = "Attached image",
                     contentScale = ContentScale.FillWidth,
+                    onError = { state -> Log.warning("Images", "Full image preview failed", state.result.throwable.message) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }

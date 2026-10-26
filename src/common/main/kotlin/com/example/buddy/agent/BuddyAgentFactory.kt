@@ -3,6 +3,7 @@ package com.example.buddy.agent
 import com.example.buddy.config.AgenticConfig
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.callbacks.BeforeModelCallback
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.tools.BaseTool
 import java.time.LocalDate
@@ -15,13 +16,20 @@ object BuddyAgentFactory {
     private const val LEFT_BRACE = '\uFF5B'
     private const val RIGHT_BRACE = '\uFF5D'
 
-    fun buildRootAgent(model: Model, instruction: String, tools: List<BaseTool>, config: AgenticConfig): LlmAgent =
+    fun buildRootAgent(
+        model: Model,
+        instruction: String,
+        tools: List<BaseTool>,
+        config: AgenticConfig,
+        beforeModelCallbacks: List<BeforeModelCallback> = emptyList()
+    ): LlmAgent =
         LlmAgent(
             name = config.agentName,
             description = config.agentDescription,
             model = model,
             instruction = Instruction(instruction),
             tools = tools,
+            beforeModelCallbacks = beforeModelCallbacks,
             maxSteps = config.maxSteps
         )
 
