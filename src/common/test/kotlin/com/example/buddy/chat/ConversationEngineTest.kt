@@ -96,6 +96,22 @@ class ConversationEngineTest {
     }
 
     @Test
+    fun `agentic turn fails instead of completing empty after step exhaustion`() = runBlocking {
+        val searchCall = LlmStreamEvent.ToolCalls(
+            listOf(LlmToolCall(id = "c1", name = "web_search", arguments = """{"queries":["buddy"]}"""))
+        )
+        val client = AgenticClient(List(10) { listOf(searchCall, LlmStreamEvent.Finished("tool_calls")) })
+        val engine = ConversationEngine(client = client, webSearch = FakeWebSearch())
+        engine.agenticMode = true
+
+        val events = engine.send("search buddy", correlationId = "offline-test").toList()
+
+        assertTrue(events.last() is ConversationEvent.Failed)
+        assertTrue(events.none { it is ConversationEvent.Completed })
+        assertTrue(events.none { it is ConversationEvent.Token })
+    }
+
+    @Test
     fun `engine forwards attached image to search query generation and summary`() = runBlocking {
         val client = FakeLlmClient("""{"queries":["Buddy"],"recency":"any"}""")
         val engine = ConversationEngine(client = client, webSearch = FakeWebSearch())

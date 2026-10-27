@@ -26,6 +26,8 @@ class WebSearchTool(
 
     private var rounds = 0
 
+    val isCapReached: Boolean get() = roundCap != null && rounds >= roundCap
+
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
         name = "web_search",
         description = description,
@@ -50,8 +52,11 @@ class WebSearchTool(
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
         val queries = (args["queries"] as? List<*>)?.mapNotNull { it as? String }?.filter { it.isNotBlank() }.orEmpty()
         if (queries.isEmpty()) return mapOf("error" to "No queries provided")
-        if (roundCap != null && rounds >= roundCap) {
-            return mapOf("error" to "Web search round cap of $roundCap reached. Answer using the results collected so far.")
+        if (isCapReached) {
+            return mapOf(
+                "status" to STATUS_ROUND_CAP_REACHED,
+                "instruction" to "Web search round cap reached. Do not call web_search again. Answer using the search results already collected; state explicitly if they are insufficient."
+            )
         }
         rounds++
 
@@ -70,6 +75,10 @@ class WebSearchTool(
         "week" -> SearchRecency.WEEK
         "month" -> SearchRecency.MONTH
         else -> SearchRecency.ANY
+    }
+
+    companion object {
+        const val STATUS_ROUND_CAP_REACHED = "round_cap_reached"
     }
 }
 

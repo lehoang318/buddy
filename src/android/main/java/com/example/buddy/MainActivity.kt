@@ -107,12 +107,15 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             val sessionRepository = SessionRepository(this@MainActivity)
+            val imageStore = SessionImageStore(this@MainActivity)
             if (sessionRepository.autoDeleteEnabled()) {
                 val removed = sessionRepository.purgeOlderThan(SessionRepository.AUTO_DELETE_AGE_MILLIS)
                 if (removed.isNotEmpty()) {
-                    SessionImageStore(this@MainActivity).delete(removed)
+                    imageStore.delete(removed)
                 }
             }
+            imageStore.reconcile(sessionRepository.knownSessionIds())
+            imageStore.cleanupStaleCaptures()
         }
 
         lifecycleScope.launch {

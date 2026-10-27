@@ -45,7 +45,7 @@
 
 4. **Install** on your Android phone (Android 10.0+ recommended, tested on Xperia 10 VII - Android 16).
 
-5. **Open the app** and grant camera permissions if you want to use photo capture feature.
+5. **Open the app**. Photo capture hands off to your device's camera app, so Buddy itself never requests a camera permission.
 
 6. **Configure Providers**:
    * LLM Provider & API Key

@@ -183,4 +183,36 @@ class SessionRepositoryTest {
         assertEquals(listOf("Health", "World"), SessionTags.normalize(listOf("health", "HEALTH", "World")))
         assertEquals(emptyList<String>(), SessionTags.normalize(listOf("henlo", "")))
     }
+
+    @Test
+    fun `addSession returns evicted ids when cap exceeded`() = runBlocking {
+        val repository = SessionRepository(FakeSessionStorage())
+        var lastEvicted = emptySet<String>()
+        for (i in 0..SessionRepository.MAX_SESSIONS) {
+            lastEvicted = repository.addSession(
+                SavedSession(id = "s$i", title = "t$i", createdAt = i.toLong(), updatedAt = i.toLong(), raw = emptyList(), summaries = emptyList())
+            )
+        }
+
+        assertEquals(setOf("s0"), lastEvicted)
+        assertEquals(SessionRepository.MAX_SESSIONS, repository.sessions.first().size)
+    }
+
+    @Test
+    fun `knownSessionIds returns null for unreadable json`() = runBlocking {
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = "{ not valid json" }
+        val repository = SessionRepository(storage)
+
+        assertEquals(null, repository.knownSessionIds())
+    }
+
+    @Test
+    fun `knownSessionIds returns empty for blank and ids when readable`() = runBlocking {
+        val repository = SessionRepository(FakeSessionStorage())
+
+        assertEquals(emptySet<String>(), repository.knownSessionIds())
+
+        repository.addSession(SavedSession(id = "abc", title = "t", raw = emptyList(), summaries = emptyList()))
+        assertEquals(setOf("abc"), repository.knownSessionIds())
+    }
 }

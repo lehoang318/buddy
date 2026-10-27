@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -159,8 +160,144 @@ class AgentTurnTest {
 
         val finished = events.filterIsInstance<AgentTurnEvent.ToolCallFinished>()
         assertEquals(3, finished.size)
-        assertTrue((finished[2].result["error"] as? String)?.contains("round cap") == true)
         assertEquals(2, searchCalls)
+        assertEquals(WebSearchTool.STATUS_ROUND_CAP_REACHED, finished[2].result["status"])
+        assertTrue((finished[2].result["instruction"] as? String)?.contains("Answer") == true)
+        assertFalse(finished[2].result.containsKey("error"))
+        assertTrue(client.toolsByCall[2].orEmpty().none { it.name == "web_search" })
+        assertEquals("Done", (events.last() as AgentTurnEvent.Completed).fullText)
+    }
+
+    @Test
+    fun exactCapAnswersWithCollectedResults() = runBlocking {
+        val client = ScriptedClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "web_search", arguments = "{\"queries\":[\"one\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c2", name = "web_search", arguments = "{\"queries\":[\"two\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                ),
+                listOf(LlmStreamEvent.TextDelta("The combined answer"), LlmStreamEvent.Finished("stop"))
+            )
+        )
+
+        val events = mutableListOf<AgentTurnEvent>()
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = true, searchRoundCap = 2).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { events += it }
+
+        assertTrue(client.toolsByCall[0].orEmpty().any { it.name == "web_search" })
+        assertTrue(client.toolsByCall[1].orEmpty().any { it.name == "web_search" })
+        assertTrue(client.toolsByCall[2].orEmpty().none { it.name == "web_search" })
+
+        val finalMessages = client.messagesByCall[2].joinToString("\n") { it.content }
+        assertTrue(finalMessages.contains("content for one"))
+        assertTrue(finalMessages.contains("content for two"))
+        assertTrue(finalMessages.contains("round cap", ignoreCase = true))
+
+        assertEquals("The combined answer", (events.last() as AgentTurnEvent.Completed).fullText)
+    }
+
+    @Test
+    fun failsWhenAgentStopsWithoutAnswer() = runBlocking {
+        val script = listOf(
+            LlmStreamEvent.TextDelta("preamble"),
+            LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "web_search", arguments = "{\"queries\":[\"kotlin\"]}"))),
+            LlmStreamEvent.Finished("tool_calls")
+        )
+        val client = ScriptedClient(List(12) { script })
+
+        val events = mutableListOf<AgentTurnEvent>()
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = true).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { events += it }
+
+        assertFalse(events.filterIsInstance<AgentTurnEvent.AnswerReset>().isEmpty())
+        assertEquals(1, events.filterIsInstance<AgentTurnEvent.Failed>().size)
+        assertTrue(events.filterIsInstance<AgentTurnEvent.Completed>().isEmpty())
+        assertTrue(events.last() is AgentTurnEvent.Failed)
+    }
+
+    @Test
+    fun failsOnWhitespaceOnlyAnswer() = runBlocking {
+        val client = ScriptedClient(
+            listOf(listOf(LlmStreamEvent.TextDelta("   "), LlmStreamEvent.Finished("stop")))
+        )
+
+        val events = mutableListOf<AgentTurnEvent>()
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = false).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { events += it }
+
+        assertEquals(1, events.filterIsInstance<AgentTurnEvent.Failed>().size)
+        assertTrue(events.filterIsInstance<AgentTurnEvent.Completed>().isEmpty())
+    }
+
+    @Test
+    fun failsOnReasoningOnlyAnswer() = runBlocking {
+        val client = ScriptedClient(
+            listOf(listOf(LlmStreamEvent.ReasoningDelta("thinking"), LlmStreamEvent.Finished("stop")))
+        )
+
+        val events = mutableListOf<AgentTurnEvent>()
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = false).run(
+            userMessage = "hello",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "hello")),
+            summaries = emptyList()
+        ).collect { events += it }
+
+        assertFalse(events.filterIsInstance<AgentTurnEvent.ThoughtsDelta>().isEmpty())
+        assertEquals(1, events.filterIsInstance<AgentTurnEvent.Failed>().size)
+        assertTrue(events.filterIsInstance<AgentTurnEvent.Completed>().isEmpty())
+    }
+
+    @Test
+    fun failsAfterClarificationWithoutAnswer() = runBlocking {
+        val script = listOf(
+            LlmStreamEvent.TextDelta("preamble"),
+            LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c1", name = "web_search", arguments = "{\"queries\":[\"kotlin\"]}"))),
+            LlmStreamEvent.Finished("tool_calls")
+        )
+        val client = ScriptedClient(
+            listOf(
+                listOf(
+                    LlmStreamEvent.ToolCalls(listOf(LlmToolCall(id = "c0", name = "ask_user", arguments = "{\"question\":\"Which one?\",\"options\":[\"the first one\",\"the second one\"]}"))),
+                    LlmStreamEvent.Finished("tool_calls")
+                )
+            ) + List(12) { script }
+        )
+        val bridge = QuestionBridge()
+        val events = mutableListOf<AgentTurnEvent>()
+
+        AgentTurn(client, FakeWebSearch(), urlFetcher = null, webSearchEnabled = true, questionBridge = bridge).run(
+            userMessage = "pick one",
+            imageBase64 = null,
+            history = listOf(ConversationMessage(Role.USER, "pick one")),
+            summaries = emptyList()
+        ).collect { event ->
+            events += event
+            if (event is AgentTurnEvent.ToolCallStarted && event.name == "ask_user") {
+                assertTrue(bridge.send("the first one"))
+            }
+        }
+
+        val answers = events.filterIsInstance<AgentTurnEvent.ToolCallFinished>().filter { it.name == "ask_user" }
+        assertEquals("the first one", answers.single().result["answer"])
+        assertTrue(events.last() is AgentTurnEvent.Failed)
+        assertTrue(events.filterIsInstance<AgentTurnEvent.Completed>().isEmpty())
     }
 
     @Test
