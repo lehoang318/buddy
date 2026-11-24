@@ -215,4 +215,141 @@ class SessionRepositoryTest {
         repository.addSession(SavedSession(id = "abc", title = "t", raw = emptyList(), summaries = emptyList()))
         assertEquals(setOf("abc"), repository.knownSessionIds())
     }
+
+    @Test
+    fun `turn ids and summary provenance round-trip through the repository`() = runBlocking {
+        val storage = FakeSessionStorage()
+        val repository = SessionRepository(storage)
+        val summary = Summary(
+            question = "Earlier conversation",
+            points = listOf(SummaryPoint("p", key = true)),
+            tags = listOf("Science"),
+            turnIds = listOf("t1", "t2"),
+            sources = listOf(
+                SummarySource(listOf(SummaryPoint("p", key = true)), listOf("Science"), listOf("t1")),
+                SummarySource(listOf(SummaryPoint("q")), listOf("World"), listOf("t2"))
+            )
+        )
+        repository.addSession(
+            SavedSession(
+                id = "provenance",
+                title = "Provenance",
+                raw = listOf(
+                    SessionMessage(role = Role.USER, content = "q1", turnId = "t1"),
+                    SessionMessage(role = Role.ASSISTANT, content = "a1", turnId = "t1")
+                ),
+                summaries = listOf(summary)
+            )
+        )
+
+        val restored = repository.sessions.first().single { it.id == "provenance" }
+
+        assertEquals(listOf("t1", "t1"), restored.raw.map { it.turnId })
+        assertEquals(summary, restored.summaries.single())
+    }
+
+    @Test
+    fun `legacy json with null raw and missing provenance is normalized`() = runBlocking {
+        val legacyJson = """[
+            {
+              "id": "s6",
+              "title": "Nulls",
+              "createdAt": 7000,
+              "raw": null,
+              "summaries": [
+                {"question": "q", "points": [{"text": "p"}]},
+                {
+                  "question": "Earlier conversation",
+                  "points": [{"text": "m"}],
+                  "turnIds": ["t1"],
+                  "sources": [
+                    {"points": [{"text": "a"}]},
+                    {"turnIds": ["t2"], "tags": ["science"]}
+                  ]
+                }
+              ]
+            }
+        ]"""
+
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = legacyJson }
+        val repository = SessionRepository(storage)
+        val session = repository.sessions.first().single()
+
+        assertTrue(session.raw.isEmpty())
+        assertTrue(!session.hasUserMessage())
+        assertEquals(emptyList<String>(), session.summaries[0].turnIds)
+        assertTrue(session.summaries[0].sources.isEmpty())
+        assertEquals(listOf("t1", "t2"), session.summaries[1].turnIds)
+        assertEquals(listOf(SummaryPoint("a")), session.summaries[1].sources[0].points)
+        assertTrue(session.summaries[1].sources[0].tags.isEmpty())
+        assertTrue(session.summaries[1].sources[0].turnIds.isEmpty())
+        assertEquals(listOf("Science"), session.summaries[1].sources[1].tags)
+        assertTrue(session.summaries[1].sources[1].points.isEmpty())
+        assertEquals(listOf("t2"), session.summaries[1].sources[1].turnIds)
+    }
+
+    @Test
+    fun `deleteEmptySessions removes only sessions without user messages`() = runBlocking {
+        val storage = FakeSessionStorage()
+        val repository = SessionRepository(storage)
+        repository.addSession(
+            SavedSession(
+                id = "kept",
+                title = "Kept",
+                raw = listOf(SessionMessage(role = Role.USER, content = "hi")),
+                summaries = emptyList()
+            )
+        )
+        repository.addSession(
+            SavedSession(
+                id = "empty",
+                title = "Empty",
+                raw = listOf(SessionMessage(role = Role.ASSISTANT, content = "hi")),
+                summaries = emptyList()
+            )
+        )
+        repository.addSession(
+            SavedSession(id = "blank", title = "Blank", raw = emptyList(), summaries = emptyList())
+        )
+
+        assertEquals(setOf("empty", "blank"), repository.deleteEmptySessions())
+        assertEquals(listOf("kept"), repository.sessions.first().map { it.id })
+    }
+
+    @Test
+    fun `deleteEmptySessions leaves malformed json intact`() = runBlocking {
+        val malformed = "[{ not valid json"
+        val storage = FakeSessionStorage().apply { sessionsJsonFlow.value = malformed }
+        val repository = SessionRepository(storage)
+
+        assertEquals(emptySet<String>(), repository.deleteEmptySessions())
+        assertEquals(malformed, storage.sessionsJsonFlow.value)
+    }
+
+    @Test
+    fun `latestSession skips a newer session without user messages`() = runBlocking {
+        val repository = SessionRepository(FakeSessionStorage())
+        repository.addSession(
+            SavedSession(
+                id = "real",
+                title = "Real",
+                createdAt = 1000,
+                updatedAt = 1000,
+                raw = listOf(SessionMessage(role = Role.USER, content = "hi")),
+                summaries = emptyList()
+            )
+        )
+        repository.addSession(
+            SavedSession(
+                id = "empty",
+                title = "Empty",
+                createdAt = 2000,
+                updatedAt = 2000,
+                raw = listOf(SessionMessage(role = Role.ASSISTANT, content = "hi")),
+                summaries = emptyList()
+            )
+        )
+
+        assertEquals("real", repository.latestSession()?.id)
+    }
 }

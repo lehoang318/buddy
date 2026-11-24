@@ -81,7 +81,8 @@ fun CodeSegmentBubble(
     streaming: Boolean,
     maxWidth: Dp,
     glowAlpha: Float,
-    shape: Shape
+    shape: Shape,
+    onLongPress: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -100,139 +101,143 @@ fun CodeSegmentBubble(
             .width(maxWidth)
             .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (lang.isNotEmpty()) {
-                    Text(lang, color = OnSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+        Box {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (lang.isNotEmpty()) {
+                        Text(lang, color = OnSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                    }
+                    if (collapsed) {
+                        Text(
+                            text = "$lineCount lines",
+                            color = OnSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(start = if (lang.isNotEmpty()) 6.dp else 0.dp)
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (!streaming) {
+                        IconButton(
+                            onClick = { userCollapsed = !collapsed },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (collapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                contentDescription = if (collapsed) "Expand code" else "Collapse code",
+                                tint = SecondaryIcons,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    if (lang in PREVIEWABLE_LANGS && !streaming) {
+                        val isHtml = lang in HTML_LANGS
+                        IconButton(
+                            onClick = {
+                                if (isHtml) {
+                                    scope.launch { openHtmlInBrowser(context, code) }
+                                } else {
+                                    showPreview = true
+                                }
+                            },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = "Preview",
+                                tint = SendButton,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    if (!streaming) {
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val name = saveCodeToDownloads(context, lang, code)
+                                    if (name != null) {
+                                        saved = true
+                                        Toast.makeText(context, "Saved to Downloads/$name", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (saved) Icons.Default.Check else Icons.Default.Download,
+                                contentDescription = "Save as file",
+                                tint = if (saved) UserBubble else SecondaryIcons,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("copied code", code))
+                            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+                            copied = true
+                        },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                            contentDescription = "Copy code",
+                            tint = if (copied) UserBubble else SecondaryIcons,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
                 if (collapsed) {
-                    Text(
-                        text = "$lineCount lines",
-                        color = OnSurfaceVariant,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(start = if (lang.isNotEmpty()) 6.dp else 0.dp)
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-                if (!streaming) {
-                    IconButton(
-                        onClick = { userCollapsed = !collapsed },
-                        modifier = Modifier.size(20.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(2.dp))
+                            .clickable { userCollapsed = false }
                     ) {
-                        Icon(
-                            imageVector = if (collapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = if (collapsed) "Expand code" else "Collapse code",
-                            tint = SecondaryIcons,
-                            modifier = Modifier.size(14.dp)
+                        Surface(
+                            color = VintageBackground,
+                            shape = RoundedCornerShape(2.dp)
+                        ) {
+                            Text(
+                                text = code.lines().take(COLLAPSED_PREVIEW_LINES).joinToString("\n"),
+                                color = SendButton,
+                                fontFamily = FontFamily.Monospace,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Transparent,
+                                            VintageBackground
+                                        )
+                                    )
+                                )
                         )
                     }
-                }
-                if (lang in PREVIEWABLE_LANGS && !streaming) {
-                    val isHtml = lang in HTML_LANGS
-                    IconButton(
-                        onClick = {
-                            if (isHtml) {
-                                scope.launch { openHtmlInBrowser(context, code) }
-                            } else {
-                                showPreview = true
-                            }
-                        },
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Visibility,
-                            contentDescription = "Preview",
-                            tint = SendButton,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-                if (!streaming) {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                val name = saveCodeToDownloads(context, lang, code)
-                                if (name != null) {
-                                    saved = true
-                                    Toast.makeText(context, "Saved to Downloads/$name", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(20.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (saved) Icons.Default.Check else Icons.Default.Download,
-                            contentDescription = "Save as file",
-                            tint = if (saved) UserBubble else SecondaryIcons,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = {
-                        clipboard.setPrimaryClip(ClipData.newPlainText("copied code", code))
-                        Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                        copied = true
-                    },
-                    modifier = Modifier.size(20.dp)
-                ) {
-                    Icon(
-                        imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                        contentDescription = "Copy code",
-                        tint = if (copied) UserBubble else SecondaryIcons,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-            if (collapsed) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(2.dp))
-                        .clickable { userCollapsed = false }
-                ) {
+                } else {
                     Surface(
                         color = VintageBackground,
                         shape = RoundedCornerShape(2.dp)
                     ) {
-                        Text(
-                            text = code.lines().take(COLLAPSED_PREVIEW_LINES).joinToString("\n"),
-                            color = SendButton,
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .matchParentSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Transparent,
-                                        VintageBackground
-                                    )
+                        Box(modifier = Modifier.padding(10.dp)) {
+                            SelectionContainer {
+                                Text(
+                                    text = code,
+                                    color = SendButton,
+                                    fontFamily = FontFamily.Monospace,
+                                    style = MaterialTheme.typography.bodySmall
                                 )
-                            )
-                    )
-                }
-            } else {
-                Surface(
-                    color = VintageBackground,
-                    shape = RoundedCornerShape(2.dp)
-                ) {
-                    SelectionContainer {
-                        Text(
-                            text = code,
-                            color = SendButton,
-                            fontFamily = FontFamily.Monospace,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(10.dp)
-                        )
+                            }
+                        }
                     }
                 }
             }
+            BubbleEdgeLongPress(onLongPress, horizontal = 10.dp, vertical = 10.dp)
         }
     }
 

@@ -11,19 +11,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -80,11 +86,17 @@ fun ChatScreen(
 
     val scope = rememberCoroutineScope()
 
+    val haptics = LocalHapticFeedback.current
+    var pendingDeleteTurnId by rememberSaveable { mutableStateOf<String?>(null) }
+    val canDeleteMessages = !state.isLoading && !state.isStreaming &&
+        !state.isAttachmentProcessing && state.pendingQuestion == null
+
     val context = LocalContext.current
     val imageStore = remember { SessionImageStore(context.applicationContext) }
     val attachmentPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
+        vm.onExternalActivityReturned()
         if (uri != null) {
             val mimeType = context.contentResolver.getType(uri)
             if (mimeType?.startsWith("image/") == true) {
@@ -98,11 +110,13 @@ fun ChatScreen(
     val takePictureLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
+        vm.onExternalActivityReturned()
         vm.onCameraResult(success)
     }
 
     val onTakePhoto = remember(vm) {
         {
+            vm.onExternalActivityLaunched()
             val uri = vm.startCameraCapture()
             if (uri == null) {
                 vm.onCameraLaunchFailed()
@@ -161,9 +175,14 @@ fun ChatScreen(
                 onClearImage = vm::onClearImage,
                 onClearFile = vm::onClearFile,
                 onPickAttachment = {
-                    attachmentPickerLauncher.launch(
-                        arrayOf("image/*", "text/*", "application/json", "application/xml", "text/plain", "text/markdown", "text/html")
-                    )
+                    vm.onExternalActivityLaunched()
+                    runCatching {
+                        attachmentPickerLauncher.launch(
+                            arrayOf("image/*", "text/*", "application/json", "application/xml", "text/plain", "text/markdown", "text/html")
+                        )
+                    }.onFailure {
+                        vm.onExternalActivityReturned()
+                    }
                 },
                 onTakePhoto = onTakePhoto,
                 onSend = {
@@ -224,6 +243,7 @@ fun ChatScreen(
                 }
                 items(state.messages, key = { it.id }) { msg ->
                     val isAsking = msg.role == Role.ASSISTANT && state.pendingQuestion?.messageId == msg.id
+                    val turnId = msg.turnId
                     MessageRow(
                         message = msg,
                         pendingOptions = if (isAsking) state.pendingQuestion?.options.orEmpty() else emptyList(),
@@ -236,7 +256,13 @@ fun ChatScreen(
                             vm.skipPendingQuestion()
                         },
                         imagePreviewMaxHeight = imagePreviewMaxHeight,
-                        imageFileFor = imageFileFor
+                        imageFileFor = imageFileFor,
+                        onDeleteRequest = if (canDeleteMessages && turnId != null) {
+                            {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                pendingDeleteTurnId = turnId
+                            }
+                        } else null
                     )
                 }
                 if (state.isLoading) {
@@ -259,5 +285,37 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    val deleteTurnId = pendingDeleteTurnId
+    if (deleteTurnId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTurnId = null },
+            title = { Text("Remove exchange?", color = MaterialTheme.colorScheme.onSurface) },
+            text = {
+                Text(
+                    "Remove this question and response from the chat? Its summary will also be removed from the context used for future replies.",
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDeleteTurnId = null
+                        vm.deleteTurn(deleteTurnId)
+                    }
+                ) {
+                    Text("Remove", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteTurnId = null }) {
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurface)
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

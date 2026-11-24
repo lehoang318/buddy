@@ -17,7 +17,8 @@ data class SessionMessage(
     val turnEvents: List<TurnEvent> = emptyList(),
     val questionAsked: String? = null,
     val questionAnswer: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val turnId: String? = null
 )
 
 data class SavedSession(
@@ -29,3 +30,6 @@ data class SavedSession(
     val summaries: List<Summary>,
     val tags: List<String> = emptyList()
 )
+
+@Suppress("USELESS_ELVIS")
+fun SavedSession.hasUserMessage(): Boolean = (raw ?: emptyList()).any { it.role == Role.USER }

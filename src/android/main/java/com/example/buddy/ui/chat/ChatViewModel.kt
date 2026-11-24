@@ -29,6 +29,8 @@ import com.example.buddy.data.Summary
 import com.example.buddy.data.TurnEvent
 import com.example.buddy.data.TurnEventKind
 import com.example.buddy.data.appendThoughtsEvent
+import com.example.buddy.data.assignTurnIds
+import com.example.buddy.data.linkSummariesToTurns
 import com.example.buddy.data.reconstructTurnEvents
 import com.example.buddy.fetch.UrlFetcher
 import com.example.buddy.llm.LlmClient
@@ -104,9 +106,17 @@ class ChatViewModel(
     private val saveMutex = Mutex()
     private var attachmentJob: Job? = null
     private var attachmentGeneration = 0
+    private var externalActivityInProgress = false
+    private var startupResumeCompleted = false
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
+
+    fun needsStartupResume(): Boolean = !startupResumeCompleted
+
+    fun markStartupResumeCompleted() {
+        startupResumeCompleted = true
+    }
 
     private val conversationEngine = ConversationEngine()
     private var currentJob: Job? = null
@@ -227,38 +237,55 @@ class ChatViewModel(
     }
 
     private fun toSessionMessages(state: ChatUiState): List<SessionMessage> =
-        state.messages.map { m ->
-            SessionMessage(
-                role = m.role,
-                content = m.content,
-                imageBase64 = m.imageBase64,
-                imageRef = m.imageRef,
-                attachedFileName = m.attachedFileName,
-                attachedFileText = m.attachedFileText,
-                webSearchUsed = m.webSearchUsed,
-                webSearchSkipped = m.webSearchSkipped,
-                webSearchQueries = m.webSearchQueries,
-                turnEvents = m.turnEvents,
-                questionAsked = m.questionAsked,
-                questionAnswer = m.questionAnswer,
-                timestamp = m.timestamp
-            )
-        }
+        state.messages.map { it.toSessionMessage() }
 
-    private suspend fun saveCurrentSession() {
+    private fun UiChatMessage.toSessionMessage(): SessionMessage =
+        SessionMessage(
+            role = role,
+            content = content,
+            imageBase64 = imageBase64,
+            imageRef = imageRef,
+            attachedFileName = attachedFileName,
+            attachedFileText = attachedFileText,
+            webSearchUsed = webSearchUsed,
+            webSearchSkipped = webSearchSkipped,
+            webSearchQueries = webSearchQueries,
+            turnEvents = turnEvents,
+            questionAsked = questionAsked,
+            questionAnswer = questionAnswer,
+            timestamp = timestamp,
+            turnId = turnId
+        )
+
+    private suspend fun saveCurrentSession(allowEmpty: Boolean = false, deleteIfEmpty: Boolean = false) {
         saveMutex.withLock {
-            val state = _uiState.value
-            val evicted = sessionManager.save(toSessionMessages(state), state.summaries) { session ->
-                session.copy(raw = sessionImageStore.detach(session.id, session.raw))
+            if (deleteIfEmpty && _uiState.value.messages.none { it.role == Role.USER }) {
+                deleteActiveSessionLocked()
+                return
             }
-            if (evicted.isNotEmpty()) sessionImageStore.delete(evicted)
+            saveCurrentSessionLocked(allowEmpty)
         }
+    }
+
+    private suspend fun saveCurrentSessionLocked(allowEmpty: Boolean = false) {
+        val state = _uiState.value
+        val evicted = sessionManager.save(toSessionMessages(state), state.summaries, allowEmpty) { session ->
+            session.copy(raw = sessionImageStore.detach(session.id, session.raw))
+        }
+        if (evicted.isNotEmpty()) sessionImageStore.delete(evicted)
+    }
+
+    private suspend fun deleteActiveSessionLocked() {
+        val id = sessionManager.deleteActive() ?: return
+        sessionImageStore.delete(setOf(id))
+        _uiState.update { it.copy(sessionId = null, summaries = emptyList()) }
+        EventLog.info(TAG, "Empty session removed", "sessionId=$id")
     }
 
     fun startNewChat() {
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
-            saveCurrentSession()
+            saveCurrentSession(deleteIfEmpty = true)
             sessionManager.reset()
             clearChat()
         }
@@ -267,14 +294,72 @@ class ChatViewModel(
     fun resumeSession(session: SavedSession) {
         viewModelScope.launch {
             currentJob?.cancelAndJoin()
-            saveCurrentSession()
+            if (session.id != sessionManager.activeSessionId) {
+                saveCurrentSession(deleteIfEmpty = true)
+            }
             val keepTrailing = AppConfigProvider.current.summaries.maxQaPairs * 2 + 2
             withRestoredSession(sessionImageStore.prepareForResume(session, keepTrailing))
         }
     }
 
+    fun onAppStopped() {
+        if (externalActivityInProgress) return
+        viewModelScope.launch {
+            saveMutex.withLock {
+                if (_uiState.value.messages.none { it.role == Role.USER }) deleteActiveSessionLocked()
+            }
+        }
+    }
+
+    fun onAppResumed() {
+        externalActivityInProgress = false
+    }
+
+    fun onExternalActivityLaunched() {
+        externalActivityInProgress = true
+    }
+
+    fun onExternalActivityReturned() {
+        externalActivityInProgress = false
+    }
+
+    fun deleteTurn(turnId: String) {
+        if (turnId.isBlank()) return
+        val state = _uiState.value
+        if (state.isLoading || state.isStreaming || state.isAttachmentProcessing || state.pendingQuestion != null) return
+        val removed = state.messages.filter { it.turnId == turnId }
+        if (removed.none { it.role == Role.USER }) return
+        val remaining = state.messages.filterNot { it.turnId == turnId }
+        val summaries = conversationEngine.removeTurn(turnId)
+        _uiState.update {
+            it.copy(
+                messages = remaining,
+                summaries = summaries,
+                webSearchError = null,
+                webSearchCancelled = false,
+                urlFetchWarnings = emptyList()
+            )
+        }
+        sessionManager.markDirty()
+        EventLog.info(TAG, "Exchange removed", "turnId=$turnId, messages=${removed.size}")
+        viewModelScope.launch {
+            saveMutex.withLock {
+                sessionManager.activeSessionId?.let { sessionId ->
+                    sessionImageStore.deleteRemovedImages(
+                        sessionId,
+                        removed.map { it.toSessionMessage() },
+                        remaining.map { it.toSessionMessage() }
+                    )
+                }
+                saveCurrentSessionLocked(allowEmpty = true)
+            }
+        }
+    }
+
     private fun withRestoredSession(session: SavedSession) {
-        val restored = migrateLegacyQuestionAnswers(session.raw)
+        val migrated = migrateLegacyQuestionAnswers(session.raw)
+        val restored = assignTurnIds(migrated)
+        val linkedSummaries = linkSummariesToTurns(restored, session.summaries)
         val raw = restored.map { m ->
             UiChatMessage(
                 role = m.role,
@@ -293,13 +378,14 @@ class ChatViewModel(
                 questionAnswer = m.questionAnswer,
                 timestamp = m.timestamp,
                 isStreaming = false,
-                isComplete = true
+                isComplete = true,
+                turnId = m.turnId
             )
         }
         val engineHistory = buildList {
             restored.forEach { m ->
                 if (m.role == Role.ASSISTANT && !m.questionAsked.isNullOrBlank() && !m.questionAnswer.isNullOrBlank()) {
-                    add(ConversationMessage(Role.USER, m.questionAnswer))
+                    add(ConversationMessage(Role.USER, m.questionAnswer, turnId = m.turnId))
                 }
                 add(
                     ConversationMessage(
@@ -307,12 +393,13 @@ class ChatViewModel(
                         content = m.content,
                         imageBase64 = m.imageBase64,
                         attachment = m.attachedFileText?.let { TextAttachment(m.attachedFileName ?: "attachment", it) },
-                        questionAsked = m.questionAsked
+                        questionAsked = m.questionAsked,
+                        turnId = m.turnId
                     )
                 )
             }
         }
-        conversationEngine.restore(engineHistory, session.summaries)
+        conversationEngine.restore(engineHistory, linkedSummaries)
         _uiState.update { state ->
             state.copy(
                 messages = raw,
@@ -329,7 +416,7 @@ class ChatViewModel(
                 isStreaming = false,
                 urlFetchInProgress = false,
                 pendingQuestion = null,
-                summaries = session.summaries,
+                summaries = linkedSummaries,
                 sessionId = session.id
             )
         }
@@ -411,6 +498,7 @@ class ChatViewModel(
     }
 
     fun onCameraLaunchFailed() {
+        externalActivityInProgress = false
         discardPendingCapture()
         _uiState.update { it.copy(attachmentError = "Could not open camera") }
     }
@@ -609,7 +697,8 @@ class ChatViewModel(
                 imageBase64 = savedImageBase64,
                 attachedFileUri = savedFileUri,
                 attachedFileName = savedFileName,
-                attachedFileText = fileText
+                attachedFileText = fileText,
+                turnId = correlationId
             ),
             isLoading = true
         )}
@@ -708,7 +797,8 @@ class ChatViewModel(
                                             searchUsed -> listOf(TurnEvent(TurnEventKind.SEARCH, queries = searchQueries))
                                             searchSkipped -> listOf(TurnEvent(TurnEventKind.SEARCH, skipped = true))
                                             else -> emptyList()
-                                        }
+                                        },
+                                        turnId = correlationId
                                     ),
                                     isLoading = false,
                                     isStreaming = true

@@ -86,6 +86,27 @@ class SessionImageStore(private val context: Context) {
         }
     }
 
+    suspend fun deleteRemovedImages(
+        sessionId: String,
+        removed: List<SessionMessage>,
+        remaining: List<SessionMessage>
+    ) = withContext(Dispatchers.IO) {
+        val dir = File(rootDir, sessionId)
+        if (!dir.exists()) return@withContext
+        val keep = remaining.flatMap { imageRefs(it) }.toSet()
+        removed.flatMap { imageRefs(it) }
+            .filter { it !in keep }
+            .distinct()
+            .forEach { ref -> runCatching { File(dir, ref).delete() } }
+    }
+
+    private fun imageRefs(message: SessionMessage): List<String> = buildList {
+        message.imageRef?.let { ref -> safeRef(ref)?.let { add(it) } }
+        message.imageBase64?.let { base64 ->
+            decodeBase64(base64)?.takeIf { it.isNotEmpty() }?.let { add(reference(it)) }
+        }
+    }
+
     suspend fun reconcile(knownSessionIds: Set<String>?) = withContext(Dispatchers.IO) {
         if (knownSessionIds == null) {
             Log.warning(TAG, "Skipped image reconciliation", "Session list could not be read")

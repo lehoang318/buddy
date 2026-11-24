@@ -89,7 +89,8 @@ fun MessageRow(
     onAnswerOption: (String) -> Unit = {},
     onSkipAnswer: () -> Unit = {},
     imagePreviewMaxHeight: Dp = 280.dp,
-    imageFileFor: (String) -> java.io.File? = { null }
+    imageFileFor: (String) -> java.io.File? = { null },
+    onDeleteRequest: (() -> Unit)? = null
 ) {
     val isUser = message.role == Role.USER
     val windowInfo = LocalWindowInfo.current
@@ -160,13 +161,17 @@ fun MessageRow(
                         shape = shape,
                         modifier = Modifier.width(maxBubbleWidth)
                     ) {
-                        SelectionContainer {
-                            Text(
-                                text = message.content,
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
-                            )
+                        Box {
+                            Box(modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)) {
+                                SelectionContainer {
+                                    Text(
+                                        text = message.content,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                            BubbleEdgeLongPress(onDeleteRequest, horizontal = 13.dp, vertical = 9.dp)
                         }
                     }
                 }
@@ -196,7 +201,8 @@ fun MessageRow(
                                         streaming = false,
                                         maxWidth = maxBubbleWidth,
                                         glowAlpha = glowAlpha,
-                                        shape = segmentShape(0, 1)
+                                        shape = segmentShape(0, 1),
+                                        onLongPress = onDeleteRequest
                                     )
                                     if (index == events.lastIndex && pendingOptions.isNotEmpty()) {
                                         Spacer(Modifier.height(6.dp))
@@ -213,7 +219,11 @@ fun MessageRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.End
                                     ) {
-                                        AnswerBubble(text = event.text, maxWidth = maxBubbleWidth)
+                                        AnswerBubble(
+                                            text = event.text,
+                                            maxWidth = maxBubbleWidth,
+                                            onLongPress = onDeleteRequest
+                                        )
                                     }
                                 }
                             }
@@ -234,7 +244,8 @@ fun MessageRow(
                                             streaming = streaming,
                                             maxWidth = maxBubbleWidth,
                                             glowAlpha = glowAlpha,
-                                            shape = shape
+                                            shape = shape,
+                                            onLongPress = onDeleteRequest
                                         )
                                         is MessageSegment.Code -> CodeSegmentBubble(
                                             lang = segment.lang,
@@ -242,7 +253,8 @@ fun MessageRow(
                                             streaming = streaming,
                                             maxWidth = maxBubbleWidth,
                                             glowAlpha = glowAlpha,
-                                            shape = shape
+                                            shape = shape,
+                                            onLongPress = onDeleteRequest
                                         )
                                     }
                                 }
@@ -303,20 +315,24 @@ fun MessageRow(
 }
 
 @Composable
-private fun AnswerBubble(text: String, maxWidth: Dp) {
+private fun AnswerBubble(text: String, maxWidth: Dp, onLongPress: (() -> Unit)? = null) {
     val display = if (text == ASK_USER_SKIP_ANSWER) "(skipped)" else text
     Surface(
         color = UserBubble,
         shape = RoundedCornerShape(8.dp, 8.dp, 0.dp, 8.dp),
         modifier = Modifier.width(maxWidth)
     ) {
-        SelectionContainer {
-            Text(
-                text = display,
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
-            )
+        Box {
+            Box(modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)) {
+                SelectionContainer {
+                    Text(
+                        text = display,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+            BubbleEdgeLongPress(onLongPress, horizontal = 13.dp, vertical = 9.dp)
         }
     }
 }
@@ -480,7 +496,8 @@ private fun TextSegmentBubble(
     streaming: Boolean,
     maxWidth: Dp,
     glowAlpha: Float,
-    shape: Shape
+    shape: Shape,
+    onLongPress: (() -> Unit)? = null
 ) {
     Surface(
         color = SurfaceVariant,
@@ -489,11 +506,15 @@ private fun TextSegmentBubble(
             .width(maxWidth)
             .then(if (streaming) Modifier.border(2.dp, SendButton.copy(alpha = glowAlpha), shape) else Modifier)
     ) {
-        val innerModifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
-        if (markdown) {
-            MarkdownRenderer(markdown = text, modifier = innerModifier)
-        } else {
-            RawTextRenderer(text = text, modifier = innerModifier)
+        Box {
+            Box(modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)) {
+                if (markdown) {
+                    MarkdownRenderer(markdown = text)
+                } else {
+                    RawTextRenderer(text = text)
+                }
+            }
+            BubbleEdgeLongPress(onLongPress, horizontal = 13.dp, vertical = 9.dp)
         }
     }
 }

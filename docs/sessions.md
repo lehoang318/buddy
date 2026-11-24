@@ -77,6 +77,21 @@ When you start a new chat or resume a session while a response is still streamin
 - The old job's cleanup (which may set flags like `webSearchCancelled`) completes before the new chat starts, so a cancellation indicator from the old conversation never leaks into the new one.
 - The old stream cannot append its assistant message or summaries into a just-restored session (the engine mutex is released on cancellation).
 
+## Removing Exchanges & Empty Sessions
+
+Removing a Q&A pair (long-press on a bubble's padding/edge — see [context-management.md](./context-management.md)) updates the saved session too: the pair's messages, its turn events, and its summary are dropped from the session's persisted state. Image files belonging to a removed pair are deleted immediately when no surviving message in the session references them.
+
+Removing the **last** pair triggers a special lifecycle:
+
+- The session is saved as **empty**, so the deleted pairs do not reappear — but the session is **not** deleted immediately.
+- While the chat is empty, the session is hidden from the History screen.
+- If the user sends another message before leaving, the **same session** (same id and title) is reused, so the conversation continues under its original name.
+- The empty session is deleted — together with its image files — when the user leaves the chat while it is still empty: leaving the app (Home, back, app switch, screen off), starting a new chat, or resuming another session.
+- Rotation and the system camera/file-picker flow do **not** trigger this cleanup.
+- A startup sweep removes empty sessions left behind by process death before the most recent session is resumed.
+
+**Known limitation (auto-save window)**: if the process dies in the milliseconds between the synchronous last-pair removal and the queued empty-session save, the pre-deletion session copy can still be on disk and the deleted pairs may reappear on next launch. The startup sweep cannot detect this — the stale copy still contains user messages, so it does not look empty.
+
 ## History Screen
 
 | Control | Behavior |
@@ -125,7 +140,7 @@ Behavioral notes:
 
 ## SessionMessage Metadata
 
-`SessionMessage` persists the web-search flags per assistant turn (`webSearchUsed`, `webSearchSkipped`, `webSearchQueries`) so the web-search indicators and query chips are preserved after resume, plus the ordered `turnEvents` timeline (`TurnEvent`: THOUGHTS/SEARCH/QUESTION/ANSWER, `data/TurnTimeline.kt`) so thoughts, search batches, and clarifying Q&A replay in chronological order after resume; legacy sessions without the timeline are reconstructed from the flags and question fields.
+`SessionMessage` persists the web-search flags per assistant turn (`webSearchUsed`, `webSearchSkipped`, `webSearchQueries`) so the web-search indicators and query chips are preserved after resume, plus the ordered `turnEvents` timeline (`TurnEvent`: THOUGHTS/SEARCH/QUESTION/ANSWER, `data/TurnTimeline.kt`) so thoughts, search batches, and clarifying Q&A replay in chronological order after resume; legacy sessions without the timeline are reconstructed from the flags and question fields. Each user/assistant message also carries a `turnId` identifying its exchange — this ties messages to their summary (`Summary.turnIds`) and enables per-exchange removal (see [context-management.md](./context-management.md)).
 
 Image attachments are **not** stored inline in the DataStore JSON: `SessionImageStore` (Android) writes each image's JPEG bytes to `filesDir/session_images/<sessionId>/<name>.jpg` and stores only the filename in `SessionMessage.imageRef` (`imageBase64` stays `null` on disk). New images use a **content-hash filename** (first 32 hex chars of the SHA-256 of the bytes), so saving the same turn repeatedly reuses the same file instead of leaking a new one, and written bytes go through a temp file that is renamed into place. The accepted user message (with its image) is persisted **before** the network turn starts, so process death during a long response keeps both the prompt and the photo; the session is saved again on completion, failure, and explicit cancellation.
 

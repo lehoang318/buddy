@@ -20,5 +20,6 @@ data class ChatMessage(
     val thoughtsStreaming: Boolean = false,
     val questionAsked: String? = null,
     val questionAnswer: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val turnId: String? = null
 )

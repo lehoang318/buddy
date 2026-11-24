@@ -7,6 +7,8 @@ import com.example.buddy.agent.SummarizerAgent
 import com.example.buddy.config.AppConfigProvider
 import com.example.buddy.data.Role
 import com.example.buddy.data.Summary
+import com.example.buddy.data.SummarySource
+import com.example.buddy.data.removeTurnFromSummaries
 import com.example.buddy.fetch.FetchedUrl
 import com.example.buddy.fetch.UrlFetchResult
 import com.example.buddy.fetch.UrlFetcher
@@ -34,7 +36,8 @@ data class ConversationMessage(
     val content: String,
     val imageBase64: String? = null,
     val attachment: TextAttachment? = null,
-    val questionAsked: String? = null
+    val questionAsked: String? = null,
+    val turnId: String? = null
 )
 
 sealed interface ConversationEvent {
@@ -98,6 +101,19 @@ class ConversationEngine(
         _summaries.value = summaries
     }
 
+    fun removeTurn(turnId: String): List<Summary> {
+        if (turnId.isBlank()) return _summaries.value
+        history.removeAll { it.turnId == turnId }
+        val updated = removeTurnFromSummaries(
+            _summaries.value,
+            turnId,
+            AppConfigProvider.current.summaries.maxSessionTags,
+            AppConfigProvider.current.summaries::sanitizeSummaryPoints
+        )
+        _summaries.value = updated
+        return updated
+    }
+
     fun send(
         userText: String,
         attachment: TextAttachment? = null,
@@ -121,7 +137,8 @@ class ConversationEngine(
                 role = Role.USER,
                 content = userText,
                 imageBase64 = imageBase64,
-                attachment = attachment
+                attachment = attachment,
+                turnId = correlationId
             )
             history += userMessage
             emit(ConversationEvent.UserMessageAccepted(userMessage))
@@ -194,8 +211,8 @@ class ConversationEngine(
         }
 
         val assistantText = response.toString()
-        history += ConversationMessage(Role.ASSISTANT, assistantText)
-        updateSummaries(activeClient, userMessage, assistantText)
+        history += ConversationMessage(Role.ASSISTANT, assistantText, turnId = correlationId)
+        updateSummaries(activeClient, userMessage, assistantText, correlationId)
         emit(ConversationEvent.Completed(assistantText, _summaries.value))
     }
 
@@ -277,7 +294,7 @@ class ConversationEngine(
                             }
                             "ask_user" -> {
                                 (event.result["answer"] as? String)?.let { answer ->
-                                    history += ConversationMessage(Role.USER, answer)
+                                    history += ConversationMessage(Role.USER, answer, turnId = correlationId)
                                     emit(ConversationEvent.ClarificationAnswered)
                                 }
                             }
@@ -301,15 +318,16 @@ class ConversationEngine(
         if (failed) return
 
         val assistantText = response.toString()
-        history += ConversationMessage(Role.ASSISTANT, assistantText, questionAsked = askedQuestion)
-        updateSummaries(activeClient, userMessage, assistantText)
+        history += ConversationMessage(Role.ASSISTANT, assistantText, questionAsked = askedQuestion, turnId = correlationId)
+        updateSummaries(activeClient, userMessage, assistantText, correlationId)
         emit(ConversationEvent.Completed(assistantText, _summaries.value))
     }
 
     private suspend fun updateSummaries(
         activeClient: LlmClient,
         userMessage: ConversationMessage,
-        assistantText: String
+        assistantText: String,
+        turnId: String
     ) {
         if (assistantText.isBlank()) return
         val summarizer = SummarizerAgent(activeClient)
@@ -318,20 +336,23 @@ class ConversationEngine(
                 userMessage.content,
                 assistantText,
                 userMessage.imageBase64
-            )
+            ).copy(turnIds = listOfNotNull(turnId.takeIf { it.isNotBlank() }))
             val updated = _summaries.value + summary
             _summaries.value = if (updated.size > AppConfigProvider.current.summaries.maxSummaries) {
                 val count = AppConfigProvider.current.summaries.maxSummaries / 2
                 try {
-                    val compressed = summarizer.compress(updated.take(count))
-                    val preservedKeys = updated.take(count)
+                    val group = updated.take(count)
+                    val compressed = summarizer.compress(group)
+                    val sources = group.flatMap { summarySources(it) }
+                    val preservedKeys = group
                         .flatMap { it.points }
                         .filter { it.key }
-                    val preservedTags = updated.take(count)
+                    val preservedTags = sources
                         .flatMap { it.tags }
                         .distinct()
                         .takeLast(AppConfigProvider.current.summaries.maxSessionTags)
-                    listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text }, preservedTags)) + updated.drop(count)
+                    val turnIds = sources.flatMap { it.turnIds }.distinct()
+                    listOf(Summary("Earlier conversation", (preservedKeys + compressed.points).distinctBy { it.text }, preservedTags, turnIds, sources)) + updated.drop(count)
                 } catch (e: Exception) {
                     Log.error("Chat", "Failed to compress summaries", e.message)
                     updated
@@ -341,6 +362,20 @@ class ConversationEngine(
             }
         } catch (e: Exception) {
             Log.error("Chat", "Failed to generate summary", e.message)
+        }
+    }
+
+    @Suppress("USELESS_ELVIS")
+    private fun summarySources(summary: Summary): List<SummarySource> {
+        val sources = (summary.sources ?: emptyList()).map { source ->
+            SummarySource(
+                points = source.points ?: emptyList(),
+                tags = source.tags ?: emptyList(),
+                turnIds = source.turnIds ?: emptyList()
+            )
+        }
+        return sources.ifEmpty {
+            listOf(SummarySource(summary.points, summary.tags ?: emptyList(), summary.turnIds ?: emptyList()))
         }
     }
 

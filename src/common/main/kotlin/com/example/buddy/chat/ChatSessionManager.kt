@@ -12,6 +12,8 @@ class ChatSessionManager(private val repository: SessionRepository) {
         private set
     var activeSessionCreatedAt: Long = 0
         private set
+    var activeSessionTitle: String? = null
+        private set
     var dirty = false
         private set
 
@@ -19,16 +21,21 @@ class ChatSessionManager(private val repository: SessionRepository) {
         dirty = true
     }
 
-    fun buildSession(messages: List<SessionMessage>, summaries: List<Summary>): SavedSession? {
-        val hasRealMessage = messages.any { it.role == Role.USER }
-        if (!hasRealMessage) return null
+    fun buildSession(messages: List<SessionMessage>, summaries: List<Summary>, allowEmpty: Boolean = false): SavedSession? {
+        val hasUserMessage = messages.any { it.role == Role.USER }
+        val activeId = activeSessionId
+        if (!hasUserMessage && (!allowEmpty || activeId == null)) return null
 
-        val title = messages.firstOrNull { it.role == Role.USER }
-            ?.content?.trim()?.take(50)?.ifBlank { "Untitled" } ?: "Untitled"
+        val derivedTitle = messages.firstOrNull { it.role == Role.USER }
+            ?.content?.trim()?.take(50)?.ifBlank { null }
+        val title = if (activeId != null) {
+            activeSessionTitle ?: derivedTitle ?: "Untitled"
+        } else {
+            derivedTitle ?: "Untitled"
+        }
 
         val tags = summaries.flatMap { it.tags }.distinct().takeLast(AppConfigProvider.current.summaries.maxSessionTags)
 
-        val activeId = activeSessionId
         if (activeId != null && !dirty) return null
 
         return if (activeId != null) {
@@ -52,25 +59,40 @@ class ChatSessionManager(private val repository: SessionRepository) {
         }
     }
 
-    suspend fun save(messages: List<SessionMessage>, summaries: List<Summary>, transform: suspend (SavedSession) -> SavedSession = { it }): Set<String> {
-        val toSave = buildSession(messages, summaries) ?: return emptySet()
+    suspend fun save(
+        messages: List<SessionMessage>,
+        summaries: List<Summary>,
+        allowEmpty: Boolean = false,
+        transform: suspend (SavedSession) -> SavedSession = { it }
+    ): Set<String> {
+        val toSave = buildSession(messages, summaries, allowEmpty) ?: return emptySet()
         val final = transform(toSave)
         val evicted = repository.addSession(final)
         activeSessionId = final.id
         activeSessionCreatedAt = final.createdAt
+        activeSessionTitle = final.title
         dirty = false
         return evicted
+    }
+
+    suspend fun deleteActive(): String? {
+        val id = activeSessionId ?: return null
+        repository.deleteSessions(setOf(id))
+        reset()
+        return id
     }
 
     fun bind(session: SavedSession) {
         activeSessionId = session.id
         activeSessionCreatedAt = session.createdAt
+        activeSessionTitle = session.title
         dirty = false
     }
 
     fun reset() {
         activeSessionId = null
         activeSessionCreatedAt = 0
+        activeSessionTitle = null
         dirty = false
     }
 }

@@ -677,6 +677,18 @@ Buddy renders assistant answers as stacked segment bubbles — prose and fenced 
 - Every message has a copy icon next to its timestamp
 - When the conversation overflows the screen, previous/next arrows appear in the input bar to jump between your messages (long-press for very first/last)
 
+### Removing an Exchange
+You can remove a single question-answer exchange from the conversation:
+
+1. Long-press the **padding/edge** of a question bubble or a response bubble (long-pressing the text itself still selects text)
+2. Confirm the "Remove exchange?" dialog
+3. That pair is removed — the question, the response (including its thoughts, search pills, and clarifying Q&A), and the summary Buddy had learned from it, so future replies no longer see that exchange
+
+Notes:
+- Removal is disabled while a response is streaming, an image is processing, or a clarifying question is waiting for your answer
+- If you remove every exchange, the chat becomes empty: it disappears from History, but if you send another message right away the same chat continues under its original title
+- An empty chat is deleted (with its image files) when you leave the app, start a new chat, or resume another session — so only intentional removals are kept
+
 </details>
 
 ---

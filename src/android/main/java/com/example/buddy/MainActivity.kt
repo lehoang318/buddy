@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -209,9 +211,30 @@ fun MainContent(
     )
 
     val resumeRepository = remember { SessionRepository(application) }
+    val sessionImageStore = remember { SessionImageStore(application) }
     LaunchedEffect(Unit) {
+        if (!chatViewModel.needsStartupResume()) return@LaunchedEffect
+        val removed = resumeRepository.deleteEmptySessions()
+        if (removed.isNotEmpty()) sessionImageStore.delete(removed)
         val last = resumeRepository.latestSession()
         if (last != null) chatViewModel.resumeSession(last)
+        chatViewModel.markStartupResumeCompleted()
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    val changingConfigurations = (lifecycleOwner as? android.app.Activity)?.isChangingConfigurations == true
+                    if (!changingConfigurations) chatViewModel.onAppStopped()
+                }
+                Lifecycle.Event.ON_RESUME -> chatViewModel.onAppResumed()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(currentSettings) {

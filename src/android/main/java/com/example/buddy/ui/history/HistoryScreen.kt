@@ -48,6 +48,7 @@ import com.example.buddy.data.SavedSession
 import com.example.buddy.data.SessionImageStore
 import com.example.buddy.data.SessionRepository
 import com.example.buddy.data.SessionTags
+import com.example.buddy.data.hasUserMessage
 import com.example.buddy.ui.icons.ArrowBack
 import com.example.buddy.ui.icons.Delete
 import com.example.buddy.ui.icons.Icons
@@ -87,10 +88,11 @@ fun HistoryScreen(
     val selectedIds = remember { mutableStateMapOf<String, Boolean>() }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
 
-    val allTags = remember(sessions) { sessions.flatMap { it.tags }.distinct().sortedBy { SessionTags.CATEGORIES.indexOf(it) } }
+    val visibleSessions = remember(sessions) { sessions.filter { it.hasUserMessage() } }
+    val allTags = remember(visibleSessions) { visibleSessions.flatMap { it.tags }.distinct().sortedBy { SessionTags.CATEGORIES.indexOf(it) } }
     val activeTags = selectedTags.intersect(allTags.toSet())
     val now = System.currentTimeMillis()
-    val filtered = sessions.filter { s ->
+    val filtered = visibleSessions.filter { s ->
         (filter.millis == null || s.updatedAt >= now - filter.millis!!) &&
             activeTags.all { it in s.tags }
     }
@@ -196,7 +198,7 @@ fun HistoryScreen(
                             checked = autoDeleteOld,
                             onCheckedChange = { enabled ->
                                 scaffoldScope.launch { repository.setAutoDeleteOld(enabled) }
-                                if (enabled && sessions.any { it.updatedAt < now - SessionRepository.AUTO_DELETE_AGE_MILLIS }) {
+                                if (enabled && visibleSessions.any { it.updatedAt < now - SessionRepository.AUTO_DELETE_AGE_MILLIS }) {
                                     showPurgeConfirm = true
                                 }
                             }
@@ -214,7 +216,7 @@ fun HistoryScreen(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = if (sessions.isEmpty()) "No saved chats yet" else "No chats match the filters",
+                                text = if (visibleSessions.isEmpty()) "No saved chats yet" else "No chats match the filters",
                                 color = OnSurfaceVariant
                             )
                         }

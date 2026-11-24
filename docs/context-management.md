@@ -19,8 +19,10 @@ After each Q&A exchange completes, a non-streaming LLM call generates a structur
 
 ```
 SummaryPoint(text: String, key: Boolean)
-Summary(question: String, points: List<SummaryPoint>, tags: List<String>)
+Summary(question: String, points: List<SummaryPoint>, tags: List<String>, turnIds: List<String>)
 ```
+
+Each summary carries the `turnId`s of the exchange(s) it was produced from (see [sessions.md](./sessions.md)); compressed summaries keep a flat `sources` list (points/tags/turnIds) tracing the merged group back to its source exchanges.
 
 Rules:
 - **2–3 points** per exchange, extracted by the LLM
@@ -58,6 +60,22 @@ When `summaries.size > maxSummaries` (20), compression triggers:
 7. Result: `summaries.size` drops from ~21 to ~12
 
 Key decisions are never lost during compression — they are preserved programmatically, not subject to LLM summarization quality.
+
+## Removing an Exchange
+
+The Android chat screen allows removing one question-answer exchange at a time: long-press the padding/edge of a question bubble or a response bubble (holding the text itself still selects text) and confirm the "Remove exchange?" dialog. On confirm, that single pair is removed:
+
+- The user question message and the assistant response message — including the thoughts/search/ask-user turn events in that response — disappear from the UI and from the saved session's raw history.
+- Matching engine history entries are removed, so the pair is no longer replayed to the model.
+- The exchange's own summary is removed from the context summaries used for future replies.
+
+**Compressed summaries**: a compressed "Earlier conversation" summary retains a flat provenance list (`sources`) of its originating exchanges, so when a removed exchange's `turnId` appears in it, the compressed summary is rebuilt from the remaining sources. Legacy compressed summaries created before this feature carry no provenance and cannot be surgically filtered.
+
+**Cross-turn references**: other summaries may still mention the removed exchange indirectly ("as discussed earlier") — only the removed exchange's own summary is dropped; surrounding summaries are left untouched.
+
+Removal is disabled while a response is streaming, an image is processing, or a clarifying question is pending. Removing the last pair leaves an empty session — its lifecycle (hidden from History, deferred cleanup) is described in [sessions.md](./sessions.md).
+
+**Cancelled/failed turns**: if a turn ended without a visible response segment (only search pills or thoughts), the exchange can still be removed from its question bubble — the response bubble may have no padding surface of its own.
 
 ## Context Assembly (`MessageBuilder`)
 
@@ -142,7 +160,7 @@ The user message is accepted after URL fetching, while actual LLM processing wai
 | `res/values/llm_prompts.xml` | Prompts: `search_query_prompt`, `summarizer_system_prompt`, `summarizer_user_template`, `compress_summaries_prompt` |
 | `res/values/conversation.xml` | Parameters: `max_summaries` (20), `max_qa_pairs` (2), `max_session_tags` (3), formatting strings (`key_prefix`, `point_indent`, `context_header`, `web_data_header`), `restrictive_patterns` |
 | `res/values/llm_defaults.xml` | LLM defaults: temperature, top_p, top_k, max_tokens, `response_hard_limit_multiplier`, `request_max_chars`, `min_response_tokens`, `search_query_max_tokens`, system_message, search tuning (see [web-search.md](./web-search.md)) |
-| `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points, tags)` |
+| `src/common/.../data/Summary.kt` | `SummaryPoint(text, key)`, `Summary(question, points, tags, turnIds)`; compressed summaries carry a flat `sources` provenance list |
 | `src/common/.../chat/ConversationEngine.kt` | Turn queue, URL/search orchestration, streaming, summary generation, compression |
 | `src/common/.../chat/ConversationEngine.kt` | `MessageBuilder` assembles system prompts, summaries, Web Data, history, and attachments |
 | `src/common/.../config/AppConfig.kt` | Accessors: `summaries.maxSummaries`, `summaries.maxQaPairs`, `summaries.formatSummariesContext()`, `summaries.sanitizeSummaryPoints()`, `search.*`, etc. |

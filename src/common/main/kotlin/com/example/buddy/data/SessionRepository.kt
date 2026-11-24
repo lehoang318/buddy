@@ -69,7 +69,17 @@ class SessionRepository(private val storage: SessionStorage) {
 
     suspend fun autoDeleteEnabled(): Boolean = storage.autoDeleteOldSetting.first()
 
-    suspend fun latestSession(): SavedSession? = sessions.first().firstOrNull()
+    suspend fun latestSession(): SavedSession? = sessions.first().firstOrNull { it.hasUserMessage() }
+
+    suspend fun deleteEmptySessions(): Set<String> = mutex.withLock {
+        val list = deserialize(storage.sessionsJson.first()).toMutableList()
+        val removed = list.filterNot { it.hasUserMessage() }.map { it.id }.toSet()
+        if (removed.isNotEmpty()) {
+            list.removeAll { it.id in removed }
+            storage.writeSessions(serialize(list))
+        }
+        removed
+    }
 
     @Suppress("USELESS_ELVIS")
     private fun deserialize(json: String): List<SavedSession> =
@@ -79,14 +89,32 @@ class SessionRepository(private val storage: SessionStorage) {
             sessions.map { session ->
                 session.copy(
                     updatedAt = if (session.updatedAt > 0) session.updatedAt else session.createdAt,
-                    raw = session.raw.map { message -> message.copy(webSearchQueries = message.webSearchQueries ?: emptyList(), turnEvents = sanitizeTurnEvents(message.turnEvents)) },
-                    summaries = session.summaries.map { summary -> summary.copy(tags = SessionTags.normalize(summary.tags ?: emptyList())) },
+                    raw = (session.raw ?: emptyList()).map { message -> message.copy(webSearchQueries = message.webSearchQueries ?: emptyList(), turnEvents = sanitizeTurnEvents(message.turnEvents)) },
+                    summaries = (session.summaries ?: emptyList()).map { it.normalizedSummary() },
                     tags = SessionTags.normalize(session.tags ?: emptyList())
                 )
             }
         } catch (_: Exception) {
             emptyList()
         }
+
+    @Suppress("USELESS_ELVIS")
+    private fun Summary.normalizedSummary(): Summary {
+        val normalizedSources = (sources ?: emptyList()).map { source ->
+            SummarySource(
+                points = source.points ?: emptyList(),
+                tags = SessionTags.normalize(source.tags ?: emptyList()),
+                turnIds = (source.turnIds ?: emptyList()).filter { it.isNotBlank() }.distinct()
+            )
+        }
+        return copy(
+            tags = SessionTags.normalize(tags ?: emptyList()),
+            turnIds = ((turnIds ?: emptyList()) + normalizedSources.flatMap { it.turnIds })
+                .filter { it.isNotBlank() }
+                .distinct(),
+            sources = normalizedSources
+        )
+    }
 
     private fun serialize(list: List<SavedSession>): String = gson.toJson(list)
 }
